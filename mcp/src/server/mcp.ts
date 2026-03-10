@@ -155,7 +155,7 @@ export const TOOLS = [
   {
     name: "agentation_get_pending",
     description:
-      "Get all pending (unacknowledged) annotations for a session. Use this to see what feedback the human has given that needs attention.",
+      "Get all annotations needing attention for a session. Returns pending (unacknowledged) annotations AND annotations with unread human thread replies.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -170,7 +170,7 @@ export const TOOLS = [
   {
     name: "agentation_get_all_pending",
     description:
-      "Get all pending annotations across ALL sessions. Use this to see all unaddressed feedback from the human across all pages they've visited.",
+      "Get all annotations needing attention across ALL sessions. Returns pending annotations AND annotations with unread human thread replies.",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -252,10 +252,11 @@ export const TOOLS = [
   {
     name: "agentation_watch_annotations",
     description:
-      "Block until new annotations appear, then collect a batch and return them. " +
-      "Triggers automatically when annotations are created — the user just annotates in the browser " +
-      "and the agent picks them up. After detecting the first new annotation, waits for a batch window " +
-      "to collect more before returning. Use in a loop for hands-free processing. " +
+      "Block until new annotations or human thread replies appear, then collect a batch and return them. " +
+      "Triggers automatically when annotations are created or when a human replies to a thread — " +
+      "the user just annotates in the browser and the agent picks them up. " +
+      "After detecting the first event, waits for a batch window to collect more before returning. " +
+      "Use in a loop for hands-free processing. " +
       "After addressing each annotation, call agentation_resolve with the annotation ID and a summary " +
       "of what you did. Only resolve annotations the user accepted — if the user rejects your change, " +
       "leave the annotation open.",
@@ -291,6 +292,13 @@ type Session = {
   createdAt: string;
 };
 
+type ThreadMessage = {
+  id: string;
+  role: "human" | "agent";
+  content: string;
+  timestamp: number;
+};
+
 type Annotation = {
   id: string;
   sessionId: string;
@@ -304,6 +312,7 @@ type Annotation = {
   nearbyText?: string;
   reactComponents?: string;
   status: string;
+  thread?: ThreadMessage[];
 };
 
 type SessionWithAnnotations = Session & {
@@ -346,14 +355,14 @@ type WatchAnnotationsResult =
   | { type: "error"; message: string };
 
 /**
- * Watch for new annotation.created events via SSE from the HTTP server.
- * When the first annotation is detected, waits for a batch window to collect
+ * Watch for new annotation.created and thread.message events via SSE from the HTTP server.
+ * When the first event is detected, waits for a batch window to collect
  * additional annotations directly from SSE event payloads.
  *
  * Initial sync events (sequence 0) are ignored to prevent false triggers
  * from pre-existing pending annotations when the SSE connection opens.
  *
- * Watches for new annotations via SSE and collects them into a batch.
+ * Watches for new annotations and human thread replies via SSE and collects them into a batch.
  */
 function watchForAnnotations(
   sessionId: string | undefined,
@@ -438,28 +447,49 @@ function watchForAnnotations(
             if (line.startsWith("data: ")) {
               try {
                 const event = JSON.parse(line.slice(6));
+
+                // Skip initial sync events (sequence 0) — historical replay, not new
+                if (event.sequence === 0) continue;
+
+                // If filtering by session, check it matches
+                if (sessionId && event.sessionId !== sessionId) continue;
+
                 if (event.type === "annotation.created") {
-                  // Skip initial sync events (sequence 0) — historical replay, not new
-                  if (event.sequence === 0) continue;
-
-                  // If filtering by session, check it matches
-                  if (sessionId && event.sessionId !== sessionId) continue;
-
                   detectedSessions.add(event.sessionId);
                   collectedAnnotations.push(event.payload as Annotation);
-
-                  // First annotation detected — start batch window
-                  if (!batchTimeout) {
-                    batchTimeout = setTimeout(() => {
-                      clearTimeout(timeoutId);
-                      cleanup();
-                      resolve({
-                        type: "annotations",
-                        annotations: collectedAnnotations,
-                        sessions: Array.from(detectedSessions),
-                      });
-                    }, batchWindowMs);
+                } else if (event.type === "thread.message") {
+                  // Only surface human thread replies (not agent's own replies)
+                  const payload = event.payload as Annotation;
+                  if (payload.thread && payload.thread.length > 0) {
+                    const lastMessage = payload.thread[payload.thread.length - 1];
+                    if (lastMessage.role === "human") {
+                      detectedSessions.add(event.sessionId);
+                      // Avoid duplicates if the same annotation already in the batch
+                      const existingIdx = collectedAnnotations.findIndex(
+                        (a) => a.id === payload.id
+                      );
+                      if (existingIdx >= 0) {
+                        collectedAnnotations[existingIdx] = payload;
+                      } else {
+                        collectedAnnotations.push(payload);
+                      }
+                    }
                   }
+                } else {
+                  continue;
+                }
+
+                // First event detected — start batch window
+                if (!batchTimeout && collectedAnnotations.length > 0) {
+                  batchTimeout = setTimeout(() => {
+                    clearTimeout(timeoutId);
+                    cleanup();
+                    resolve({
+                      type: "annotations",
+                      annotations: collectedAnnotations,
+                      sessions: Array.from(detectedSessions),
+                    });
+                  }, batchWindowMs);
                 }
               } catch {
                 // Ignore parse errors for individual events

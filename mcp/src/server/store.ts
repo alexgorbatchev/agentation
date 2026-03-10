@@ -229,6 +229,20 @@ function createMemoryStore(): AFSStore {
       );
     },
 
+    getAnnotationsNeedingAttention(sessionId: string): Annotation[] {
+      return Array.from(annotations.values()).filter((a) => {
+        if (a.sessionId !== sessionId) return false;
+        // Pending annotations always need attention
+        if (a.status === "pending") return true;
+        // Non-pending annotations need attention if the last thread message is from a human
+        if (a.thread && a.thread.length > 0) {
+          const lastMessage = a.thread[a.thread.length - 1];
+          return lastMessage.role === "human";
+        }
+        return false;
+      });
+    },
+
     getSessionAnnotations(sessionId: string): Annotation[] {
       return Array.from(annotations.values()).filter(
         (a) => a.sessionId === sessionId
@@ -330,6 +344,10 @@ export function addThreadMessage(
 
 export function getPendingAnnotations(sessionId: string): Annotation[] {
   return getStore().getPendingAnnotations(sessionId);
+}
+
+export function getAnnotationsNeedingAttention(sessionId: string): Annotation[] {
+  return getStore().getAnnotationsNeedingAttention(sessionId);
 }
 
 export function getSessionAnnotations(sessionId: string): Annotation[] {

@@ -273,6 +273,7 @@ export function createSQLiteStore(dbPath?: string): AFSStore {
     getAnnotation: db.prepare("SELECT * FROM annotations WHERE id = ?"),
     getAnnotationsBySession: db.prepare("SELECT * FROM annotations WHERE session_id = ? ORDER BY timestamp"),
     getPendingAnnotations: db.prepare("SELECT * FROM annotations WHERE session_id = ? AND status = 'pending' ORDER BY timestamp"),
+    getAnnotationsNeedingAttention: db.prepare("SELECT * FROM annotations WHERE session_id = ? AND (status = 'pending' OR (thread IS NOT NULL AND thread != '[]')) ORDER BY timestamp"),
     deleteAnnotation: db.prepare("DELETE FROM annotations WHERE id = ?"),
     updateAnnotation: db.prepare(`
       UPDATE annotations SET
@@ -505,6 +506,20 @@ export function createSQLiteStore(dbPath?: string): AFSStore {
     getPendingAnnotations(sessionId: string): Annotation[] {
       const rows = stmts.getPendingAnnotations.all(sessionId) as Record<string, unknown>[];
       return rows.map(rowToAnnotation);
+    },
+
+    getAnnotationsNeedingAttention(sessionId: string): Annotation[] {
+      const rows = stmts.getAnnotationsNeedingAttention.all(sessionId) as Record<string, unknown>[];
+      return rows.map(rowToAnnotation).filter((a) => {
+        // Pending annotations always need attention
+        if (a.status === "pending") return true;
+        // Non-pending annotations need attention only if last thread message is from a human
+        if (a.thread && a.thread.length > 0) {
+          const lastMessage = a.thread[a.thread.length - 1];
+          return lastMessage.role === "human";
+        }
+        return false;
+      });
     },
 
     getSessionAnnotations(sessionId: string): Annotation[] {

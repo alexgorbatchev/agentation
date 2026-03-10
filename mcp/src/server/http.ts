@@ -21,6 +21,7 @@ import {
   deleteAnnotation,
   listSessions,
   getPendingAnnotations,
+  getAnnotationsNeedingAttention,
   addThreadMessage,
   getEventsSince,
 } from "./store.js";
@@ -426,19 +427,22 @@ const deleteAnnotationHandler: RouteHandler = async (_req, res, params) => {
 };
 
 /**
- * GET /sessions/:id/pending - Get pending annotations for a session.
+ * GET /sessions/:id/pending - Get annotations needing agent attention for a session.
+ * Returns both pending (unacknowledged) annotations AND non-pending annotations
+ * where the last thread message is from a human (unread human replies).
  */
 const getPendingHandler: RouteHandler = async (_req, res, params) => {
-  const pending = getPendingAnnotations(params.id);
+  const pending = getAnnotationsNeedingAttention(params.id);
   sendJson(res, 200, { count: pending.length, annotations: pending });
 };
 
 /**
- * GET /pending - Get all pending annotations across all sessions.
+ * GET /pending - Get all annotations needing agent attention across all sessions.
+ * Returns both pending annotations AND annotations with unread human replies.
  */
 const getAllPendingHandler: RouteHandler = async (_req, res) => {
   const sessions = listSessions();
-  const allPending = sessions.flatMap((session) => getPendingAnnotations(session.id));
+  const allPending = sessions.flatMap((session) => getAnnotationsNeedingAttention(session.id));
   sendJson(res, 200, { count: allPending.length, annotations: allPending });
 };
 
@@ -628,7 +632,7 @@ const globalSseHandler: RouteHandler = async (req, res) => {
   // Send initial comment to establish connection
   res.write(`: connected${domain ? ` to domain ${domain}` : ""}\n\n`);
 
-  // Send all pending annotations on connect (initial sync for agents)
+  // Send all annotations needing attention on connect (initial sync for agents)
   if (isAgent) {
     let syncCount = 0;
     const sessions = listSessions();
@@ -639,8 +643,8 @@ const globalSseHandler: RouteHandler = async (req, res) => {
           const sessionHost = new URL(session.url).host;
           if (sessionHost !== domain) continue;
         }
-        const pending = getPendingAnnotations(session.id);
-        for (const annotation of pending) {
+        const needsAttention = getAnnotationsNeedingAttention(session.id);
+        for (const annotation of needsAttention) {
           // Send as annotation.created events so agents see existing annotations
           // Use sequence 0 for initial sync events (they're historical, not new)
           sendSSEEvent(res, {
