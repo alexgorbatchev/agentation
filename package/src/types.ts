@@ -44,6 +44,7 @@ export type Annotation = {
 
   // Local-only sync tracking (not sent to server)
   _syncedTo?: string; // Session ID this annotation was synced to
+  _reviewedAt?: number; // Timestamp when user reviewed this resolved annotation
 };
 
 // -----------------------------------------------------------------------------

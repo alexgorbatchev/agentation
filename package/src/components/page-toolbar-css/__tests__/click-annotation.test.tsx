@@ -1407,7 +1407,7 @@ describe("Click-to-annotate flow", () => {
   // ===========================================================================
 
   describe("Renderable annotation filtering", () => {
-    it("resolved annotations do not render as markers", async () => {
+    it("resolved annotations render as faded resolved markers", async () => {
       const annotations = [
         makeAnnotation({
           id: "resolved1",
@@ -1427,11 +1427,12 @@ describe("Click-to-annotate flow", () => {
 
       await waitFor(() => {
         const markers = document.querySelectorAll("[data-annotation-marker]");
-        expect(markers.length).toBe(1);
+        // Both render: 1 active numbered marker + 1 resolved faded marker
+        expect(markers.length).toBe(2);
       });
     });
 
-    it("dismissed annotations do not render as markers", async () => {
+    it("dismissed annotations render as faded resolved markers", async () => {
       const annotations = [
         makeAnnotation({
           id: "dismissed1",
@@ -1451,7 +1452,8 @@ describe("Click-to-annotate flow", () => {
 
       await waitFor(() => {
         const markers = document.querySelectorAll("[data-annotation-marker]");
-        expect(markers.length).toBe(1);
+        // Both render: 1 active numbered marker + 1 dismissed faded marker
+        expect(markers.length).toBe(2);
       });
     });
 
