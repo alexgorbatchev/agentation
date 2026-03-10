@@ -567,7 +567,7 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       expect(overlays.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("does not render resolved/dismissed annotations as markers", async () => {
+    it("renders resolved/dismissed annotations as faded resolved markers", async () => {
       const annotations = [
         makeAnnotation({ id: "active1", comment: "Active" }),
         makeAnnotation({ id: "resolved1", comment: "Resolved", status: "resolved" }),
@@ -580,8 +580,8 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
 
       await waitFor(() => {
         const markers = document.querySelectorAll("[data-annotation-marker]");
-        // Only the active annotation should render as a marker
-        expect(markers.length).toBe(1);
+        // All 3 render: 1 active numbered marker + 2 resolved faded markers
+        expect(markers.length).toBe(3);
       });
     });
   });

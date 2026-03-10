@@ -360,8 +360,8 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-function isRenderableAnnotation(annotation: Annotation): boolean {
-  return annotation.status !== "resolved" && annotation.status !== "dismissed";
+function isRenderableAnnotation(_annotation: Annotation): boolean {
+  return true; // All annotations are renderable — resolved ones show as faded checkmarks
 }
 
 function truncateUrl(url: string): string {
@@ -672,6 +672,8 @@ export function PageFeedbackToolbarCSS({
   const [isFrozen, setIsFrozen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSettingsVisible, setShowSettingsVisible] = useState(false);
+  const [showReviewQueue, setShowReviewQueue] = useState(false);
+  const [showReviewQueueVisible, setShowReviewQueueVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
@@ -898,6 +900,7 @@ export function PageFeedbackToolbarCSS({
   useEffect(() => {
     if (showSettings) {
       setShowSettingsVisible(true);
+      setShowReviewQueue(false); // Mutual exclusivity
     } else {
       // Reset tooltips when settings close (fixes tooltips not showing after closing settings)
       setTooltipsHidden(false);
@@ -907,6 +910,17 @@ export function PageFeedbackToolbarCSS({
       return () => clearTimeout(timer);
     }
   }, [showSettings]);
+
+  // Handle showReviewQueue changes with exit animation
+  useEffect(() => {
+    if (showReviewQueue) {
+      setShowReviewQueueVisible(true);
+      setShowSettings(false); // Mutual exclusivity
+    } else {
+      const timer = originalSetTimeout(() => setShowReviewQueueVisible(false), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [showReviewQueue]);
 
   useEffect(() => {
     setIsTransitioning(true);
@@ -1266,17 +1280,15 @@ export function PageFeedbackToolbarCSS({
       try {
         const event = JSON.parse(e.data);
         if (removedStatuses.includes(event.payload?.status)) {
-          const id = event.payload.id as string;
-          // Trigger exit animation then remove
-          setExitingMarkers((prev) => new Set(prev).add(id));
-          originalSetTimeout(() => {
-            setAnnotations((prev) => prev.filter((a) => a.id !== id));
-            setExitingMarkers((prev) => {
-              const next = new Set(prev);
-              next.delete(id);
-              return next;
-            });
-          }, 150);
+          const { id, status, thread, resolvedAt, resolvedBy } = event.payload;
+          // Update annotation status in place (keep for review queue)
+          setAnnotations((prev) =>
+            prev.map((a) =>
+              a.id === id
+                ? { ...a, status, thread: thread ?? a.thread, resolvedAt, resolvedBy }
+                : a
+            )
+          );
         }
       } catch {
         // Ignore parse errors
@@ -1401,10 +1413,26 @@ export function PageFeedbackToolbarCSS({
     }
   }, [connectionStatus, endpoint, mounted, currentSessionId, pathname]);
 
+  const toggleReviewed = useCallback((id: string) => {
+    setAnnotations((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? { ...a, _reviewedAt: a._reviewedAt ? undefined : Date.now() }
+          : a
+      )
+    );
+  }, []);
+
+  const clearReviewedAnnotations = useCallback(() => {
+    setAnnotations((prev) => prev.filter((a) => !a._reviewedAt));
+    setShowReviewQueue(false);
+  }, []);
+
   const hideToolbarTemporarily = useCallback(() => {
     if (isToolbarHiding) return;
     setIsToolbarHiding(true);
     setShowSettings(false);
+    setShowReviewQueue(false);
     setIsActive(false);
     originalSetTimeout(() => {
       saveToolbarHidden(true);
@@ -1642,6 +1670,7 @@ export function PageFeedbackToolbarCSS({
       setEditingTargetElements([]);
       setHoverInfo(null);
       setShowSettings(false); // Close settings when toolbar closes
+      setShowReviewQueue(false); // Close review queue when toolbar closes
       setPendingMultiSelectElements([]); // Clear multi-select
       modifiersHeldRef.current = { cmd: false, shift: false }; // Reset modifier tracking
       if (isFrozen) {
@@ -3121,6 +3150,13 @@ export function PageFeedbackToolbarCSS({
         }
       }
 
+      // "R" to toggle review queue
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        hideTooltipsUntilMouseLeave();
+        setShowReviewQueue((prev) => !prev);
+      }
+
       // "S" to send annotations
       if (e.key === "s" || e.key === "S") {
         const hasValidWebhook =
@@ -3156,12 +3192,18 @@ export function PageFeedbackToolbarCSS({
   if (!mounted) return null;
   if (isToolbarHidden) return null;
 
-  const hasAnnotations = annotations.length > 0;
+  const isResolvedAnnotation = (a: Annotation) =>
+    a.status === "resolved" || a.status === "dismissed";
 
-  // Filter annotations for rendering (exclude exiting ones from normal flow)
-  const visibleAnnotations = annotations.filter(
-    (a) => !exitingMarkers.has(a.id) && isRenderableAnnotation(a),
+  const activeAnnotations = annotations.filter(
+    (a) => !exitingMarkers.has(a.id) && !isResolvedAnnotation(a),
   );
+  const resolvedAnnotations = annotations.filter(isResolvedAnnotation);
+  const unreviewedCount = resolvedAnnotations.filter((a) => !a._reviewedAt).length;
+  const hasAnnotations = activeAnnotations.length > 0 || resolvedAnnotations.length > 0;
+
+  // visibleAnnotations = active only (for numbered markers + existing logic)
+  const visibleAnnotations = activeAnnotations;
   const exitingAnnotationsList = annotations.filter((a) =>
     exitingMarkers.has(a.id),
   );
@@ -3261,12 +3303,12 @@ export function PageFeedbackToolbarCSS({
             className={`${styles.toggleContent} ${!isActive ? styles.visible : styles.hidden}`}
           >
             <IconListSparkle size={24} />
-            {hasAnnotations && (
+            {activeAnnotations.length > 0 && (
               <span
                 className={`${styles.badge} ${isActive ? styles.fadeOut : ""} ${showEntranceAnimation ? styles.entrance : ""}`}
                 style={{ backgroundColor: settings.annotationColor }}
               >
-                {annotations.length}
+                {activeAnnotations.length}
               </span>
             )}
           </div>
@@ -3277,7 +3319,7 @@ export function PageFeedbackToolbarCSS({
               toolbarPosition && toolbarPosition.y < 100
                 ? styles.tooltipBelow
                 : ""
-            } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
+            } ${tooltipsHidden || showSettings || showReviewQueue ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
             onMouseEnter={handleControlsMouseEnter}
             onMouseLeave={handleControlsMouseLeave}
           >
@@ -3368,12 +3410,12 @@ export function PageFeedbackToolbarCSS({
                 }
               >
                 <IconSendArrow size={24} state={sendState} />
-                {hasAnnotations && sendState === "idle" && (
+                {activeAnnotations.length > 0 && sendState === "idle" && (
                   <span
                     className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}
                     style={{ backgroundColor: settings.annotationColor }}
                   >
-                    {annotations.length}
+                    {activeAnnotations.length}
                   </span>
                 )}
               </button>
@@ -3399,6 +3441,34 @@ export function PageFeedbackToolbarCSS({
               <span className={styles.buttonTooltip}>
                 Clear all
                 <span className={styles.shortcut}>X</span>
+              </span>
+            </div>
+
+            <div
+              className={`${styles.buttonWrapper} ${styles.reviewQueueButtonWrapper} ${resolvedAnnotations.length > 0 ? styles.reviewQueueButtonVisible : ""}`}
+            >
+              <button
+                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  hideTooltipsUntilMouseLeave();
+                  setShowReviewQueue(!showReviewQueue);
+                }}
+                data-active={showReviewQueue}
+              >
+                <IconCheckmarkCircle size={24} />
+                {unreviewedCount > 0 && (
+                  <span
+                    className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}
+                    style={{ backgroundColor: "#34C759" }}
+                  >
+                    {unreviewedCount}
+                  </span>
+                )}
+              </button>
+              <span className={styles.buttonTooltip}>
+                Review queue
+                <span className={styles.shortcut}>R</span>
               </span>
             </div>
 
@@ -3869,6 +3939,77 @@ export function PageFeedbackToolbarCSS({
               </div>
             </div>
           </div>
+
+          {/* Review Queue Panel */}
+          <div
+            className={`${styles.reviewQueuePanel} ${isDarkMode ? styles.dark : styles.light} ${showReviewQueueVisible ? styles.enter : styles.exit}`}
+            onClick={(e) => e.stopPropagation()}
+            style={
+              toolbarPosition && toolbarPosition.y < 230
+                ? {
+                    bottom: "auto",
+                    top: "calc(100% + 0.5rem)",
+                  }
+                : undefined
+            }
+          >
+            <div className={styles.reviewQueueHeader}>
+              <span className={styles.reviewQueueTitle}>Review Queue</span>
+              <span className={styles.reviewQueueCount}>
+                {resolvedAnnotations.filter((a) => a._reviewedAt).length}/{resolvedAnnotations.length}
+              </span>
+            </div>
+            <div className={styles.reviewQueueList}>
+              {resolvedAnnotations.map((annotation) => {
+                const agentReply = annotation.thread?.find((m) => m.role === "agent");
+                return (
+                  <label
+                    key={annotation.id}
+                    className={`${styles.reviewQueueItem} ${annotation._reviewedAt ? styles.checked : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!annotation._reviewedAt}
+                      onChange={() => toggleReviewed(annotation.id)}
+                    />
+                    <span
+                      className={`${styles.customCheckbox} ${annotation._reviewedAt ? styles.checked : ""}`}
+                    >
+                      {annotation._reviewedAt && <IconCheckSmall size={14} />}
+                    </span>
+                    <div className={styles.reviewQueueItemContent}>
+                      <span className={styles.reviewQueueItemElement}>
+                        {annotation.element}
+                      </span>
+                      <span className={styles.reviewQueueItemComment}>
+                        {annotation.comment}
+                      </span>
+                      {agentReply && (
+                        <span className={styles.reviewQueueItemReply}>
+                          {agentReply.content}
+                        </span>
+                      )}
+                      <span className={`${styles.reviewQueueItemStatus} ${styles[annotation.status || "resolved"]}`}>
+                        {annotation.status}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className={styles.reviewQueueFooter}>
+              <span className={styles.reviewQueueFooterCount}>
+                {resolvedAnnotations.filter((a) => a._reviewedAt).length} reviewed
+              </span>
+              <button
+                className={`${styles.reviewQueueClearButton} ${!isDarkMode ? styles.light : ""}`}
+                disabled={resolvedAnnotations.length === 0 || resolvedAnnotations.some((a) => !a._reviewedAt)}
+                onClick={clearReviewedAnnotations}
+              >
+                Clear reviewed
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3887,7 +4028,7 @@ export function PageFeedbackToolbarCSS({
               const markerColor = isMulti
                 ? "#34C759"
                 : settings.annotationColor;
-              const globalIndex = annotations.findIndex(
+              const globalIndex = activeAnnotations.findIndex(
                 (a) => a.id === annotation.id,
               );
               const needsEnterAnimation = !animatedMarkers.has(annotation.id);
@@ -3979,6 +4120,29 @@ export function PageFeedbackToolbarCSS({
               );
             })}
 
+        {/* Resolved markers (normal) - faded with checkmark */}
+        {markersVisible &&
+          !markersExiting &&
+          resolvedAnnotations
+            .filter((a) => !a.isFixed)
+            .map((annotation) => (
+              <div
+                key={annotation.id}
+                className={`${styles.marker} ${styles.resolved} ${annotation._reviewedAt ? styles.reviewed : ""} ${annotation.isMultiSelect ? styles.multiSelect : ""}`}
+                data-annotation-marker
+                style={{
+                  left: `${annotation.x}%`,
+                  top: annotation.y,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startEditAnnotation(annotation);
+                }}
+              >
+                <IconCheckSmall size={12} />
+              </div>
+            ))}
+
         {/* Exiting markers (normal) - individual deletion animations */}
         {markersVisible &&
           !markersExiting &&
@@ -4020,7 +4184,7 @@ export function PageFeedbackToolbarCSS({
               const markerColor = isMulti
                 ? "#34C759"
                 : settings.annotationColor;
-              const globalIndex = annotations.findIndex(
+              const globalIndex = activeAnnotations.findIndex(
                 (a) => a.id === annotation.id,
               );
               const needsEnterAnimation = !animatedMarkers.has(annotation.id);
@@ -4111,6 +4275,29 @@ export function PageFeedbackToolbarCSS({
                 </div>
               );
             })}
+
+        {/* Resolved markers (fixed) - faded with checkmark */}
+        {markersVisible &&
+          !markersExiting &&
+          resolvedAnnotations
+            .filter((a) => a.isFixed)
+            .map((annotation) => (
+              <div
+                key={annotation.id}
+                className={`${styles.marker} ${styles.fixed} ${styles.resolved} ${annotation._reviewedAt ? styles.reviewed : ""} ${annotation.isMultiSelect ? styles.multiSelect : ""}`}
+                data-annotation-marker
+                style={{
+                  left: `${annotation.x}%`,
+                  top: annotation.y,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startEditAnnotation(annotation);
+                }}
+              >
+                <IconCheckSmall size={12} />
+              </div>
+            ))}
 
         {/* Exiting markers (fixed) - individual deletion animations */}
         {markersVisible &&
