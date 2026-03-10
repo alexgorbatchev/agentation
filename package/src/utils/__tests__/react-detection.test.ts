@@ -201,6 +201,49 @@ describe("react-detection", () => {
       expect(result.components).not.toContain("ThemeProvider");
     });
 
+    // Deep select feature: video framework internals filtered out
+    it("mode: filtered skips video framework exact names (SeriesSequence, AbsoluteFill)", () => {
+      const series = createMockFiber("SeriesSequence");
+      const fill = createMockFiber("AbsoluteFill", series);
+      const app = createMockFiber("App", fill);
+      const element = createElementWithFiber(app);
+
+      const result = getReactComponentName(element, { mode: "filtered" });
+      expect(result.components).not.toContain("SeriesSequence");
+      expect(result.components).not.toContain("AbsoluteFill");
+      expect(result.components).toContain("App");
+    });
+
+    it("mode: filtered skips Remotion-prefixed patterns", () => {
+      const remotion = createMockFiber("RemotionPlayer");
+      const app = createMockFiber("App", remotion);
+      const element = createElementWithFiber(app);
+
+      const result = getReactComponentName(element, { mode: "filtered" });
+      expect(result.components).not.toContain("RemotionPlayer");
+      expect(result.components).toContain("App");
+    });
+
+    it("mode: filtered skips TransitionSeries patterns", () => {
+      const transition = createMockFiber("TransitionSeriesSequence");
+      const app = createMockFiber("App", transition);
+      const element = createElementWithFiber(app);
+
+      const result = getReactComponentName(element, { mode: "filtered" });
+      expect(result.components).not.toContain("TransitionSeriesSequence");
+      expect(result.components).toContain("App");
+    });
+
+    it("mode: filtered skips RefForwarding patterns", () => {
+      const ref = createMockFiber("RefForwardingComponent");
+      const app = createMockFiber("App", ref);
+      const element = createElementWithFiber(app);
+
+      const result = getReactComponentName(element, { mode: "filtered" });
+      expect(result.components).not.toContain("RefForwardingComponent");
+      expect(result.components).toContain("App");
+    });
+
     it("mode: all includes more components", () => {
       const app = createMockFiber("App");
       const layout = createMockFiber("Layout", app);
@@ -228,6 +271,12 @@ describe("react-detection", () => {
       expect(DEFAULT_SKIP_EXACT.has("Routes")).toBe(true);
       expect(DEFAULT_SKIP_EXACT.has("Route")).toBe(true);
       expect(DEFAULT_SKIP_EXACT.has("Outlet")).toBe(true);
+    });
+
+    // Deep select feature: video framework internals
+    it("includes video framework internals", () => {
+      expect(DEFAULT_SKIP_EXACT.has("SeriesSequence")).toBe(true);
+      expect(DEFAULT_SKIP_EXACT.has("AbsoluteFill")).toBe(true);
     });
   });
 
@@ -260,6 +309,28 @@ describe("react-detection", () => {
     it("does not match ClientProfile (avoid false positives)", () => {
       const matches = DEFAULT_SKIP_PATTERNS.some((p) => p.test("ClientProfile"));
       expect(matches).toBe(false);
+    });
+
+    // Deep select feature: video framework and React internal patterns
+    it("matches RefForwarding patterns (React.forwardRef wrappers)", () => {
+      const matches = DEFAULT_SKIP_PATTERNS.some((p) => p.test("RefForwardingComponent"));
+      expect(matches).toBe(true);
+    });
+
+    it("matches Remotion-prefixed internals", () => {
+      expect(DEFAULT_SKIP_PATTERNS.some((p) => p.test("RemotionPlayer"))).toBe(true);
+      expect(DEFAULT_SKIP_PATTERNS.some((p) => p.test("RemotionRoot"))).toBe(true);
+    });
+
+    it("matches TransitionSeries wrappers", () => {
+      expect(DEFAULT_SKIP_PATTERNS.some((p) => p.test("TransitionSeriesSequence"))).toBe(true);
+      expect(DEFAULT_SKIP_PATTERNS.some((p) => p.test("TransitionSeries"))).toBe(true);
+    });
+
+    it("does not match user components with similar names", () => {
+      // Should not false-positive on user components
+      expect(DEFAULT_SKIP_PATTERNS.some((p) => p.test("VideoPlayer"))).toBe(false);
+      expect(DEFAULT_SKIP_PATTERNS.some((p) => p.test("Timeline"))).toBe(false);
     });
   });
 

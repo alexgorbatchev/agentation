@@ -48,3 +48,5 @@ export {
 
 // Types
 export type { Annotation } from "./types";
+
+console.log('HEY')

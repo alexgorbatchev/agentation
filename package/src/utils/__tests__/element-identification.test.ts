@@ -379,6 +379,93 @@ describe("identifyElement", () => {
       document.body.appendChild(nav);
       expect(identifyElement(nav).name).toBe("nav");
     });
+
+    // Deep select feature: direct text content preferred over class names
+    describe("direct text content (deep select)", () => {
+      it("prefers direct text content over class names for div", () => {
+        const div = document.createElement("div");
+        div.className = "styles_productPrice_abc123";
+        div.appendChild(document.createTextNode("$54"));
+        document.body.appendChild(div);
+        expect(identifyElement(div).name).toBe('"$54"');
+      });
+
+      it("prefers direct text content over class names for section", () => {
+        const section = document.createElement("section");
+        section.className = "hero-banner";
+        section.appendChild(document.createTextNode("Welcome"));
+        document.body.appendChild(section);
+        expect(identifyElement(section).name).toBe('"Welcome"');
+      });
+
+      it("concatenates multiple direct text nodes", () => {
+        const div = document.createElement("div");
+        div.appendChild(document.createTextNode("Hello"));
+        div.appendChild(document.createElement("span")); // child element in between
+        div.appendChild(document.createTextNode("World"));
+        document.body.appendChild(div);
+        expect(identifyElement(div).name).toBe('"Hello World"');
+      });
+
+      it("ignores whitespace-only text nodes", () => {
+        const div = document.createElement("div");
+        div.className = "card-wrapper";
+        div.appendChild(document.createTextNode("   "));
+        div.appendChild(document.createTextNode("\n"));
+        document.body.appendChild(div);
+        // No meaningful direct text, falls back to class name
+        const name = identifyElement(div).name;
+        expect(name).toContain("card");
+      });
+
+      it("falls back to class names when direct text is too long (>= 50 chars)", () => {
+        const div = document.createElement("div");
+        div.className = "description-block";
+        div.appendChild(document.createTextNode("A".repeat(50)));
+        document.body.appendChild(div);
+        const name = identifyElement(div).name;
+        expect(name).toContain("description");
+      });
+
+      it("does not skip class names when there is no direct text (only child elements)", () => {
+        const div = document.createElement("div");
+        div.className = "nav-container";
+        const child = document.createElement("span");
+        child.textContent = "Link text";
+        div.appendChild(child);
+        document.body.appendChild(div);
+        // The text is in a child element, not a direct text node
+        const name = identifyElement(div).name;
+        expect(name).toContain("nav");
+      });
+
+      it("still uses aria-label over direct text content", () => {
+        const div = document.createElement("div");
+        div.setAttribute("aria-label", "Price display");
+        div.appendChild(document.createTextNode("$54"));
+        document.body.appendChild(div);
+        expect(identifyElement(div).name).toBe("div [Price display]");
+      });
+
+      it("still uses role over direct text content", () => {
+        const div = document.createElement("div");
+        div.setAttribute("role", "status");
+        div.appendChild(document.createTextNode("Loading..."));
+        document.body.appendChild(div);
+        expect(identifyElement(div).name).toBe("status");
+      });
+
+      it("works with all generic container tags", () => {
+        const tags = ["div", "section", "article", "nav", "header", "footer", "aside", "main"];
+        for (const tag of tags) {
+          const el = document.createElement(tag);
+          el.appendChild(document.createTextNode("Content"));
+          document.body.appendChild(el);
+          expect(identifyElement(el).name).toBe('"Content"');
+          el.remove();
+        }
+      });
+    });
   });
 
   it("returns tag name for unknown elements", () => {
