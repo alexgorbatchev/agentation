@@ -181,6 +181,7 @@ export interface AFSStore {
     content: string
   ): Annotation | undefined;
   getPendingAnnotations(sessionId: string): Annotation[];
+  getAnnotationsNeedingAttention(sessionId: string): Annotation[];
   getSessionAnnotations(sessionId: string): Annotation[];
   deleteAnnotation(id: string): Annotation | undefined;
 

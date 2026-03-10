@@ -30,6 +30,8 @@
     "watch": "tsup --watch",
     "dev": "pnpm build && pnpm watch",
     "start": "pnpm build && node dist/cli.js server",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
@@ -41,7 +43,8 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
   },
   "engines": {
     "node": ">=18.0.0"
