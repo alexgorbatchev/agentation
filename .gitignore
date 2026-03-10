@@ -3,3 +3,4 @@ node_modules
 mcp/dist
 .DS_Store
 *.tgz
+/package/coverage
