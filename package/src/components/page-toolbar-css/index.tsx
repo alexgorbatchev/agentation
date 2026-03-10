@@ -3998,15 +3998,27 @@ export function PageFeedbackToolbarCSS({
               })}
             </div>
             <div className={styles.reviewQueueFooter}>
-              <span className={styles.reviewQueueFooterCount}>
-                {resolvedAnnotations.filter((a) => a._reviewedAt).length} reviewed
-              </span>
               <button
-                className={`${styles.reviewQueueClearButton} ${!isDarkMode ? styles.light : ""}`}
-                disabled={resolvedAnnotations.length === 0 || resolvedAnnotations.some((a) => !a._reviewedAt)}
+                className={`${styles.reviewQueueFooterButton} ${!isDarkMode ? styles.light : ""}`}
+                disabled={resolvedAnnotations.length === 0 || resolvedAnnotations.every((a) => a._reviewedAt)}
+                onClick={() => {
+                  setAnnotations((prev) =>
+                    prev.map((a) =>
+                      (a.status === "resolved" || a.status === "dismissed") && !a._reviewedAt
+                        ? { ...a, _reviewedAt: Date.now() }
+                        : a
+                    )
+                  );
+                }}
+              >
+                Select All
+              </button>
+              <button
+                className={`${styles.reviewQueueFooterButton} ${!isDarkMode ? styles.light : ""}`}
+                disabled={!resolvedAnnotations.some((a) => a._reviewedAt)}
                 onClick={clearReviewedAnnotations}
               >
-                Clear reviewed
+                Clear Selected
               </button>
             </div>
           </div>

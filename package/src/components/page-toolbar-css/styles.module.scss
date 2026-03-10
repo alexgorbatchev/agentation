@@ -1831,7 +1831,8 @@ $green: #34c759;
 .reviewQueueFooter {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 6px;
   padding: 8px 1rem 0;
   margin-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
@@ -1841,29 +1842,22 @@ $green: #34c759;
   }
 }
 
-.reviewQueueFooterCount {
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
-
-  .light & {
-    color: rgba(0, 0, 0, 0.35);
-  }
-}
-
-.reviewQueueClearButton {
+.reviewQueueFooterButton {
   font-size: 11px;
   font-weight: 500;
-  color: $green;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
   transition:
     background 0.1s ease,
+    color 0.1s ease,
     opacity 0.1s ease;
 
   &:hover:not(:disabled) {
-    background: rgba(52, 199, 89, 0.1);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
   }
 
   &:disabled {
@@ -1872,8 +1866,12 @@ $green: #34c759;
   }
 
   &.light {
+    color: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.04);
+
     &:hover:not(:disabled) {
-      background: rgba(52, 199, 89, 0.08);
+      background: rgba(0, 0, 0, 0.08);
+      color: rgba(0, 0, 0, 0.85);
     }
   }
 }
