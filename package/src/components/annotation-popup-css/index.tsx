@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import styles from "./styles.module.scss";
 import { IconTrash } from "../icons";
 import { originalSetTimeout } from "../../utils/freeze-animations";
+import type { ThreadMessage } from "../../types";
 
 // =============================================================================
 // Helpers
@@ -57,6 +58,12 @@ export interface AnnotationPopupCSSProps {
   lightMode?: boolean;
   /** Computed styles for the selected element */
   computedStyles?: Record<string, string>;
+  /** Thread messages for this annotation */
+  thread?: ThreadMessage[];
+  /** Called when user sends a reply in the thread */
+  onReply?: (content: string) => void;
+  /** Whether a reply is currently being sent */
+  isReplySending?: boolean;
 }
 
 export interface AnnotationPopupCSSHandle {
@@ -85,18 +92,25 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
       isExiting = false,
       lightMode = false,
       computedStyles,
+      thread,
+      onReply,
+      isReplySending = false,
     },
     ref
   ) {
-    const [text, setText] = useState(initialValue);
+    const hasThread = thread && thread.length > 0;
+    const [text, setText] = useState(hasThread ? "" : initialValue);
     const [isShaking, setIsShaking] = useState(false);
     const [animState, setAnimState] = useState<"initial" | "enter" | "entered" | "exit">("initial");
     const [isFocused, setIsFocused] = useState(false);
     const [isStylesExpanded, setIsStylesExpanded] = useState(false); // Computed styles accordion state
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const threadMessagesRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
     const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [replyText, setReplyText] = useState("");
 
     // Sync with parent exit state
     useEffect(() => {
@@ -116,11 +130,11 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
         setAnimState("entered");
       }, 200); // Match animation duration
       const focusTimer = originalSetTimeout(() => {
-        const textarea = textareaRef.current;
-        if (textarea) {
-          focusBypassingTraps(textarea);
-          textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-          textarea.scrollTop = textarea.scrollHeight;
+        const target = hasThread ? replyTextareaRef.current : textareaRef.current;
+        if (target) {
+          focusBypassingTraps(target);
+          target.selectionStart = target.selectionEnd = target.value.length;
+          target.scrollTop = target.scrollHeight;
         }
       }, 50);
       return () => {
@@ -129,7 +143,15 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
         if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
         if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
       };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Auto-scroll thread to bottom on new messages
+    useEffect(() => {
+      if (threadMessagesRef.current) {
+        threadMessagesRef.current.scrollTop = threadMessagesRef.current.scrollHeight;
+      }
+    }, [thread?.length]);
 
     // Shake animation
     const shake = useCallback(() => {
@@ -160,6 +182,13 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
       onSubmit(text.trim());
     }, [text, onSubmit]);
 
+    // Handle reply
+    const handleReply = useCallback(() => {
+      if (!replyText.trim() || !onReply) return;
+      onReply(replyText.trim());
+      setReplyText("");
+    }, [replyText, onReply]);
+
     // Handle keyboard
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -174,6 +203,22 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
         }
       },
       [handleSubmit, handleCancel]
+    );
+
+    // Handle reply keyboard
+    const handleReplyKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        e.stopPropagation();
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          handleReply();
+        }
+        if (e.key === "Escape") {
+          handleCancel();
+        }
+      },
+      [handleReply, handleCancel]
     );
 
     const popupClassName = [
@@ -249,49 +294,113 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
           </div>
         )}
 
-        {selectedText && (
-          <div className={styles.quote}>
-            &ldquo;{selectedText.slice(0, 80)}
-            {selectedText.length > 80 ? "..." : ""}&rdquo;
-          </div>
-        )}
+        {hasThread ? (
+          <>
+            {/* Thread view: original comment read-only, messages, reply input */}
+            <div className={styles.threadOriginal}>{initialValue}</div>
 
-        <textarea
-          ref={textareaRef}
-          className={styles.textarea}
-          style={{ borderColor: isFocused ? accentColor : undefined }}
-          placeholder={placeholder}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          rows={2}
-          onKeyDown={handleKeyDown}
-        />
+            <div ref={threadMessagesRef} className={styles.threadMessages}>
+              {thread.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`${styles.threadMessage} ${msg.role === "agent" ? styles.agent : styles.human}`}
+                >
+                  <div className={styles.threadRole}>
+                    {msg.role === "agent" ? "Agent" : "You"}
+                  </div>
+                  <div className={styles.threadContent}>{msg.content}</div>
+                </div>
+              ))}
+            </div>
 
-        <div className={styles.actions}>
-          {onDelete && (
-            <div className={styles.deleteWrapper}>
-              <button className={styles.deleteButton} onClick={onDelete} type="button">
-                <IconTrash size={22} />
+            {onReply && (
+              <div className={styles.threadReplySection}>
+                <textarea
+                  ref={replyTextareaRef}
+                  className={styles.textarea}
+                  style={{ borderColor: isFocused ? accentColor : undefined }}
+                  placeholder="Reply..."
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  rows={2}
+                  onKeyDown={handleReplyKeyDown}
+                />
+                <div className={styles.actions}>
+                  <button className={styles.cancel} onClick={handleCancel}>
+                    Close
+                  </button>
+                  <button
+                    className={styles.submit}
+                    style={{
+                      backgroundColor: accentColor,
+                      opacity: replyText.trim() && !isReplySending ? 1 : 0.4,
+                    }}
+                    onClick={handleReply}
+                    disabled={!replyText.trim() || isReplySending}
+                  >
+                    {isReplySending ? "Sending..." : "Reply"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!onReply && (
+              <div className={styles.actions}>
+                <button className={styles.cancel} onClick={handleCancel}>
+                  Close
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {selectedText && (
+              <div className={styles.quote}>
+                &ldquo;{selectedText.slice(0, 80)}
+                {selectedText.length > 80 ? "..." : ""}&rdquo;
+              </div>
+            )}
+
+            <textarea
+              ref={textareaRef}
+              className={styles.textarea}
+              style={{ borderColor: isFocused ? accentColor : undefined }}
+              placeholder={placeholder}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              rows={2}
+              onKeyDown={handleKeyDown}
+            />
+
+            <div className={styles.actions}>
+              {onDelete && (
+                <div className={styles.deleteWrapper}>
+                  <button className={styles.deleteButton} onClick={onDelete} type="button">
+                    <IconTrash size={22} />
+                  </button>
+                </div>
+              )}
+              <button className={styles.cancel} onClick={handleCancel}>
+                Cancel
+              </button>
+              <button
+                className={styles.submit}
+                style={{
+                  backgroundColor: accentColor,
+                  opacity: text.trim() ? 1 : 0.4,
+                }}
+                onClick={handleSubmit}
+                disabled={!text.trim()}
+              >
+                {submitLabel}
               </button>
             </div>
-          )}
-          <button className={styles.cancel} onClick={handleCancel}>
-            Cancel
-          </button>
-          <button
-            className={styles.submit}
-            style={{
-              backgroundColor: accentColor,
-              opacity: text.trim() ? 1 : 0.4,
-            }}
-            onClick={handleSubmit}
-            disabled={!text.trim()}
-          >
-            {submitLabel}
-          </button>
-        </div>
+          </>
+        )}
       </div>
     );
   }
