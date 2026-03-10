@@ -70,6 +70,7 @@ import {
   updateAnnotation as updateAnnotationOnServer,
   deleteAnnotation as deleteAnnotationFromServer,
   requestAction,
+  postThreadReply,
 } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
 import {
@@ -567,6 +568,7 @@ export function PageFeedbackToolbarCSS({
   const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(
     null,
   );
+  const [isReplySending, setIsReplySending] = useState(false);
   const [editingTargetElement, setEditingTargetElement] =
     useState<HTMLElement | null>(null);
   const [editingTargetElements, setEditingTargetElements] = useState<
@@ -1191,8 +1193,32 @@ export function PageFeedbackToolbarCSS({
 
     eventSource.addEventListener("annotation.updated", handler);
 
+    // Listen for thread messages — payload is now the full Annotation
+    const threadHandler = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data);
+        const updated = event.payload as Annotation;
+        if (!updated?.id || !updated?.thread) return;
+
+        // Update annotations array
+        setAnnotations((prev) =>
+          prev.map((a) => (a.id === updated.id ? { ...a, thread: updated.thread } : a))
+        );
+
+        // Update editingAnnotation if it's the same one
+        setEditingAnnotation((prev) =>
+          prev && prev.id === updated.id ? { ...prev, thread: updated.thread } : prev
+        );
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    eventSource.addEventListener("thread.message", threadHandler);
+
     return () => {
       eventSource.removeEventListener("annotation.updated", handler);
+      eventSource.removeEventListener("thread.message", threadHandler);
       eventSource.close();
     };
   }, [endpoint, mounted, currentSessionId]);
@@ -2606,6 +2632,30 @@ export function PageFeedbackToolbarCSS({
     [editingAnnotation, onAnnotationUpdate, fireWebhook, endpoint],
   );
 
+  // Handle thread reply from edit popup
+  const handleThreadReply = useCallback(
+    async (content: string) => {
+      if (!editingAnnotation || !endpoint) return;
+
+      setIsReplySending(true);
+      try {
+        const updated = await postThreadReply(endpoint, editingAnnotation.id, content);
+        // Update annotations array with server response
+        setAnnotations((prev) =>
+          prev.map((a) => (a.id === updated.id ? { ...a, thread: updated.thread } : a))
+        );
+        setEditingAnnotation((prev) =>
+          prev && prev.id === updated.id ? { ...prev, thread: updated.thread } : prev
+        );
+      } catch (error) {
+        console.warn("[Agentation] Failed to post thread reply:", error);
+      } finally {
+        setIsReplySending(false);
+      }
+    },
+    [editingAnnotation, endpoint],
+  );
+
   // Cancel editing with exit animation
   const cancelEditAnnotation = useCallback(() => {
     setEditExiting(true);
@@ -3803,6 +3853,11 @@ export function PageFeedbackToolbarCSS({
                       {globalIndex + 1}
                     </span>
                   )}
+                  {annotation.thread && annotation.thread.length > 0 && !showDeleteState && (
+                    <span className={styles.threadBadge}>
+                      {annotation.thread.length}
+                    </span>
+                  )}
                   {isHovered && !editingAnnotation && (
                     <div
                       className={`${styles.markerTooltip} ${!isDarkMode ? styles.light : ""} ${styles.enter}`}
@@ -3929,6 +3984,11 @@ export function PageFeedbackToolbarCSS({
                       }
                     >
                       {globalIndex + 1}
+                    </span>
+                  )}
+                  {annotation.thread && annotation.thread.length > 0 && !showDeleteState && (
+                    <span className={styles.threadBadge}>
+                      {annotation.thread.length}
                     </span>
                   )}
                   {isHovered && !editingAnnotation && (
@@ -4374,6 +4434,9 @@ export function PageFeedbackToolbarCSS({
                 onDelete={() => deleteAnnotation(editingAnnotation.id)}
                 isExiting={editExiting}
                 lightMode={!isDarkMode}
+                thread={editingAnnotation.thread}
+                onReply={endpoint ? handleThreadReply : undefined}
+                isReplySending={isReplySending}
                 accentColor={
                   editingAnnotation.isMultiSelect
                     ? "#34C759"

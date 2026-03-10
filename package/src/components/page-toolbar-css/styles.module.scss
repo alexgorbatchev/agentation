@@ -1013,6 +1013,26 @@ $green: #34c759;
   }
 }
 
+.threadBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  background: #AF52DE;
+  color: white;
+  border-radius: 7px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
 .renumber {
   display: block;
   animation: renumberRoll 0.2s ease-out;
