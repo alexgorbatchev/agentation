@@ -138,40 +138,6 @@ export function clearSyncMarkers(pathname: string): void {
 }
 
 // =============================================================================
-// Dismissed (Cleared) Annotation IDs
-// =============================================================================
-//
-// When a user clears reviewed annotations from the review queue, we store their
-// IDs so they stay hidden after reload (the server still returns them).
-//
-
-const DISMISSED_PREFIX = "agentation-dismissed-";
-
-export function loadDismissedIds(pathname: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const stored = localStorage.getItem(`${DISMISSED_PREFIX}${pathname}`);
-    if (!stored) return new Set();
-    return new Set(JSON.parse(stored));
-  } catch {
-    return new Set();
-  }
-}
-
-export function saveDismissedIds(pathname: string, ids: Set<string>): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (ids.size === 0) {
-      localStorage.removeItem(`${DISMISSED_PREFIX}${pathname}`);
-    } else {
-      localStorage.setItem(`${DISMISSED_PREFIX}${pathname}`, JSON.stringify([...ids]));
-    }
-  } catch {
-    // localStorage might be full or disabled
-  }
-}
-
-// =============================================================================
 // Session Storage
 // =============================================================================
 

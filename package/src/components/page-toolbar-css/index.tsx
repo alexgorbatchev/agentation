@@ -62,8 +62,6 @@ import {
   saveAnnotationsWithSyncMarker,
   loadToolbarHidden,
   saveToolbarHidden,
-  loadDismissedIds,
-  saveDismissedIds,
 } from "../../utils/storage";
 import {
   createSession,
@@ -584,18 +582,7 @@ export function PageFeedbackToolbarCSS({
   className: userClassName,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
-  const [annotations, setAnnotationsRaw] = useState<Annotation[]>([]);
-  const dismissedIdsRef = useRef<Set<string>>(new Set());
-
-  // Gate: every setAnnotations call filters out dismissed IDs
-  const setAnnotations: typeof setAnnotationsRaw = useCallback((update) => {
-    setAnnotationsRaw((prev) => {
-      const next = typeof update === "function" ? update(prev) : update;
-      const dismissed = dismissedIdsRef.current;
-      if (dismissed.size === 0) return next;
-      return next.filter((a) => !dismissed.has(a.id));
-    });
-  }, []);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showMarkers, setShowMarkers] = useState(true);
   const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
   const [isToolbarHiding, setIsToolbarHiding] = useState(false);
@@ -975,7 +962,6 @@ export function PageFeedbackToolbarCSS({
   useEffect(() => {
     setMounted(true);
     setScrollY(window.scrollY);
-    dismissedIdsRef.current = loadDismissedIds(pathname);
     const stored = loadAnnotations<Annotation>(pathname);
     setAnnotations(stored.filter(isRenderableAnnotation));
 
@@ -1438,16 +1424,23 @@ export function PageFeedbackToolbarCSS({
   }, []);
 
   const clearReviewedAnnotations = useCallback(() => {
-    setAnnotationsRaw((prev) => {
-      const toClear = prev.filter((a) => a._reviewedAt);
-      if (toClear.length > 0) {
-        toClear.forEach((a) => dismissedIdsRef.current.add(a.id));
-        saveDismissedIds(pathname, dismissedIdsRef.current);
-      }
-      return prev.filter((a) => !a._reviewedAt);
-    });
+    const toClear = annotations.filter((a) => a._reviewedAt);
+    if (toClear.length === 0) return;
+
+    // Delete from server (non-blocking, same pattern as clearAll)
+    if (endpoint) {
+      Promise.all(
+        toClear.map((a) =>
+          deleteAnnotationFromServer(endpoint, a.id).catch((error) => {
+            console.warn("[Agentation] Failed to delete reviewed annotation:", error);
+          })
+        )
+      );
+    }
+
+    setAnnotations((prev) => prev.filter((a) => !a._reviewedAt));
     setShowReviewQueue(false);
-  }, [pathname]);
+  }, [annotations, endpoint]);
 
   const hideToolbarTemporarily = useCallback(() => {
     if (isToolbarHiding) return;
