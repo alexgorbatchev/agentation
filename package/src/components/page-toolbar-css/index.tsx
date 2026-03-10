@@ -3150,8 +3150,8 @@ export function PageFeedbackToolbarCSS({
         }
       }
 
-      // "R" to toggle review queue
-      if (e.key === "r" || e.key === "R") {
+      // "Q" to toggle review queue
+      if (e.key === "q" || e.key === "Q") {
         e.preventDefault();
         hideTooltipsUntilMouseLeave();
         setShowReviewQueue((prev) => !prev);
@@ -3468,7 +3468,7 @@ export function PageFeedbackToolbarCSS({
               </button>
               <span className={styles.buttonTooltip}>
                 Review queue
-                <span className={styles.shortcut}>R</span>
+                <span className={styles.shortcut}>Q</span>
               </span>
             </div>
 
