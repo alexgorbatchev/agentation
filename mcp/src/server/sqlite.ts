@@ -495,7 +495,7 @@ export function createSQLiteStore(dbPath?: string): AFSStore {
       const updated = this.updateAnnotation(annotationId, { thread });
 
       if (updated && existing.sessionId) {
-        const event = eventBus.emit("thread.message", existing.sessionId, message);
+        const event = eventBus.emit("thread.message", existing.sessionId, updated);
         persistEvent(event);
       }
 

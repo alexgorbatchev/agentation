@@ -115,6 +115,27 @@ export async function deleteAnnotation(
   }
 }
 
+/**
+ * Post a thread reply to an annotation.
+ */
+export async function postThreadReply(
+  endpoint: string,
+  annotationId: string,
+  content: string
+): Promise<Annotation> {
+  const response = await fetch(`${endpoint}/annotations/${annotationId}/thread`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "human", content }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to post thread reply: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export type ActionResponse = {
   success: boolean;
   annotationCount: number;

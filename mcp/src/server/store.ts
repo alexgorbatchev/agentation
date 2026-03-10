@@ -216,7 +216,7 @@ function createMemoryStore(): AFSStore {
       annotation.updatedAt = new Date().toISOString();
 
       if (annotation.sessionId) {
-        const event = eventBus.emit("thread.message", annotation.sessionId, message);
+        const event = eventBus.emit("thread.message", annotation.sessionId, annotation);
         events.push(event);
       }
 
