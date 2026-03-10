@@ -62,6 +62,8 @@ import {
   saveAnnotationsWithSyncMarker,
   loadToolbarHidden,
   saveToolbarHidden,
+  loadDismissedIds,
+  saveDismissedIds,
 } from "../../utils/storage";
 import {
   createSession,
@@ -582,7 +584,18 @@ export function PageFeedbackToolbarCSS({
   className: userClassName,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotations, setAnnotationsRaw] = useState<Annotation[]>([]);
+  const dismissedIdsRef = useRef<Set<string>>(new Set());
+
+  // Gate: every setAnnotations call filters out dismissed IDs
+  const setAnnotations: typeof setAnnotationsRaw = useCallback((update) => {
+    setAnnotationsRaw((prev) => {
+      const next = typeof update === "function" ? update(prev) : update;
+      const dismissed = dismissedIdsRef.current;
+      if (dismissed.size === 0) return next;
+      return next.filter((a) => !dismissed.has(a.id));
+    });
+  }, []);
   const [showMarkers, setShowMarkers] = useState(true);
   const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
   const [isToolbarHiding, setIsToolbarHiding] = useState(false);
@@ -962,6 +975,7 @@ export function PageFeedbackToolbarCSS({
   useEffect(() => {
     setMounted(true);
     setScrollY(window.scrollY);
+    dismissedIdsRef.current = loadDismissedIds(pathname);
     const stored = loadAnnotations<Annotation>(pathname);
     setAnnotations(stored.filter(isRenderableAnnotation));
 
@@ -1424,9 +1438,16 @@ export function PageFeedbackToolbarCSS({
   }, []);
 
   const clearReviewedAnnotations = useCallback(() => {
-    setAnnotations((prev) => prev.filter((a) => !a._reviewedAt));
+    setAnnotationsRaw((prev) => {
+      const toClear = prev.filter((a) => a._reviewedAt);
+      if (toClear.length > 0) {
+        toClear.forEach((a) => dismissedIdsRef.current.add(a.id));
+        saveDismissedIds(pathname, dismissedIdsRef.current);
+      }
+      return prev.filter((a) => !a._reviewedAt);
+    });
     setShowReviewQueue(false);
-  }, []);
+  }, [pathname]);
 
   const hideToolbarTemporarily = useCallback(() => {
     if (isToolbarHiding) return;
