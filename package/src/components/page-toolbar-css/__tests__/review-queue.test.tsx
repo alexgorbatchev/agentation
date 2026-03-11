@@ -226,7 +226,7 @@ describe("resolved annotations stay visible as markers", () => {
 // =============================================================================
 
 describe("review queue button", () => {
-  it("is not visible when there are no resolved annotations", async () => {
+  it("is disabled when there are no resolved annotations", async () => {
     seedAnnotations([
       makeAnnotation({ id: "active-1", comment: "Active" }),
     ]);
@@ -235,14 +235,11 @@ describe("review queue button", () => {
     await activateToolbar();
 
     const reviewBtn = findButtonByTooltip("Review queue");
-    // Button wrapper exists but should not have the visible class
     expect(reviewBtn).toBeTruthy();
-    const wrapper = reviewBtn!.closest("[class*='reviewQueueButton']");
-    expect(wrapper).toBeTruthy();
-    expect(wrapper!.className).not.toContain("reviewQueueButtonVisible");
+    expect(reviewBtn!.disabled).toBe(true);
   });
 
-  it("becomes visible when resolved annotations exist", async () => {
+  it("is enabled when resolved annotations exist", async () => {
     seedAnnotations([
       makeAnnotation({ id: "resolved-1", status: "resolved" }),
     ]);
@@ -253,8 +250,7 @@ describe("review queue button", () => {
     await waitFor(() => {
       const reviewBtn = findButtonByTooltip("Review queue");
       expect(reviewBtn).toBeTruthy();
-      const wrapper = reviewBtn!.closest("[class*='reviewQueueButton']");
-      expect(wrapper!.className).toContain("reviewQueueButtonVisible");
+      expect(reviewBtn!.disabled).toBe(false);
     });
   });
 
@@ -890,11 +886,11 @@ describe("SSE annotation.resolved keeps annotation visible", () => {
       expect(markers[0].className).toMatch(/resolved/);
     });
 
-    // Review queue button should now be visible
+    // Review queue button should now be enabled
     await waitFor(() => {
       const reviewBtn = findButtonByTooltip("Review queue");
-      const wrapper = reviewBtn!.closest("[class*='reviewQueueButton']");
-      expect(wrapper!.className).toContain("reviewQueueButtonVisible");
+      expect(reviewBtn).toBeTruthy();
+      expect(reviewBtn!.disabled).toBe(false);
     });
   });
 });
