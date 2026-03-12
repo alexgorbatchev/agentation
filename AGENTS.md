@@ -33,3 +33,6 @@ Website changes (`package/example/`) only affect agentation.dev.
 ## Annotations
 
 Whenever the user brings up annotations, fetch all the pending annotations before doing anything else. And infer whether I am referencing any annotations.
+
+**IMPORTANT**: All PRs should be made in this repository by default.
+
