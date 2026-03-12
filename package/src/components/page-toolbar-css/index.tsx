@@ -382,6 +382,16 @@ function truncateUrl(url: string): string {
   }
 }
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
+
 function getActiveButtonStyle(
   isActive: boolean,
   color: string,
@@ -695,6 +705,9 @@ export function PageFeedbackToolbarCSS({
     }>
   >([]);
   const modifiersHeldRef = useRef({ cmd: false, shift: false });
+  const isAltSelectionHeldRef = useRef(false);
+  const didAltActivateToolbarRef = useRef(false);
+  const [isAltSelectionHeld, setIsAltSelectionHeld] = useState(false);
 
   // Hide tooltips after button click until mouse leaves
   const hideTooltipsUntilMouseLeave = () => {
@@ -1679,6 +1692,9 @@ export function PageFeedbackToolbarCSS({
   // Reset state when deactivating
   useEffect(() => {
     if (!isActive) {
+      isAltSelectionHeldRef.current = false;
+      didAltActivateToolbarRef.current = false;
+      setIsAltSelectionHeld(false);
       setPendingAnnotation(null);
       setEditingAnnotation(null);
       setEditingTargetElement(null);
@@ -1707,13 +1723,14 @@ export function PageFeedbackToolbarCSS({
 
     const style = document.createElement("style");
     style.id = "feedback-cursor-styles";
-    // Text elements get text cursor (higher specificity with body prefix)
-    // Everything else gets crosshair
     style.textContent = `
       body * {
         cursor: crosshair !important;
       }
-      body p, body span, body h1, body h2, body h3, body h4, body h5, body h6,
+      ${
+        isAltSelectionHeld
+          ? ""
+          : `body p, body span, body h1, body h2, body h3, body h4, body h5, body h6,
       body li, body td, body th, body label, body blockquote, body figcaption,
       body caption, body legend, body dt, body dd, body pre, body code,
       body em, body strong, body b, body i, body u, body s, body a,
@@ -1723,6 +1740,7 @@ export function PageFeedbackToolbarCSS({
       body h5 *, body h6 *, body li *, body a *, body label *, body pre *,
       body code *, body blockquote *, body [contenteditable] * {
         cursor: text !important;
+      }`
       }
       [data-feedback-toolbar], [data-feedback-toolbar] * {
         cursor: default !important;
@@ -3099,12 +3117,23 @@ export function PageFeedbackToolbarCSS({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in inputs
-      const target = e.target as HTMLElement;
-      const isTyping =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
+      const isTyping = isTypingTarget(e.target);
+
+      if (e.key === "Alt") {
+        if (isTyping || e.repeat || isAltSelectionHeldRef.current) {
+          return;
+        }
+
+        setTooltipsHidden(true);
+        isAltSelectionHeldRef.current = true;
+        didAltActivateToolbarRef.current = !isActive;
+        setIsAltSelectionHeld(true);
+
+        if (!isActive) {
+          setIsActive(true);
+        }
+        return;
+      }
 
       if (e.key === "Escape") {
         // Clear multi-select if active
@@ -3129,7 +3158,7 @@ export function PageFeedbackToolbarCSS({
       }
 
       // Skip other shortcuts if typing or modifier keys are held
-      if (isTyping || e.metaKey || e.ctrlKey) return;
+      if (isTyping || e.metaKey || e.ctrlKey || e.altKey) return;
 
       // "P" to toggle pause/freeze
       if (e.key === "p" || e.key === "P") {
@@ -3188,11 +3217,56 @@ export function PageFeedbackToolbarCSS({
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== "Alt" || !isAltSelectionHeldRef.current) return;
+
+      isAltSelectionHeldRef.current = false;
+      const didAltActivateToolbar = didAltActivateToolbarRef.current;
+      didAltActivateToolbarRef.current = false;
+      setIsAltSelectionHeld(false);
+
+      const shouldKeepToolbarOpen =
+        pendingAnnotation !== null ||
+        editingAnnotation !== null ||
+        pendingMultiSelectElements.length > 0;
+
+      if (shouldKeepToolbarOpen || !didAltActivateToolbar) return;
+
+      setTooltipsHidden(true);
+      setIsActive(false);
+    };
+
+    const handleBlur = () => {
+      if (!isAltSelectionHeldRef.current) return;
+
+      isAltSelectionHeldRef.current = false;
+      const didAltActivateToolbar = didAltActivateToolbarRef.current;
+      didAltActivateToolbarRef.current = false;
+      setIsAltSelectionHeld(false);
+
+      const shouldKeepToolbarOpen =
+        pendingAnnotation !== null ||
+        editingAnnotation !== null ||
+        pendingMultiSelectElements.length > 0;
+
+      if (shouldKeepToolbarOpen || !didAltActivateToolbar) return;
+
+      setIsActive(false);
+    };
+
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+    };
   }, [
     isActive,
+    isAltSelectionHeld,
     pendingAnnotation,
+    editingAnnotation,
     annotations.length,
     settings.webhookUrl,
     webhookUrl,

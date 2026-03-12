@@ -7,6 +7,7 @@
 >
 > - Annotation thread and reply UI
 > - Deep select for piercing overlays
+> - Alt hold-to-select mode with a crosshair cursor
 > - Review queue for resolved annotations
 > - MCP support for surfacing human thread replies
 > - Storybook plus expanded automated test coverage
