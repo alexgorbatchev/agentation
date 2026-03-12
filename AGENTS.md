@@ -14,7 +14,8 @@ A floating toolbar for annotating web pages and collecting structured feedback f
 ```bash
 pnpm install    # Install all workspace dependencies
 pnpm dev        # Run both package watch + website dev server
-pnpm build      # Build package only
+pnpm build      # Build all packages
+pnpm test       # Run all tests
 ```
 
 ## Important
