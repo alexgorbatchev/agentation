@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { createRef } from "react";
 import { AnnotationPopupCSS } from "../index";
 import type { AnnotationPopupCSSHandle } from "../index";
@@ -286,7 +286,7 @@ describe("shake via ref", () => {
     expect(typeof ref.current?.shake).toBe("function");
   });
 
-  it("calling shake does not throw", () => {
+  it("calling shake does not throw", async () => {
     const ref = createRef<AnnotationPopupCSSHandle>();
     render(
       <AnnotationPopupCSS
@@ -296,7 +296,11 @@ describe("shake via ref", () => {
         onCancel={vi.fn()}
       />
     );
-    expect(() => ref.current?.shake()).not.toThrow();
+
+    await act(async () => {
+      expect(() => ref.current?.shake()).not.toThrow();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
   });
 });
 
