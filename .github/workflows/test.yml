@@ -21,8 +21,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
       - run: pnpm install --frozen-lockfile
-
       - run: pnpm build
-
-      - run: pnpm --filter agentation test
+      - run: pnpm build:storybook
+      - run: pnpm test
