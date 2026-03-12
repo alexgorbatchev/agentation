@@ -146,6 +146,12 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(new Response("ok", { status: 200 })),
+  );
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: mockWriteText },
     writable: true,

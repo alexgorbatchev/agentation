@@ -34,6 +34,13 @@ function seedAnnotations(annotations: Annotation[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
 }
 
+async function flushAsyncEffects(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 /**
  * Activate the toolbar by clicking the collapsed container.
  */
@@ -86,6 +93,18 @@ beforeEach(() => {
   // Clear storage
   localStorage.clear();
   sessionStorage.clear();
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        id: "test-session",
+        annotations: [],
+        status: "active",
+      }),
+    })),
+  );
 
   // Mock clipboard
   Object.defineProperty(navigator, "clipboard", {
@@ -785,20 +804,18 @@ describe("PageFeedbackToolbarCSS", () => {
       ).not.toThrow();
     });
 
-    it("renders with endpoint and sessionId props", () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(new Error("Network error"))
+    it("renders with endpoint and sessionId props", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      render(
+        <PageFeedbackToolbarCSS
+          endpoint="http://localhost:4747"
+          sessionId="test-session-123"
+        />
       );
 
-      expect(() =>
-        render(
-          <PageFeedbackToolbarCSS
-            endpoint="http://localhost:4747"
-            sessionId="test-session-123"
-          />
-        )
-      ).not.toThrow();
+      await flushAsyncEffects();
 
       const toolbar = document.querySelector("[data-feedback-toolbar]");
       expect(toolbar).toBeTruthy();
@@ -1324,20 +1341,21 @@ describe("PageFeedbackToolbarCSS", () => {
       expect(() => render(<PageFeedbackToolbarCSS />)).not.toThrow();
     });
 
-    it("renders when both endpoint and webhookUrl are provided", () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(new Error("Network error"))
+    it("renders when both endpoint and webhookUrl are provided", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      render(
+        <PageFeedbackToolbarCSS
+          endpoint="http://localhost:4747"
+          webhookUrl="https://example.com/webhook"
+        />
       );
 
-      expect(() =>
-        render(
-          <PageFeedbackToolbarCSS
-            endpoint="http://localhost:4747"
-            webhookUrl="https://example.com/webhook"
-          />
-        )
-      ).not.toThrow();
+      await flushAsyncEffects();
+
+      const toolbar = document.querySelector("[data-feedback-toolbar]");
+      expect(toolbar).toBeTruthy();
     });
   });
 

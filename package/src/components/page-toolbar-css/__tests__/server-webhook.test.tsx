@@ -689,7 +689,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       });
 
       // Wait a bit and verify annotation still exists (not removed)
-      await new Promise((r) => setTimeout(r, 300));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      });
 
       // The toolbar should still be rendered and the annotation should still exist in state
       const toolbar = document.querySelector("[data-feedback-toolbar]");

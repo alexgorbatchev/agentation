@@ -911,7 +911,10 @@ describe("Marker interactions and JSX render paths", () => {
       });
       const preventDefaultSpy = vi.spyOn(contextMenuEvent, "preventDefault");
 
-      marker.dispatchEvent(contextMenuEvent);
+      await act(async () => {
+        marker.dispatchEvent(contextMenuEvent);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      });
 
       // In delete mode, right-click should prevent default and start edit
       expect(preventDefaultSpy).toHaveBeenCalled();

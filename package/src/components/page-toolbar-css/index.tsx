@@ -1462,11 +1462,12 @@ export function PageFeedbackToolbarCSS({
     if (annotations.length > 0) return;
 
     const timeoutIds: ReturnType<typeof setTimeout>[] = [];
+    const initialActivationDelay = Math.max(0, demoDelay - 200);
 
     timeoutIds.push(
       originalSetTimeout(() => {
         setIsActive(true);
-      }, demoDelay - 200),
+      }, initialActivationDelay),
     );
 
     demoAnnotations.forEach((demo, index) => {

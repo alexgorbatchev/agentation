@@ -5,6 +5,7 @@ const config: StorybookConfig = {
   framework: "@storybook/react-vite",
   addons: [
     "@alexgorbatchev/storybook-addon-localstorage",
+    "@storybook/addon-vitest",
   ],
   viteFinal: (config) => {
     config.define = {

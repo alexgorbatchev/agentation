@@ -4,15 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter agentation watch & pnpm --filter feedback-tool-example dev",
-    "build": "pnpm --filter agentation build",
-    "example": "pnpm --filter feedback-tool-example dev",
-    "pack": "cd package && pnpm pack",
-    "build:pack": "pnpm build && cd package && npm pack && cd ../mcp && pnpm build && npm pack",
-    "mcp": "pnpm --filter agentation-mcp start",
+    "dev:mcp": "pnpm --filter agentation-mcp dev",
+    "storybook": "pnpm --filter agentation storybook",
+    "test": "pnpm -r run test",
+    "test:watch": "pnpm -r run test:watch",
+    "build": "pnpm -r run build",
+    "build:agentation": "pnpm --filter agentation build",
+    "build:mcp": "pnpm --filter agentation-mcp build",
+    "build:storybook": "pnpm --filter agentation build-storybook",
+    "pack": "pnpm build && pnpm --filter agentation pack && pnpm --filter agentation-mcp pack",
     "publish:agentation": "pnpm --filter agentation publish --access public",
     "publish:mcp": "pnpm --filter agentation-mcp publish --access public",
-    "publish:all": "pnpm publish:agentation && pnpm publish:mcp",
-    "storybook": "pnpm --filter agentation storybook"
+    "publish:all": "pnpm publish:agentation && pnpm publish:mcp"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

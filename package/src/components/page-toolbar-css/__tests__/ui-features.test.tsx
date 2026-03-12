@@ -316,6 +316,34 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
 
       btn.remove();
     });
+
+    it("supports demo delays shorter than the activation lead time", async () => {
+      const btn = document.createElement("button");
+      btn.id = "demo-short-delay";
+      btn.textContent = "Short Delay";
+      document.body.appendChild(btn);
+
+      render(
+        <PageFeedbackToolbarCSS
+          enableDemoMode={true}
+          demoAnnotations={[
+            { selector: "#demo-short-delay", comment: "Short delay annotation" },
+          ]}
+          demoDelay={50}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByTitle("Start feedback mode")).toBeNull();
+      });
+
+      await waitFor(() => {
+        const markers = document.querySelectorAll("[data-annotation-marker]");
+        expect(markers.length).toBe(1);
+      });
+
+      btn.remove();
+    });
   });
 
   // ===========================================================================
