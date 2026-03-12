@@ -62,8 +62,9 @@ export default defineConfig({
           globals: true,
           browser: {
             enabled: true,
+            headless: true,
             provider: playwright({
-              launch: { headless: true },
+              launchOptions: { headless: true },
             }),
             instances: [{ browser: "chromium" }],
           },

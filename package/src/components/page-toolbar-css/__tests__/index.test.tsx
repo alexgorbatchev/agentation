@@ -94,6 +94,18 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        id: "test-session",
+        annotations: [],
+        status: "active",
+      }),
+    })),
+  );
+
   // Mock clipboard
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: mockWriteText },
