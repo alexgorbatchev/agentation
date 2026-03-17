@@ -62,6 +62,10 @@ async function clickToolbar() {
 const meta: Meta<typeof PageFeedbackToolbarCSS> = {
   title: "Tests/PageToolbar",
   component: PageFeedbackToolbarCSS,
+  args: {
+    componentEditor: "neovim",
+    neovimBridgeUrl: "http://127.0.0.1:8787",
+  },
   beforeEach: () => {
     localStorage.clear();
     sessionStorage.clear();

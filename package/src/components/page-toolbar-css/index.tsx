@@ -79,6 +79,14 @@ import {
   formatSourceLocation,
 } from "../../utils/source-location";
 import {
+  createComponentSourceUrl,
+  formatComponentSourcePath,
+  inspectComponentElement,
+  type ComponentEditor,
+  type ComponentInspection,
+  type ComponentSourceUrlParams,
+} from "../../utils/component-inspector";
+import {
   freeze as freezeAll,
   unfreeze as unfreezeAll,
   originalSetTimeout,
@@ -143,6 +151,18 @@ type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
+const neovimHeartbeatIntervalMs = 5000;
+const neovimConnectionTimeoutMs = 15000;
+
+function normalizeNeovimBridgeUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+type ComponentMenuState = {
+  items: ComponentInspection[];
+  x: number;
+  y: number;
+};
 
 type ToolbarSettings = {
   outputDetail: OutputDetailLevel;
@@ -565,6 +585,16 @@ export type PageFeedbackToolbarCSSProps = {
   webhookUrl?: string;
   /** Custom class name applied to the toolbar container. Use to adjust positioning or z-index. */
   className?: string;
+  /** Editor protocol used for alt+right-click component navigation. */
+  componentEditor?: ComponentEditor;
+  /** Override editor URL generation for alt+right-click component navigation. */
+  getComponentEditorUrl?: (params: ComponentSourceUrlParams) => string;
+  /** Base URL for the Neovim bridge/router when using componentEditor="neovim". */
+  neovimBridgeUrl?: string;
+  /** Optional project ID used by the Neovim router to resolve the target session. */
+  neovimProjectId?: string;
+  /** Copy the component source path to the clipboard when opening it. */
+  copyComponentSourcePath?: boolean;
 };
 
 /** Alias for PageFeedbackToolbarCSSProps */
@@ -590,6 +620,11 @@ export function PageFeedbackToolbarCSS({
   onSessionCreated,
   webhookUrl,
   className: userClassName,
+  componentEditor = "vscode",
+  getComponentEditorUrl,
+  neovimBridgeUrl = "http://127.0.0.1:8777",
+  neovimProjectId,
+  copyComponentSourcePath = true,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -684,6 +719,8 @@ export function PageFeedbackToolbarCSS({
   const [showSettingsVisible, setShowSettingsVisible] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
   const [showReviewQueueVisible, setShowReviewQueueVisible] = useState(false);
+  const [componentMenu, setComponentMenu] = useState<ComponentMenuState | null>(null);
+  const [hoveredComponentMenuIndex, setHoveredComponentMenuIndex] = useState<number | null>(null);
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
@@ -865,6 +902,10 @@ export function PageFeedbackToolbarCSS({
   const [connectionStatus, setConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected"
   >(endpoint ? "connecting" : "disconnected");
+  const [neovimConnectionStatus, setNeovimConnectionStatus] = useState<
+    "disconnected" | "connecting" | "connected"
+  >(componentEditor === "neovim" ? "connecting" : "disconnected");
+  const normalizedNeovimBridgeUrl = normalizeNeovimBridgeUrl(neovimBridgeUrl);
 
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
@@ -1695,6 +1736,8 @@ export function PageFeedbackToolbarCSS({
       isAltSelectionHeldRef.current = false;
       didAltActivateToolbarRef.current = false;
       setIsAltSelectionHeld(false);
+      setComponentMenu(null);
+      setHoveredComponentMenuIndex(null);
       setPendingAnnotation(null);
       setEditingAnnotation(null);
       setEditingTargetElement(null);
@@ -1972,6 +2015,152 @@ export function PageFeedbackToolbarCSS({
     effectiveReactMode,
     pendingMultiSelectElements,
   ]);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleContextMenu = (e: MouseEvent) => {
+      const target = (e.composedPath()[0] || e.target) as HTMLElement;
+
+      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) return;
+      if (closestCrossingShadow(target, "[data-annotation-popup]")) return;
+      if (closestCrossingShadow(target, "[data-annotation-marker]")) return;
+
+      if (!e.altKey) {
+        setComponentMenu(null);
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const piercing = e.metaKey || e.ctrlKey;
+      const elementUnder = piercing
+        ? pierceElementFromPoint(e.clientX, e.clientY)
+        : deepElementFromPoint(e.clientX, e.clientY);
+      if (!elementUnder) {
+        setComponentMenu(null);
+        return;
+      }
+
+      const items = inspectComponentElement(elementUnder);
+      if (items.length === 0) {
+        setComponentMenu(null);
+        return;
+      }
+
+      setComponentMenu({ items, x: e.clientX, y: e.clientY });
+      setHoverInfo(null);
+    };
+
+    document.addEventListener("contextmenu", handleContextMenu, true);
+    return () => document.removeEventListener("contextmenu", handleContextMenu, true);
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!componentMenu) return;
+
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && closestCrossingShadow(target, "[data-component-source-menu]")) {
+        return;
+      }
+      setComponentMenu(null);
+      setHoveredComponentMenuIndex(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setComponentMenu(null);
+        setHoveredComponentMenuIndex(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [componentMenu]);
+
+  useEffect(() => {
+    if (componentEditor !== "neovim" || typeof fetch !== "function") {
+      setNeovimConnectionStatus("disconnected");
+      return;
+    }
+
+    let isDisposed = false;
+    let timeoutId: number | null = null;
+
+    const markDisconnected = (): void => {
+      setNeovimConnectionStatus("disconnected");
+    };
+
+    const scheduleDisconnect = (): void => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutId = window.setTimeout(markDisconnected, neovimConnectionTimeoutMs);
+    };
+
+    let pingUrl: URL;
+    try {
+      pingUrl = new URL(`${normalizedNeovimBridgeUrl}/ping`);
+    } catch {
+      setNeovimConnectionStatus("disconnected");
+      return;
+    }
+    if (neovimProjectId) {
+      pingUrl.searchParams.set("projectId", neovimProjectId);
+    }
+    if (typeof window !== "undefined" && window.location.origin) {
+      pingUrl.searchParams.set("origin", window.location.origin);
+    }
+
+    async function pingBridge(): Promise<void> {
+      if (isDisposed) {
+        return;
+      }
+
+      setNeovimConnectionStatus((current) =>
+        current === "connected" ? current : "connecting",
+      );
+
+      try {
+        const response = await fetch(pingUrl.toString(), {
+          method: "GET",
+          mode: "cors",
+          keepalive: true,
+        });
+        if (!response.ok) {
+          throw new Error(`Neovim bridge ping failed with status ${response.status}`);
+        }
+        if (!isDisposed) {
+          setNeovimConnectionStatus("connected");
+          scheduleDisconnect();
+        }
+      } catch {
+        if (!isDisposed) {
+          setNeovimConnectionStatus("disconnected");
+        }
+      }
+    }
+
+    void pingBridge();
+    const interval = window.setInterval(() => {
+      void pingBridge();
+    }, neovimHeartbeatIntervalMs);
+
+    return () => {
+      isDisposed = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      window.clearInterval(interval);
+    };
+  }, [componentEditor, normalizedNeovimBridgeUrl, neovimProjectId]);
 
   // Cmd+shift+click multi-select: keyup listener for modifier release
   useEffect(() => {
@@ -3228,7 +3417,8 @@ export function PageFeedbackToolbarCSS({
       const shouldKeepToolbarOpen =
         pendingAnnotation !== null ||
         editingAnnotation !== null ||
-        pendingMultiSelectElements.length > 0;
+        pendingMultiSelectElements.length > 0 ||
+        componentMenu !== null;
 
       if (shouldKeepToolbarOpen || !didAltActivateToolbar) return;
 
@@ -3247,7 +3437,8 @@ export function PageFeedbackToolbarCSS({
       const shouldKeepToolbarOpen =
         pendingAnnotation !== null ||
         editingAnnotation !== null ||
-        pendingMultiSelectElements.length > 0;
+        pendingMultiSelectElements.length > 0 ||
+        componentMenu !== null;
 
       if (shouldKeepToolbarOpen || !didAltActivateToolbar) return;
 
@@ -3276,6 +3467,7 @@ export function PageFeedbackToolbarCSS({
     copyOutput,
     clearAll,
     pendingMultiSelectElements,
+    componentMenu,
   ]);
 
   if (!mounted) return null;
@@ -3342,6 +3534,47 @@ export function PageFeedbackToolbarCSS({
 
     return styles;
   };
+
+  async function openComponentSource(item: ComponentInspection): Promise<void> {
+    const sourcePath = formatComponentSourcePath(item.source);
+
+    if (copyComponentSourcePath) {
+      try {
+        await navigator.clipboard.writeText(sourcePath);
+      } catch {
+        // Ignore clipboard failures and still attempt editor navigation.
+      }
+    }
+
+    const url = createComponentSourceUrl(
+      item.source,
+      componentEditor,
+      getComponentEditorUrl,
+      normalizedNeovimBridgeUrl,
+      neovimProjectId,
+    );
+
+    if (
+      componentEditor === "neovim" &&
+      /^https?:\/\//.test(url) &&
+      typeof fetch === "function"
+    ) {
+      try {
+        await fetch(url, {
+          method: "GET",
+          mode: "cors",
+          keepalive: true,
+        });
+      } catch {
+        // Ignore local bridge failures and keep the menu behavior predictable.
+      }
+    } else {
+      window.location.assign(url);
+    }
+
+    setComponentMenu(null);
+    setHoveredComponentMenuIndex(null);
+  }
 
   return createPortal(
     <div ref={portalWrapperRef} style={{ display: "contents" }}>
@@ -3959,6 +4192,38 @@ export function PageFeedbackToolbarCSS({
                       Learn more
                     </a>
                   </p>
+
+                  {componentEditor === "neovim" && (
+                    <>
+                      <div className={styles.settingsRow}>
+                        <span
+                          className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
+                        >
+                          Neovim Bridge
+                        </span>
+                        <div
+                          className={`${styles.mcpStatusDot} ${styles[neovimConnectionStatus]}`}
+                          title={
+                            neovimConnectionStatus === "connected"
+                              ? "Connected"
+                              : neovimConnectionStatus === "connecting"
+                                ? "Connecting..."
+                                : "Disconnected"
+                          }
+                        />
+                      </div>
+                      <p
+                        className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
+                        style={{ paddingBottom: 6 }}
+                      >
+                        {neovimConnectionStatus === "connected"
+                          ? "Web page connected to Neovim."
+                          : neovimConnectionStatus === "connecting"
+                            ? "Connecting to Neovim bridge..."
+                            : "Neovim bridge not detected."}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Webhooks section */}
@@ -4599,6 +4864,118 @@ export function PageFeedbackToolbarCSS({
               <div className={styles.hoverElementName}>
                 {hoverInfo.elementName}
               </div>
+            </div>
+          )}
+
+          {componentMenu && (
+            <div
+              data-component-source-menu
+              style={{
+                position: "fixed",
+                left: Math.min(componentMenu.x, window.innerWidth - 440),
+                top: Math.min(
+                  componentMenu.y,
+                  Math.max(16, window.innerHeight - 24 - componentMenu.items.length * 72),
+                ),
+                zIndex: 2147483647,
+                minWidth: 420,
+                maxWidth: 460,
+                background: isDarkMode ? "#111827" : "#ffffff",
+                color: isDarkMode ? "#f9fafb" : "#111827",
+                fontFamily:
+                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.12)" : "rgba(17,24,39,0.12)"}`,
+                borderRadius: 12,
+                boxShadow: "0 24px 48px rgba(0,0,0,0.22)",
+                padding: 8,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              {componentMenu.items.map((item, index) => {
+                const propNames = Object.keys(item.props);
+                const sourceLabel = formatComponentSourcePath(item.source);
+
+                return (
+                  <button
+                    key={`${item.displayName}-${item.source.fileName}-${item.source.lineNumber}-${index}`}
+                    type="button"
+                    onClick={() => {
+                      void openComponentSource(item);
+                    }}
+                    onMouseEnter={() => setHoveredComponentMenuIndex(index)}
+                    onMouseLeave={() => setHoveredComponentMenuIndex((current) => current === index ? null : current)}
+                    onFocus={() => setHoveredComponentMenuIndex(index)}
+                    onBlur={() => setHoveredComponentMenuIndex((current) => current === index ? null : current)}
+                    style={{
+                      all: "unset",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      cursor: "pointer",
+                      background:
+                        hoveredComponentMenuIndex === index
+                          ? isDarkMode
+                            ? "rgba(96,165,250,0.22)"
+                            : "rgba(59,130,246,0.14)"
+                          : isDarkMode
+                            ? "rgba(255,255,255,0.04)"
+                            : "rgba(15,23,42,0.03)",
+                      boxShadow:
+                        hoveredComponentMenuIndex === index
+                          ? isDarkMode
+                            ? "inset 0 0 0 1px rgba(147,197,253,0.28)"
+                            : "inset 0 0 0 1px rgba(59,130,246,0.2)"
+                          : "none",
+                      transform: hoveredComponentMenuIndex === index ? "translateY(-1px)" : "none",
+                      transition: "background 120ms ease, box-shadow 120ms ease, transform 120ms ease",
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
+                      {`<${item.displayName}>`}
+                    </div>
+                    {propNames.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {propNames.map((propName) => (
+                          <span
+                            key={propName}
+                            title={item.props[propName]}
+                            style={{
+                              fontSize: 11,
+                              lineHeight: 1,
+                              padding: "4px 6px",
+                              borderRadius: 999,
+                              background: isDarkMode ? "rgba(96,165,250,0.18)" : "rgba(59,130,246,0.12)",
+                              color: isDarkMode ? "#bfdbfe" : "#1d4ed8",
+                            }}
+                          >
+                            {propName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div
+                      title={sourceLabel}
+                      style={{
+                        fontSize: 11,
+                        lineHeight: 1.3,
+                        opacity: 0.75,
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        direction: "rtl",
+                        textAlign: "left",
+                      }}
+                    >
+                      {sourceLabel}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
 

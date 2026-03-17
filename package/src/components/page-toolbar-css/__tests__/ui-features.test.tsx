@@ -731,6 +731,35 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
         expect(document.body.textContent).toContain("Auto-Send");
       });
     });
+
+    it("shows Neovim bridge status when using the neovim editor mode", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+        }),
+      );
+
+      render(<PageFeedbackToolbarCSS componentEditor="neovim" />);
+      await activateToolbar();
+
+      const settingsBtn = findButtonByTooltip("Settings");
+      fireEvent.click(settingsBtn!);
+
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("Manage MCP & Webhooks");
+      });
+
+      const navLinks = Array.from(
+        document.querySelectorAll("[data-feedback-toolbar] button"),
+      ).filter((btn) => btn.textContent?.includes("Manage MCP & Webhooks"));
+      fireEvent.click(navLinks[0]);
+
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("Neovim Bridge");
+        expect(document.body.textContent).toContain("Web page connected to Neovim");
+      });
+    });
   });
 
   // ===========================================================================

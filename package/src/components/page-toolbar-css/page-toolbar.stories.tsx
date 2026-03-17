@@ -171,6 +171,10 @@ async function clickToolbar() {
 const meta: Meta<typeof PageFeedbackToolbarCSS> = {
   title: "PageToolbar",
   component: PageFeedbackToolbarCSS,
+  args: {
+    componentEditor: "neovim",
+    neovimBridgeUrl: "http://127.0.0.1:8787",
+  },
   parameters: {
     localStorage: localStorageForStorybook({
       [STORAGE_KEY]: [],
@@ -233,6 +237,12 @@ export default meta;
 type Story = StoryObj<typeof PageFeedbackToolbarCSS>;
 
 export const Default: Story = {};
+
+export const VSCodeEditor: Story = {
+  args: {
+    componentEditor: "vscode",
+  },
+};
 
 export const Expanded: Story = {
   play: async () => {
