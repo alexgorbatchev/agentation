@@ -7,10 +7,34 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: router/go.mod
+
+      - name: Router tests
+        working-directory: router
+        run: go test ./...
+
+      - name: Router cross-build smoke
+        working-directory: router
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          for goos in linux darwin windows; do
+            for goarch in amd64 arm64; do
+              output="../tmp/router-ci/agentation-router-${goos}-${goarch}"
+              if [[ "$goos" == "windows" ]]; then
+                output="${output}.exe"
+              fi
+              GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$output" ./cmd/agentation-router
+            done
+          done
 
       - uses: pnpm/action-setup@v4
         with:

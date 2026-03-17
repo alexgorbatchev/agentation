@@ -155,9 +155,17 @@ func runStop() int {
 		pid = fallbackPID
 	}
 
-	if error := syscall.Kill(pid, syscall.SIGTERM); error != nil {
-		fmt.Fprintf(os.Stderr, "failed to stop agentation-router: %v\n", error)
+	process, error := os.FindProcess(pid)
+	if error != nil {
+		fmt.Fprintf(os.Stderr, "failed to find agentation-router process: %v\n", error)
 		return 1
+	}
+
+	if error := process.Signal(os.Interrupt); error != nil {
+		if killError := process.Kill(); killError != nil {
+			fmt.Fprintf(os.Stderr, "failed to stop agentation-router: %v\n", killError)
+			return 1
+		}
 	}
 
 	for attempt := 0; attempt < 30; attempt++ {
@@ -169,7 +177,7 @@ func runStop() int {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	if error := syscall.Kill(pid, syscall.SIGKILL); error != nil {
+	if error := process.Kill(); error != nil {
 		fmt.Fprintf(os.Stderr, "failed to kill agentation-router: %v\n", error)
 		return 1
 	}
@@ -267,8 +275,26 @@ func removePIDFile() error {
 }
 
 func isProcessRunning(pid int) bool {
-	error := syscall.Kill(pid, 0)
-	return error == nil || errors.Is(error, syscall.EPERM)
+	if pid <= 0 {
+		return false
+	}
+
+	process, error := os.FindProcess(pid)
+	if error != nil {
+		return false
+	}
+
+	error = process.Signal(syscall.Signal(0))
+	if error == nil {
+		return true
+	}
+
+	message := strings.ToLower(error.Error())
+	if strings.Contains(message, "process already finished") || strings.Contains(message, "no such process") {
+		return false
+	}
+
+	return true
 }
 
 func loadRunningPID() (int, bool) {
