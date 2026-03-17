@@ -3,14 +3,20 @@
 [![npm version](https://img.shields.io/npm/v/agentation)](https://www.npmjs.com/package/agentation)
 [![downloads](https://img.shields.io/npm/dm/agentation)](https://www.npmjs.com/package/agentation)
 
+---
+
+> [!WARNING]
 > Fork notice: this repository is a maintained fork of [benjitaylor/agentation](https://github.com/benjitaylor/agentation) with several additions on top of upstream:
->
-> - Annotation thread and reply UI
-> - Deep select for piercing overlays
-> - Alt hold-to-select mode with a crosshair cursor
-> - Review queue for resolved annotations
-> - MCP support for surfacing human thread replies
-> - Storybook plus expanded automated test coverage
+
+- Annotation thread and reply UI
+- Deep select for piercing overlays
+- Alt hold-to-select mode with a crosshair cursor
+- Review queue for resolved annotations
+- MCP support for surfacing human thread replies
+- Storybook plus expanded automated test coverage
+- Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon ([`router/README.md`](router/README.md)) for multi-project Neovim routing
+
+---
 
 **[Agentation](https://agentation.dev)** is an agent-agnostic visual feedback tool. Click elements on your page, add notes, and copy structured output that helps AI coding agents find the exact code you're referring to.
 
@@ -60,6 +66,21 @@ Agentation captures class names, selectors, and element positions so AI agents c
 ## Docs
 
 Full documentation at [agentation.dev](https://agentation.dev)
+
+Neovim/router docs:
+
+- `nvim/README.md`
+- `router/README.md`
+
+## Development
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+```
+
+Router binaries are published via GitHub Actions on tags matching `router-v*`.
 
 ## License
 

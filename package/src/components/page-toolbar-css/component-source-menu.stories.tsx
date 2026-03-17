@@ -158,7 +158,8 @@ const meta: Meta<typeof PageFeedbackToolbarCSS> = {
     ),
   ],
   args: {
-    componentEditor: "cursor",
+    componentEditor: "neovim",
+    neovimBridgeUrl: "http://127.0.0.1:8787",
   },
 };
 

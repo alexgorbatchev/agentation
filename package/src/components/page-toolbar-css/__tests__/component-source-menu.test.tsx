@@ -54,6 +54,12 @@ describe("component source menu", () => {
       value: vi.fn(),
       configurable: true,
     });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+      }),
+    );
   });
 
   it("opens a component menu on alt+right-click and navigates on selection", async () => {
@@ -106,5 +112,66 @@ describe("component source menu", () => {
       expect(hooks.createUrl).toHaveBeenCalled();
     });
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
+  it("uses location navigation for non-neovim editors even when URL is http", async () => {
+    hooks.createUrl.mockReturnValueOnce("https://example.dev/open?path=src/Button.tsx");
+
+    render(<PageFeedbackToolbarCSS componentEditor="cursor" />);
+    await activateToolbar();
+
+    const target = document.createElement("button");
+    document.body.appendChild(target);
+    vi.mocked(document.elementFromPoint).mockReturnValue(target);
+
+    fireEvent.contextMenu(target, {
+      altKey: true,
+      clientX: 120,
+      clientY: 180,
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /<Button>/ }));
+
+    await waitFor(() => {
+      expect(hooks.createUrl).toHaveBeenCalled();
+    });
+
+    expect(
+      vi.mocked(fetch).mock.calls.some(
+        ([url]) => url === "https://example.dev/open?path=src/Button.tsx",
+      ),
+    ).toBe(false);
+  });
+
+  it("uses fetch instead of location navigation for neovim bridge requests", async () => {
+    hooks.createUrl.mockReturnValueOnce(
+      "http://127.0.0.1:8777/open?path=src%2FButton.tsx&line=42&column=8",
+    );
+
+    render(<PageFeedbackToolbarCSS componentEditor="neovim" />);
+    await activateToolbar();
+
+    const target = document.createElement("button");
+    document.body.appendChild(target);
+    vi.mocked(document.elementFromPoint).mockReturnValue(target);
+
+    fireEvent.contextMenu(target, {
+      altKey: true,
+      clientX: 120,
+      clientY: 180,
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /<Button>/ }));
+
+    await waitFor(() => {
+      expect(
+        vi.mocked(fetch).mock.calls.some(
+          ([url, options]) =>
+            url === "http://127.0.0.1:8777/open?path=src%2FButton.tsx&line=42&column=8" &&
+            (options as RequestInit | undefined)?.method === "GET",
+        ),
+      ).toBe(true);
+    });
+    expect(Location.prototype.assign).not.toHaveBeenCalled();
   });
 });

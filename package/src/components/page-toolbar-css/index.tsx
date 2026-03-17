@@ -151,6 +151,12 @@ type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
+const neovimHeartbeatIntervalMs = 5000;
+const neovimConnectionTimeoutMs = 15000;
+
+function normalizeNeovimBridgeUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
 
 type ComponentMenuState = {
   items: ComponentInspection[];
@@ -583,6 +589,10 @@ export type PageFeedbackToolbarCSSProps = {
   componentEditor?: ComponentEditor;
   /** Override editor URL generation for alt+right-click component navigation. */
   getComponentEditorUrl?: (params: ComponentSourceUrlParams) => string;
+  /** Base URL for the Neovim bridge/router when using componentEditor="neovim". */
+  neovimBridgeUrl?: string;
+  /** Optional project ID used by the Neovim router to resolve the target session. */
+  neovimProjectId?: string;
   /** Copy the component source path to the clipboard when opening it. */
   copyComponentSourcePath?: boolean;
 };
@@ -612,6 +622,8 @@ export function PageFeedbackToolbarCSS({
   className: userClassName,
   componentEditor = "vscode",
   getComponentEditorUrl,
+  neovimBridgeUrl = "http://127.0.0.1:8777",
+  neovimProjectId,
   copyComponentSourcePath = true,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
@@ -890,6 +902,10 @@ export function PageFeedbackToolbarCSS({
   const [connectionStatus, setConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected"
   >(endpoint ? "connecting" : "disconnected");
+  const [neovimConnectionStatus, setNeovimConnectionStatus] = useState<
+    "disconnected" | "connecting" | "connected"
+  >(componentEditor === "neovim" ? "connecting" : "disconnected");
+  const normalizedNeovimBridgeUrl = normalizeNeovimBridgeUrl(neovimBridgeUrl);
 
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
@@ -2068,6 +2084,83 @@ export function PageFeedbackToolbarCSS({
       document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [componentMenu]);
+
+  useEffect(() => {
+    if (componentEditor !== "neovim" || typeof fetch !== "function") {
+      setNeovimConnectionStatus("disconnected");
+      return;
+    }
+
+    let isDisposed = false;
+    let timeoutId: number | null = null;
+
+    const markDisconnected = (): void => {
+      setNeovimConnectionStatus("disconnected");
+    };
+
+    const scheduleDisconnect = (): void => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutId = window.setTimeout(markDisconnected, neovimConnectionTimeoutMs);
+    };
+
+    let pingUrl: URL;
+    try {
+      pingUrl = new URL(`${normalizedNeovimBridgeUrl}/ping`);
+    } catch {
+      setNeovimConnectionStatus("disconnected");
+      return;
+    }
+    if (neovimProjectId) {
+      pingUrl.searchParams.set("projectId", neovimProjectId);
+    }
+    if (typeof window !== "undefined" && window.location.origin) {
+      pingUrl.searchParams.set("origin", window.location.origin);
+    }
+
+    async function pingBridge(): Promise<void> {
+      if (isDisposed) {
+        return;
+      }
+
+      setNeovimConnectionStatus((current) =>
+        current === "connected" ? current : "connecting",
+      );
+
+      try {
+        const response = await fetch(pingUrl.toString(), {
+          method: "GET",
+          mode: "cors",
+          keepalive: true,
+        });
+        if (!response.ok) {
+          throw new Error(`Neovim bridge ping failed with status ${response.status}`);
+        }
+        if (!isDisposed) {
+          setNeovimConnectionStatus("connected");
+          scheduleDisconnect();
+        }
+      } catch {
+        if (!isDisposed) {
+          setNeovimConnectionStatus("disconnected");
+        }
+      }
+    }
+
+    void pingBridge();
+    const interval = window.setInterval(() => {
+      void pingBridge();
+    }, neovimHeartbeatIntervalMs);
+
+    return () => {
+      isDisposed = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      window.clearInterval(interval);
+    };
+  }, [componentEditor, normalizedNeovimBridgeUrl, neovimProjectId]);
 
   // Cmd+shift+click multi-select: keyup listener for modifier release
   useEffect(() => {
@@ -3457,8 +3550,28 @@ export function PageFeedbackToolbarCSS({
       item.source,
       componentEditor,
       getComponentEditorUrl,
+      normalizedNeovimBridgeUrl,
+      neovimProjectId,
     );
-    window.location.assign(url);
+
+    if (
+      componentEditor === "neovim" &&
+      /^https?:\/\//.test(url) &&
+      typeof fetch === "function"
+    ) {
+      try {
+        await fetch(url, {
+          method: "GET",
+          mode: "cors",
+          keepalive: true,
+        });
+      } catch {
+        // Ignore local bridge failures and keep the menu behavior predictable.
+      }
+    } else {
+      window.location.assign(url);
+    }
+
     setComponentMenu(null);
     setHoveredComponentMenuIndex(null);
   }
@@ -4079,6 +4192,38 @@ export function PageFeedbackToolbarCSS({
                       Learn more
                     </a>
                   </p>
+
+                  {componentEditor === "neovim" && (
+                    <>
+                      <div className={styles.settingsRow}>
+                        <span
+                          className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
+                        >
+                          Neovim Bridge
+                        </span>
+                        <div
+                          className={`${styles.mcpStatusDot} ${styles[neovimConnectionStatus]}`}
+                          title={
+                            neovimConnectionStatus === "connected"
+                              ? "Connected"
+                              : neovimConnectionStatus === "connecting"
+                                ? "Connecting..."
+                                : "Disconnected"
+                          }
+                        />
+                      </div>
+                      <p
+                        className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
+                        style={{ paddingBottom: 6 }}
+                      >
+                        {neovimConnectionStatus === "connected"
+                          ? "Web page connected to Neovim."
+                          : neovimConnectionStatus === "connecting"
+                            ? "Connecting to Neovim bridge..."
+                            : "Neovim bridge not detected."}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Webhooks section */}
@@ -4737,6 +4882,8 @@ export function PageFeedbackToolbarCSS({
                 maxWidth: 460,
                 background: isDarkMode ? "#111827" : "#ffffff",
                 color: isDarkMode ? "#f9fafb" : "#111827",
+                fontFamily:
+                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.12)" : "rgba(17,24,39,0.12)"}`,
                 borderRadius: 12,
                 boxShadow: "0 24px 48px rgba(0,0,0,0.22)",

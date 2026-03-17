@@ -27,12 +27,14 @@ type ReactDevToolsHook = {
   renderers?: Map<number, ReactRenderer>;
 };
 
-export type ComponentEditor = "cursor" | "vscode" | "vscode-insiders" | "webstorm";
+export type ComponentEditor = "cursor" | "neovim" | "vscode" | "vscode-insiders" | "webstorm";
 
 export type ComponentSourceUrlParams = {
   path: string;
   line: number;
   column: number;
+  projectId?: string;
+  bridgeUrl?: string;
 };
 
 export type ComponentInspection = {
@@ -176,15 +178,23 @@ export function formatComponentSourcePath(source: SourceLocation): string {
   return `${toProjectRelativePath(source.fileName)}:${source.lineNumber}${source.columnNumber ? `:${source.columnNumber}` : ""}`;
 }
 
+function normalizeBridgeUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
 export function createComponentSourceUrl(
   source: SourceLocation,
   editor: ComponentEditor,
   getEditorUrl?: (params: ComponentSourceUrlParams) => string,
+  neovimBridgeUrl = "http://127.0.0.1:8777",
+  neovimProjectId?: string,
 ): string {
   const params: ComponentSourceUrlParams = {
     path: toProjectRelativePath(source.fileName),
     line: source.lineNumber,
     column: source.columnNumber ?? 1,
+    projectId: neovimProjectId,
+    bridgeUrl: normalizeBridgeUrl(neovimBridgeUrl),
   };
 
   if (getEditorUrl) {
@@ -194,6 +204,12 @@ export function createComponentSourceUrl(
   switch (editor) {
     case "cursor":
       return `cursor://open?url=file:/${params.path}&line=${params.line}&column=${params.column}`;
+    case "neovim": {
+      const projectIdQuery = params.projectId
+        ? `&projectId=${encodeURIComponent(params.projectId)}`
+        : "";
+      return `${params.bridgeUrl}/open?path=${encodeURIComponent(params.path)}&line=${params.line}&column=${params.column}${projectIdQuery}`;
+    }
     case "vscode-insiders":
       return `vscode-insiders://file/${params.path}:${params.line}:${params.column}`;
     case "webstorm":

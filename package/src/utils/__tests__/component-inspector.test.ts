@@ -84,6 +84,29 @@ describe("createComponentSourceUrl", () => {
     ).toBe("cursor://open?url=file:/src/Button.tsx&line=10&column=2");
   });
 
+  it("builds a Neovim bridge URL", () => {
+    expect(
+      createComponentSourceUrl(
+        { fileName: "/src/Button.tsx", lineNumber: 10, columnNumber: 2 },
+        "neovim",
+      ),
+    ).toBe("http://127.0.0.1:8777/open?path=src%2FButton.tsx&line=10&column=2");
+  });
+
+  it("builds a Neovim bridge URL with custom base URL and projectId", () => {
+    expect(
+      createComponentSourceUrl(
+        { fileName: "/src/Button.tsx", lineNumber: 10, columnNumber: 2 },
+        "neovim",
+        undefined,
+        "http://127.0.0.1:8787/",
+        "project-123",
+      ),
+    ).toBe(
+      "http://127.0.0.1:8787/open?path=src%2FButton.tsx&line=10&column=2&projectId=project-123",
+    );
+  });
+
   it("uses a custom editor URL factory when provided", () => {
     expect(
       createComponentSourceUrl(
