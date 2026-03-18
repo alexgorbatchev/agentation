@@ -7,7 +7,7 @@ Minimal Neovim bridge for Agentation component-source links.
 - starts a small local HTTP server
 - accepts requests like `/open?path=src/Button.tsx&line=42&column=8`
 - opens the file in the current Neovim instance and jumps to the location
-- optionally registers this Neovim session with `agentation-router`
+- optionally registers this Neovim session with the Agentation router managed by the `agentation` CLI
 
 ## Install
 
@@ -21,6 +21,10 @@ Example with `lazy.nvim` local plugin development:
   config = function()
     require("agentation").setup({
       root = "/path/to/agentation/package",
+
+      -- Optional router integration for local checkouts
+      router_url = "http://127.0.0.1:8787",
+      router_bin = "/path/to/agentation/bin/agentation",
     })
   end,
 }
@@ -52,7 +56,8 @@ require("agentation").setup({
   router_token = nil,
   router_register_interval_ms = 5000,
   router_auto_start = true,
-  router_bin = "agentation-router", -- defaults to PATH lookup
+  router_bin = "agentation", -- defaults to PATH lookup
+  router_start_args = { "start" },
 
   -- Optional identity overrides
   project_id = nil,
@@ -70,7 +75,14 @@ require("agentation").setup({
 Project IDs default to `sha256(realpath(git_root_or_root))`.
 Repo IDs default to `sha256(git remote.origin.url)` when available.
 
-When `router_auto_start=true`, the plugin attempts to start the router with `<router_bin> start` whenever `router_url` is configured but unreachable.
+When `router_auto_start=true`, the plugin attempts to start the router with `<router_bin> <router_start_args...>` whenever `router_url` is configured but unreachable.
+
+With the current CLI lifecycle model, `router_start_args = { "start" }` starts the single Agentation stack process (server + router).
+If you want router-only startup from Neovim auto-start, launch Neovim with `AGENTATION_SERVER_ADDR=0` in the environment.
+
+`router_bin` defaults to `"agentation"` (resolved via `PATH`). Set an absolute path in `setup()` if you want to force a local binary.
+
+Startup auto-connect failures are silent. Manual `:AgentationStart` emits at most one router warning per command invocation.
 
 ## Statusline indicator
 

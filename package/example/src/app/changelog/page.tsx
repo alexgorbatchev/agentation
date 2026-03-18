@@ -87,7 +87,7 @@ const releases: Release[] = [
     version: "2.1.0",
     date: "February 5, 2026",
     changes: [
-      { type: "added", text: <><a href="/mcp#hands-free-mode" className="styled-link">Hands-free mode</a> — <code>watch_annotations</code> tool blocks until new annotations appear, then returns a batch for the agent to process in a loop</> },
+      { type: "added", text: <><a href="/server#hands-free-mode" className="styled-link">Hands-free mode</a> — <code>watch_annotations</code> tool blocks until new annotations appear, then returns a batch for the agent to process in a loop</> },
       { type: "added", text: <>Keyboard shortcut <code>Cmd+Shift+F</code> / <code>Ctrl+Shift+F</code> to toggle feedback mode</> },
       { type: "added", text: "Resolved annotations now animate out of the browser UI in real time via Server-Sent Events" },
       { type: "fixed", text: "Production builds no longer health-check localhost:4747 on every page load" },
@@ -100,9 +100,9 @@ const releases: Release[] = [
     date: "February 5, 2026",
     summary: "The shift from \"annotate, copy, paste\" to \"annotate and collaborate.\" Agents now see your annotations directly. This update adds MCP server integration, webhooks, React component detection, Shadow DOM support, and much more.",
     changes: [
-      { type: "added", text: <><a href="/mcp" className="styled-link">MCP server</a> for direct agent integration — agents can fetch, acknowledge, resolve, and dismiss annotations</> },
+      { type: "added", text: <><a href="/server" className="styled-link">MCP server</a> for direct agent integration — agents can fetch, acknowledge, resolve, and dismiss annotations</> },
       { type: "added", text: "HTTP API and Server-Sent Events for real-time updates" },
-      { type: "added", text: <>Per-page <a href="/mcp#sessions" className="styled-link">sessions</a> with rich annotation metadata (timestamps, status, resolver info)</> },
+      { type: "added", text: <>Per-page <a href="/server#sessions" className="styled-link">sessions</a> with rich annotation metadata (timestamps, status, resolver info)</> },
       { type: "added", text: "Status transitions: pending → acknowledged → resolved/dismissed, all timestamped" },
       { type: "added", text: <><a href="/schema" className="styled-link">Annotation Format Schema</a> with intent and severity fields for prioritization</> },
       { type: "added", text: "JSON Schema and TypeScript definitions for the annotation format" },

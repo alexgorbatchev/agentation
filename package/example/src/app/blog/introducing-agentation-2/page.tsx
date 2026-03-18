@@ -37,15 +37,15 @@ export default function Agentation2Page() {
         </div>
 
         <section>
-          <h2 id="mcp">MCP Integration</h2>
+          <h2 id="mcp">Server Integration</h2>
           <p>
-            The <Link href="/mcp">Model Context Protocol server</Link> is the biggest addition in 2.0. It&rsquo;s what makes the direct connection possible.
+            The local <Link href="/server">Agentation server</Link> is the biggest addition in 2.0. It&rsquo;s what makes direct agent collaboration possible.
           </p>
           <p>
-            With MCP, agents can fetch your current annotations, acknowledge them, ask follow-up questions, resolve issues with summaries, or dismiss feedback with reasons. Your annotations flow directly into the agent&rsquo;s context.
+            With server sync, agents can fetch current annotations, acknowledge them, ask follow-up questions, resolve issues with summaries, or dismiss feedback with reasons. Your annotations flow directly into the agent workflow.
           </p>
           <p>
-            The server runs locally and supports multiple interfaces: <Link href="/mcp">MCP tools</Link> for direct agent integration, an <Link href="/api">HTTP API</Link> for custom workflows, and <Link href="/api#real-time-events">Server-Sent Events</Link> for real-time updates. It&rsquo;s designed to work with Claude Code and any MCP-compatible client.
+            The server runs locally and exposes an <Link href="/api">HTTP API</Link> plus <Link href="/api#real-time-events">Server-Sent Events</Link> for real-time updates. It&rsquo;s designed to work with CLI-driven agent loops and local automation.
           </p>
           <p>
             Here&rsquo;s what the workflow looks like:
@@ -63,7 +63,7 @@ export default function Agentation2Page() {
         <section>
           <h2 id="sessions">Sessions &amp; Smart Filtering</h2>
           <p>
-            Every page now gets its own <Link href="/mcp#sessions">session</Link>, and every annotation carries rich metadata: when it was created, when it was last updated, its current status, and who resolved it. This unlocks entirely new ways to work with feedback.
+            Every page now gets its own session, and every annotation carries rich metadata: when it was created, when it was last updated, its current status, and who resolved it. This unlocks entirely new ways to work with feedback.
           </p>
           <p>
             Ask your agent things like:

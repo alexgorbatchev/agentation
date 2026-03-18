@@ -251,7 +251,7 @@ export default function AgentationDocs() {
               padding: '0.04em 0.06em',
               borderRadius: '0.2em 0.15em',
               backgroundImage: 'linear-gradient(75deg, rgba(250, 204, 21, 0.5), rgba(250, 204, 21, 0.15) 4%, rgba(250, 204, 21, 0.3) 96%, rgba(250, 204, 21, 0.6))',
-            }}>Note:</strong> With <Link href="/mcp">MCP</Link>, you can skip the copy-paste step entirely &mdash; your agent already sees what you&apos;re pointing at. Just say &ldquo;address my feedback&rdquo; or &ldquo;fix annotation 3.&rdquo;
+            }}>Note:</strong> With <Link href="/server">the Agentation server</Link>, you can skip the copy-paste step entirely &mdash; your agent already sees what you&apos;re pointing at. Just say &ldquo;address my feedback&rdquo; or &ldquo;fix annotation 3.&rdquo;
           </p>
         </section>
 
@@ -321,7 +321,7 @@ export default function AgentationDocs() {
         <section>
           <h2>Agents talk back</h2>
           <p>
-            With <a href="/mcp">MCP integration</a> and the <a href="/schema">Annotation Format Schema</a>, agents don&rsquo;t just read your annotations &mdash; they can respond to them:
+            With <a href="/server">server integration</a> and the <a href="/schema">Annotation Format Schema</a>, agents don&rsquo;t just read your annotations &mdash; they can respond to them:
           </p>
           <ul>
             <li><strong>&ldquo;What annotations do I have?&rdquo;</strong> &mdash; List all feedback across pages</li>
@@ -354,7 +354,7 @@ export default function AgentationDocs() {
         </section>
 
         <section className="quickstart-links">
-          <p><Link href="/mcp" className="styled-link">Set up real-time sync with MCP <span className="arrow">→</span></Link></p>
+          <p><Link href="/server" className="styled-link">Set up real-time sync with the Agentation server <span className="arrow">→</span></Link></p>
           <p><Link href="/webhooks" className="styled-link">Push annotations to external services <span className="arrow">→</span></Link></p>
           <p><Link href="/api" className="styled-link">Build your own integration with the API <span className="arrow">→</span></Link></p>
         </section>

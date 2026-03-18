@@ -626,20 +626,20 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       fireEvent.click(settingsBtn!);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("Manage MCP & Webhooks");
+        expect(document.body.textContent).toContain("Manage Connections");
       });
 
-      // Click the "Manage MCP & Webhooks" link
+      // Click the "Manage Connections" link
       const navLinks = Array.from(
         document.querySelectorAll("[data-feedback-toolbar] button"),
       ).filter((btn) =>
-        btn.textContent?.includes("Manage MCP & Webhooks"),
+        btn.textContent?.includes("Manage Connections"),
       );
       expect(navLinks.length).toBeGreaterThanOrEqual(1);
       fireEvent.click(navLinks[0]);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("MCP Connection");
+        expect(document.body.textContent).toContain("Server Connection");
         expect(document.body.textContent).toContain("Webhooks");
       });
     });
@@ -652,26 +652,26 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       fireEvent.click(settingsBtn!);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("Manage MCP & Webhooks");
+        expect(document.body.textContent).toContain("Manage Connections");
       });
 
       // Navigate to automations
       const navLinks = Array.from(
         document.querySelectorAll("[data-feedback-toolbar] button"),
-      ).filter((btn) => btn.textContent?.includes("Manage MCP & Webhooks"));
+      ).filter((btn) => btn.textContent?.includes("Manage Connections"));
       fireEvent.click(navLinks[0]);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("MCP Connection");
+        expect(document.body.textContent).toContain("Server Connection");
       });
 
-      // Find and click back button (contains Manage MCP & Webhooks text and is a button)
+      // Find and click back button (contains Manage Connections text and is a button)
       const backButtons = Array.from(
         document.querySelectorAll("[data-feedback-toolbar] button"),
       ).filter((btn) => {
-        // The back button has the text "Manage MCP & Webhooks" and an SVG icon
+        // The back button has the text "Manage Connections" and an SVG icon
         return (
-          btn.textContent?.includes("Manage MCP & Webhooks") &&
+          btn.textContent?.includes("Manage Connections") &&
           btn.querySelector("svg") !== null
         );
       });
@@ -695,12 +695,12 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       fireEvent.click(settingsBtn!);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("Manage MCP & Webhooks");
+        expect(document.body.textContent).toContain("Manage Connections");
       });
 
       const navLinks = Array.from(
         document.querySelectorAll("[data-feedback-toolbar] button"),
-      ).filter((btn) => btn.textContent?.includes("Manage MCP & Webhooks"));
+      ).filter((btn) => btn.textContent?.includes("Manage Connections"));
       fireEvent.click(navLinks[0]);
 
       await waitFor(() => {
@@ -719,12 +719,12 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       fireEvent.click(settingsBtn!);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("Manage MCP & Webhooks");
+        expect(document.body.textContent).toContain("Manage Connections");
       });
 
       const navLinks = Array.from(
         document.querySelectorAll("[data-feedback-toolbar] button"),
-      ).filter((btn) => btn.textContent?.includes("Manage MCP & Webhooks"));
+      ).filter((btn) => btn.textContent?.includes("Manage Connections"));
       fireEvent.click(navLinks[0]);
 
       await waitFor(() => {
@@ -747,12 +747,12 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       fireEvent.click(settingsBtn!);
 
       await waitFor(() => {
-        expect(document.body.textContent).toContain("Manage MCP & Webhooks");
+        expect(document.body.textContent).toContain("Manage Connections");
       });
 
       const navLinks = Array.from(
         document.querySelectorAll("[data-feedback-toolbar] button"),
-      ).filter((btn) => btn.textContent?.includes("Manage MCP & Webhooks"));
+      ).filter((btn) => btn.textContent?.includes("Manage Connections"));
       fireEvent.click(navLinks[0]);
 
       await waitFor(() => {

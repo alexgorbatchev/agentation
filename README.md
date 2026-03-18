@@ -12,9 +12,9 @@
 - Deep select for piercing overlays
 - Alt hold-to-select mode with a crosshair cursor
 - Review queue for resolved annotations
-- MCP support for surfacing human thread replies
+- Local CLI/server support for surfacing human thread replies
 - Storybook plus expanded automated test coverage
-- Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon ([`router/README.md`](router/README.md)) for multi-project Neovim routing
+- Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon managed by the Go CLI for multi-project Neovim routing
 
 ---
 
@@ -80,7 +80,7 @@ pnpm build
 pnpm test
 ```
 
-Router binaries are published via GitHub Actions on tags matching `router-v*`.
+CLI binaries are published via GitHub Actions on tags matching `cli-v*`.
 
 ## License
 
