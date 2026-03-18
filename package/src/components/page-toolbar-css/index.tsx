@@ -4122,7 +4122,7 @@ export function PageFeedbackToolbarCSS({
                     className={`${styles.settingsNavLink} ${!isDarkMode ? styles.light : ""}`}
                     onClick={() => setSettingsPage("automations")}
                   >
-                    <span>Manage MCP & Webhooks</span>
+                    <span>Manage Connections</span>
                     <span className={styles.settingsNavLinkRight}>
                       {endpoint && connectionStatus !== "disconnected" && (
                         <span
@@ -4146,17 +4146,17 @@ export function PageFeedbackToolbarCSS({
                   onClick={() => setSettingsPage("main")}
                 >
                   <IconChevronLeft size={16} />
-                  <span>Manage MCP & Webhooks</span>
+                  <span>Manage Connections</span>
                 </button>
 
-                {/* MCP Connection section */}
+                {/* Server Connection section */}
                 <div className={styles.settingsSection}>
                   <div className={styles.settingsRow}>
                     <span
                       className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
                     >
-                      MCP Connection
-                      <Tooltip content="Connect via Model Context Protocol to let AI agents like Claude Code receive annotations in real-time.">
+                      Server Connection
+                      <Tooltip content="Connect to an Agentation server to let AI agents like Claude Code receive annotations in real-time.">
                         <span
                           className={`${styles.helpIcon} ${styles.helpIconNudgeDown}`}
                         >
@@ -4181,7 +4181,7 @@ export function PageFeedbackToolbarCSS({
                     className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
                     style={{ paddingBottom: 6 }}
                   >
-                    MCP connection allows agents to receive and act on
+                    Server connection allows agents to receive and act on
                     annotations.{" "}
                     <a
                       href="https://agentation.dev/mcp"
