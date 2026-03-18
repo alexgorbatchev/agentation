@@ -67,7 +67,7 @@ jobs:
           target_dir="dist/agentation-${GOOS}-${GOARCH}"
           mkdir -p "$target_dir"
 
-          go build -trimpath -ldflags="-s -w" -o "$target_dir/$binary_name" ./cli/cmd/agentation
+          go build -C cli -trimpath -ldflags="-s -w" -o "../$target_dir/$binary_name" ./cmd/agentation
 
           cp cli/README.md "$target_dir/README.md"
           cp LICENSE "$target_dir/LICENSE"
