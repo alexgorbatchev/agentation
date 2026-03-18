@@ -28,12 +28,18 @@ command -v agentation >/dev/null || { echo "agentation CLI not found"; exit 1; }
 agentation pending --json >/dev/null
 ```
 
-If unreachable, start server first:
+If unreachable, start Agentation first:
 
 ```bash
-agentation server start --background
+agentation start --background
 # or foreground during debugging
-agentation server start --foreground
+agentation start --foreground
+```
+
+If you only want the HTTP API without router for this run:
+
+```bash
+AGENTATION_ROUTER_ADDR=0 agentation start --background
 ```
 
 3. Always fetch pending work **before waiting**:
@@ -135,6 +141,6 @@ Round 4:
 
 ## Troubleshooting
 
-- `agentation pending` fails: server not running or wrong URL.
-- If using non-default server URL, pass `--base-url` or set `AGENTATION_HTTP_URL`.
+- `agentation pending` fails: Agentation is not running or base URL is wrong (`agentation start --background`).
+- If using non-default server URL, pass `--base-url` or set `AGENTATION_BASE_URL`.
 - If frontend keeps creating new sessions unexpectedly, verify localStorage/session behavior in the host app or Storybook setup.

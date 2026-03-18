@@ -80,7 +80,7 @@ pnpm build
 pnpm test
 ```
 
-Router binaries are published via GitHub Actions on tags matching `router-v*`.
+CLI binaries are published via GitHub Actions for Agentation releases.
 
 ## License
 
