@@ -22,7 +22,7 @@ export default function APIPage() {
           <ul>
             <li>Sync annotations to a database or backend service</li>
             <li>Build analytics dashboards tracking feedback patterns</li>
-            <li>Create custom AI integrations (MCP servers, agent tools)</li>
+            <li>Create custom AI integrations (CLI loops, agent tools)</li>
           </ul>
         </section>
 
@@ -84,7 +84,7 @@ export default function APIPage() {
                 <code className="prop-name">endpoint</code>
                 <span className="prop-type">string</span>
               </div>
-              <p className="prop-desc">MCP server URL for syncing annotations</p>
+              <p className="prop-desc">Server URL for syncing annotations</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
@@ -176,7 +176,7 @@ function App() {
         <section>
           <h2 id="http-api">HTTP API</h2>
           <p>
-            The <code>agentation-mcp</code> server provides a REST API for programmatic access:
+            The local Agentation server (started with <code>agentation start</code>) provides a REST API for programmatic access:
           </p>
 
           <h3 style={{ marginTop: "1.25rem" }}>Sessions</h3>
@@ -341,7 +341,7 @@ curl -N -H "Last-Event-ID: 42" http://localhost:4747/sessions/:id/events`}
           <CodeBlock
             language="bash"
             copyable
-            code={`AGENTATION_STORE=memory npx agentation-mcp server`}
+            code={`AGENTATION_STORE=memory agentation start --foreground`}
           />
         </section>
 
@@ -349,16 +349,14 @@ curl -N -H "Last-Event-ID: 42" http://localhost:4747/sessions/:id/events`}
           <h2 id="programmatic-usage">Programmatic Usage</h2>
           <CodeBlock
             language="typescript"
-            code={`import { startHttpServer, startMcpServer } from 'agentation-mcp';
+            code={`// Start local stack (server + router)
+agentation start
 
-// Start HTTP server on port 4747
-startHttpServer(4747);
-
-// Start MCP server (connects via stdio)
-await startMcpServer('http://localhost:4747');`}
+// Or start in foreground while debugging
+agentation start --foreground`}
           />
           <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem" }}>
-            See <a href="/mcp">MCP Server</a> for AI agent integration and available tools.
+            See <a href="/server">Agentation Server (CLI)</a> for agent integration workflows.
           </p>
         </section>
       </article>

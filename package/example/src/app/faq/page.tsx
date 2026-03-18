@@ -64,11 +64,11 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "Where are annotations stored?",
-        answer: "By default, annotations are stored in <code>localStorage</code>, keyed by page pathname. They persist across page refreshes but are cleared after 7 days. With Agent Sync enabled, annotations are stored on the MCP server instead, which persists across pages and sessions."
+        answer: "By default, annotations are stored in <code>localStorage</code>, keyed by page pathname. They persist across page refreshes but are cleared after 7 days. With Agent Sync enabled, annotations are stored on the local Agentation server, which persists across pages and sessions."
       },
       {
         question: "What is Agent Sync?",
-        answer: "Agent Sync connects the browser toolbar to an MCP server, enabling real-time sync between reviewers and AI agents. Annotations persist across pages and can be accessed via MCP tools. Run <code>npx add-mcp \"npx -y agentation-mcp server\"</code> to configure your agent, or <code>npx agentation-mcp init</code> for Claude Code specifically, then enable Agent Sync in settings."
+        answer: "Agent Sync connects the browser toolbar to the local Agentation server, enabling real-time sync between reviewers and AI agents. Start the stack with <code>agentation start</code>, then use CLI commands like <code>agentation pending</code>, <code>agentation watch</code>, and <code>agentation resolve</code> in your agent workflow."
       },
     ]
   },
@@ -117,8 +117,8 @@ const faqCategories: FAQCategory[] = [
         answer: "Currently, Agentation only annotates elements in the main document. Iframes and shadow DOM content are not accessible due to browser security restrictions."
       },
       {
-        question: "I'm having issues with better-sqlite3 in the MCP server",
-        answer: "The MCP server uses <code>better-sqlite3</code> as a native dependency, which occasionally causes build or runtime issues depending on your Node.js version and platform. If you run into problems, check the <a href=\"https://github.com/WiseLibs/better-sqlite3/blob/master/docs/troubleshooting.md\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"faq-link\">better-sqlite3 troubleshooting guide</a> for solutions."
+        question: "I'm having server startup issues",
+        answer: "Use <code>agentation start --foreground</code> to see logs directly, or check the log files shown by <code>agentation start --background</code>. You can also run <code>agentation status</code> to verify the stack is running and set <code>AGENTATION_STORE=memory</code> for troubleshooting storage issues."
       },
       {
         question: "How do I report bugs or request features?",

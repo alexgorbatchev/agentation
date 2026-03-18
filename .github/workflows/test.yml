@@ -14,25 +14,25 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: router/go.mod
+          go-version-file: cli/go.mod
 
-      - name: Router tests
-        working-directory: router
+      - name: CLI tests
+        working-directory: cli
         run: go test ./...
 
-      - name: Router cross-build smoke
-        working-directory: router
+      - name: CLI cross-build smoke
+        working-directory: cli
         env:
           CGO_ENABLED: "0"
         run: |
           set -euo pipefail
           for goos in linux darwin windows; do
             for goarch in amd64 arm64; do
-              output="../tmp/router-ci/agentation-router-${goos}-${goarch}"
+              output="../tmp/cli-ci/agentation-${goos}-${goarch}"
               if [[ "$goos" == "windows" ]]; then
                 output="${output}.exe"
               fi
-              GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$output" ./cmd/agentation-router
+              GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$output" ./cmd/agentation
             done
           done
 

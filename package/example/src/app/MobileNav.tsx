@@ -10,7 +10,7 @@ const links = [
   { href: "/features", label: "Features" },
   { href: "/output", label: "Output" },
   { href: "/schema", label: "Schema" },
-  { href: "/mcp", label: "MCP" },
+  { href: "/server", label: "Server" },
   { href: "/api", label: "API" },
   { href: "/webhooks", label: "Webhooks" },
   { href: "/changelog", label: "Changelog" },

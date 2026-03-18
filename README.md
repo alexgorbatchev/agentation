@@ -12,7 +12,7 @@
 - Deep select for piercing overlays
 - Alt hold-to-select mode with a crosshair cursor
 - Review queue for resolved annotations
-- MCP support for surfacing human thread replies
+- Local CLI/server support for surfacing human thread replies
 - Storybook plus expanded automated test coverage
 - Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon managed by the Go CLI for multi-project Neovim routing
 
@@ -70,7 +70,7 @@ Full documentation at [agentation.dev](https://agentation.dev)
 Neovim/router docs:
 
 - `nvim/README.md`
-- `cli/README.md` (router lifecycle is integrated into `agentation` CLI)
+- `router/README.md`
 
 ## Development
 
@@ -80,7 +80,7 @@ pnpm build
 pnpm test
 ```
 
-CLI binaries are published via GitHub Actions for Agentation releases.
+CLI binaries are published via GitHub Actions on tags matching `cli-v*`.
 
 ## License
 

@@ -1,13 +1,13 @@
-name: Router Binaries
+name: CLI Binaries
 
 on:
   push:
     tags:
-      - "router-v*"
+      - "cli-v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish (e.g. router-v0.1.0)"
+        description: "Release tag to publish (e.g. cli-v0.1.0)"
         required: true
         type: string
 
@@ -47,7 +47,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: router/go.mod
+          go-version-file: cli/go.mod
 
       - name: Build binary
         shell: bash
@@ -59,17 +59,17 @@ jobs:
           set -euo pipefail
           mkdir -p dist
 
-          binary_name="agentation-router"
+          binary_name="agentation"
           if [[ "$GOOS" == "windows" ]]; then
             binary_name="${binary_name}.exe"
           fi
 
-          target_dir="dist/agentation-router-${GOOS}-${GOARCH}"
+          target_dir="dist/agentation-${GOOS}-${GOARCH}"
           mkdir -p "$target_dir"
 
-          go build -trimpath -ldflags="-s -w" -o "$target_dir/$binary_name" ./router/cmd/agentation-router
+          go build -trimpath -ldflags="-s -w" -o "$target_dir/$binary_name" ./cli/cmd/agentation
 
-          cp router/README.md "$target_dir/README.md"
+          cp cli/README.md "$target_dir/README.md"
           cp LICENSE "$target_dir/LICENSE"
 
       - name: Archive build
@@ -80,7 +80,7 @@ jobs:
           ARCHIVE_EXT: ${{ matrix.archive_ext }}
         run: |
           set -euo pipefail
-          base="agentation-router-${GOOS}-${GOARCH}"
+          base="agentation-${GOOS}-${GOARCH}"
           pushd dist >/dev/null
 
           if [[ "$ARCHIVE_EXT" == "zip" ]]; then
@@ -94,10 +94,10 @@ jobs:
       - name: Upload archive artifact
         uses: actions/upload-artifact@v4
         with:
-          name: router-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            dist/agentation-router-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-            dist/agentation-router-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            dist/agentation-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+            dist/agentation-${{ matrix.goos }}-${{ matrix.goarch }}.zip
           if-no-files-found: ignore
 
   publish:
@@ -108,7 +108,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: router-*
+          pattern: cli-*
           merge-multiple: true
 
       - name: Generate checksums
@@ -116,14 +116,14 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          sha256sum agentation-router-* > checksums.txt
+          sha256sum agentation-* > checksums.txt
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
           files: |
-            dist/agentation-router-*.tar.gz
-            dist/agentation-router-*.zip
+            dist/agentation-*.tar.gz
+            dist/agentation-*.zip
             dist/checksums.txt
           generate_release_notes: true

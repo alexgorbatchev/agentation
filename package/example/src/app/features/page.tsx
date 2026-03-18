@@ -134,7 +134,7 @@ export default function FeaturesPage() {
       <section>
         <h2 id="agent-sync">Agent sync</h2>
         <p>
-          With <a href="/mcp">MCP integration</a> and the <a href="/schema">Annotation Format Schema</a>, annotations become a two-way conversation.
+          With <a href="/server">server integration</a> and the <a href="/schema">Annotation Format Schema</a>, annotations become a two-way conversation.
           Agents can query, respond to, and manage your feedback:
         </p>
         <AgentChatDemo />
@@ -153,7 +153,7 @@ export default function FeaturesPage() {
         <h3 style={{ fontSize: '0.75rem', fontWeight: 500, color: 'rgba(0,0,0,0.45)', marginBottom: '0.5rem' }}>Limitations</h3>
         <ul style={{ fontSize: '0.75rem', color: 'rgba(0,0,0,0.5)', lineHeight: 1.5 }}>
           <li><strong>Desktop only</strong> &mdash; requires a desktop browser</li>
-          <li><strong>Per-page storage</strong> &mdash; localStorage persists 7 days. Use <a href="/install#agent-integration">MCP server</a> for cross-page persistence.</li>
+          <li><strong>Per-page storage</strong> &mdash; localStorage persists 7 days. Use <a href="/install#agent-integration">Agentation server</a> for cross-page persistence.</li>
           <li><strong>Static positions</strong> &mdash; markers don&rsquo;t update if layout changes</li>
           <li><strong>No screenshots</strong> &mdash; output is text-only</li>
           <li><strong>Animation pause</strong> &mdash; freezes most animations and videos on the page. Some third-party animation libraries may not fully pause.</li>
