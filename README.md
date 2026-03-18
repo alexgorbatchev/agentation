@@ -14,7 +14,7 @@
 - Review queue for resolved annotations
 - MCP support for surfacing human thread replies
 - Storybook plus expanded automated test coverage
-- Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon ([`router/README.md`](router/README.md)) for multi-project Neovim routing
+- Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon managed by the Go CLI for multi-project Neovim routing
 
 ---
 
@@ -70,7 +70,7 @@ Full documentation at [agentation.dev](https://agentation.dev)
 Neovim/router docs:
 
 - `nvim/README.md`
-- `router/README.md`
+- `cli/README.md` (router lifecycle is integrated into `agentation` CLI)
 
 ## Development
 

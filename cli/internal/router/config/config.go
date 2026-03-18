@@ -2,6 +2,8 @@ package config
 
 import (
 	"flag"
+	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -22,7 +24,7 @@ type Config struct {
 	EnforceRootBounds  bool
 }
 
-func Load(args []string) Config {
+func Load(args []string, stderr io.Writer) (Config, error) {
 	defaults := Config{
 		Address:            envOrDefault("AGENTATION_ROUTER_ADDRESS", "127.0.0.1:8787"),
 		AuthToken:          strings.TrimSpace(os.Getenv("AGENTATION_ROUTER_TOKEN")),
@@ -38,6 +40,7 @@ func Load(args []string) Config {
 	}
 
 	flags := flag.NewFlagSet("agentation-router", flag.ContinueOnError)
+	flags.SetOutput(stderr)
 	address := flags.String("address", defaults.Address, "listen address (host:port)")
 	authToken := flags.String("token", defaults.AuthToken, "shared auth token for mutating endpoints")
 	requestBodyLimit := flags.Int64("body-limit", defaults.RequestBodyLimit, "max request body size in bytes")
@@ -50,7 +53,12 @@ func Load(args []string) Config {
 	allowAbsolutePaths := flags.Bool("allow-absolute-paths", defaults.AllowAbsolutePaths, "allow absolute file paths on /open")
 	enforceRootBounds := flags.Bool("enforce-root-bounds", defaults.EnforceRootBounds, "require absolute /open paths to stay under session root")
 
-	_ = flags.Parse(args)
+	if err := flags.Parse(args); err != nil {
+		return Config{}, err
+	}
+	if flags.NArg() != 0 {
+		return Config{}, fmt.Errorf("unexpected positional arguments: %v", flags.Args())
+	}
 
 	return Config{
 		Address:            strings.TrimSpace(*address),
@@ -64,7 +72,7 @@ func Load(args []string) Config {
 		SessionStaleAfter:  *sessionStaleAfter,
 		AllowAbsolutePaths: *allowAbsolutePaths,
 		EnforceRootBounds:  *enforceRootBounds,
-	}
+	}, nil
 }
 
 func envOrDefault(key string, fallback string) string {

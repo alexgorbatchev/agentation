@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/benjitaylor/agentation/router/internal/config"
-	"github.com/benjitaylor/agentation/router/internal/model"
-	routerpkg "github.com/benjitaylor/agentation/router/internal/router"
-	"github.com/benjitaylor/agentation/router/internal/store"
+	"github.com/benjitaylor/agentation/cli/internal/router/config"
+	"github.com/benjitaylor/agentation/cli/internal/router/model"
+	routerpkg "github.com/benjitaylor/agentation/cli/internal/router/router"
+	"github.com/benjitaylor/agentation/cli/internal/router/store"
 )
 
 type Server struct {
