@@ -15,7 +15,7 @@ If annotations should be consumed live by another coding-agent session, validate
 ```bash
 command -v agentation >/dev/null || { echo "ERROR: agentation CLI not found on PATH"; exit 1; }
 agentation status
-agentation pending --json >/dev/null || agentation start --background
+agentation projects --json >/dev/null || agentation start --background
 agentation status
 ```
 
@@ -184,7 +184,7 @@ Restart Claude Code after installing. Verify with `/agentation-self-driving` —
 
 - **"Browser not launched. Call launch first."**: Stale session from a previous run — run `agent-browser close 2>/dev/null` then retry the `--headed open` command
 - **Toolbar not found on page**: Agentation isn't installed — run `/agentation` to set it up first
-- **CLI sync not working / no MCP handoff**: Verify `agentation status`; if stack is down run `agentation start --background` and re-check `agentation pending --json`
+- **CLI sync not working / no MCP handoff**: Verify `agentation status`; if stack is down run `agentation start --background` and re-check `agentation projects --json`
 - **No dialog after clicking**: Toolbar collapsed — re-expand with the state-aware eval (check `[class*=expanded]` first), retry
 - **Wrong element targeted**: Click Cancel, scroll to intended element, retry with correct coordinates
 - **Add button stays disabled**: Text wasn't filled — re-snapshot and fill the textbox
@@ -213,7 +213,7 @@ These will silently break the workflow if you're not aware of them:
 With MCP connected (toolbar shows "MCP Connected"), annotations auto-send to any listening agent. This enables:
 
 - **Session 1** (this skill): Watches the page, adds critique annotations in the visible browser
-- **Session 2**: Runs the Agentation CLI loop (`agentation pending --json`, then `agentation watch --timeout 300 --batch-window 10 --json`) and fixes each annotation
+- **Session 2**: Runs the Agentation CLI loop (`agentation pending <project-id> --json`, then `agentation watch <project-id> --timeout 300 --batch-window 10 --json`) and fixes each annotation
 
 Before Session 2 starts, ensure the CLI stack is running (`agentation status`; if needed `agentation start --background`).
 

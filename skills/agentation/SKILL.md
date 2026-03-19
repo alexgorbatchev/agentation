@@ -28,7 +28,7 @@ Set up the Agentation annotation toolbar in this project, with optional local Ag
    import { Agentation } from "agentation";
 
    // Add inside <body>, after children:
-   {process.env.NODE_ENV === "development" && <Agentation />}
+   {process.env.NODE_ENV === "development" && <Agentation projectId="my-project" />}
    ```
 
    For Next.js Pages Router, add to `_app`:
@@ -36,21 +36,22 @@ Set up the Agentation annotation toolbar in this project, with optional local Ag
    import { Agentation } from "agentation";
 
    // Add after <Component {...pageProps} />:
-   {process.env.NODE_ENV === "development" && <Agentation />}
+   {process.env.NODE_ENV === "development" && <Agentation projectId="my-project" />}
    ```
 
-5. **Optional: enable CLI/server sync**
+5. **Set required project scope and optional CLI/server sync endpoint**
+   - `projectId` is required on `<Agentation />`.
    - `endpoint` is optional. Without it, Agentation works with localStorage-only annotations.
    - For real-time sync with the Agentation CLI, set:
    ```tsx
-   <Agentation endpoint="http://127.0.0.1:4747" />
+   <Agentation projectId="my-project" endpoint="http://127.0.0.1:4747" />
    ```
 
 6. **If sync is enabled, validate and start the Agentation CLI stack**
    - Ensure `agentation` is on `PATH` (`command -v agentation`).
    - Start stack: `agentation start` (or `agentation start --background`).
    - Verify: `agentation status`.
-   - Verify API reachability: `agentation pending --json`.
+   - Verify API reachability: `agentation projects --json`.
 
 7. **Confirm setup**
    - Confirm toolbar renders in development.
