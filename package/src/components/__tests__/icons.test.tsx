@@ -40,6 +40,44 @@ import {
   AnimatedBunny,
 } from "../icons";
 
+import {
+  IconClose as GroupedIconClose,
+  IconPlus as GroupedIconPlus,
+  IconCheck as GroupedIconCheck,
+  IconCheckSmall as GroupedIconCheckSmall,
+  IconListSparkle as GroupedIconListSparkle,
+  IconHelp as GroupedIconHelp,
+  IconCheckSmallAnimated as GroupedIconCheckSmallAnimated,
+  IconCopyAlt as GroupedIconCopyAlt,
+  IconCopyAnimated as GroupedIconCopyAnimated,
+  IconSendArrow as GroupedIconSendArrow,
+  IconSendAnimated as GroupedIconSendAnimated,
+  IconEye as GroupedIconEye,
+  IconEyeAlt as GroupedIconEyeAlt,
+  IconEyeClosed as GroupedIconEyeClosed,
+  IconEyeAnimated as GroupedIconEyeAnimated,
+  IconPausePlayAnimated as GroupedIconPausePlayAnimated,
+  IconEyeMinus as GroupedIconEyeMinus,
+  IconGear as GroupedIconGear,
+  IconPauseAlt as GroupedIconPauseAlt,
+  IconPause as GroupedIconPause,
+  IconPlayAlt as GroupedIconPlayAlt,
+  IconTrashAlt as GroupedIconTrashAlt,
+  IconChatEllipsis as GroupedIconChatEllipsis,
+  IconCheckmark as GroupedIconCheckmark,
+  IconCheckmarkLarge as GroupedIconCheckmarkLarge,
+  IconCheckmarkCircle as GroupedIconCheckmarkCircle,
+  IconXmark as GroupedIconXmark,
+  IconXmarkLarge as GroupedIconXmarkLarge,
+  IconSun as GroupedIconSun,
+  IconMoon as GroupedIconMoon,
+  IconEdit as GroupedIconEdit,
+  IconTrash as GroupedIconTrash,
+  IconChevronLeft as GroupedIconChevronLeft,
+  IconChevronRight as GroupedIconChevronRight,
+  AnimatedBunny as GroupedAnimatedBunny,
+} from "../icons/index";
+
 // =============================================================================
 // Simple icons (size-only props)
 // =============================================================================
@@ -76,7 +114,51 @@ const simpleIcons = [
   { name: "IconChevronRight", Component: IconChevronRight },
 ] as const;
 
+const iconExportPairs = [
+  { name: "IconClose", legacy: IconClose, grouped: GroupedIconClose },
+  { name: "IconPlus", legacy: IconPlus, grouped: GroupedIconPlus },
+  { name: "IconCheck", legacy: IconCheck, grouped: GroupedIconCheck },
+  { name: "IconCheckSmall", legacy: IconCheckSmall, grouped: GroupedIconCheckSmall },
+  { name: "IconListSparkle", legacy: IconListSparkle, grouped: GroupedIconListSparkle },
+  { name: "IconHelp", legacy: IconHelp, grouped: GroupedIconHelp },
+  { name: "IconCheckSmallAnimated", legacy: IconCheckSmallAnimated, grouped: GroupedIconCheckSmallAnimated },
+  { name: "IconCopyAlt", legacy: IconCopyAlt, grouped: GroupedIconCopyAlt },
+  { name: "IconCopyAnimated", legacy: IconCopyAnimated, grouped: GroupedIconCopyAnimated },
+  { name: "IconSendArrow", legacy: IconSendArrow, grouped: GroupedIconSendArrow },
+  { name: "IconSendAnimated", legacy: IconSendAnimated, grouped: GroupedIconSendAnimated },
+  { name: "IconEye", legacy: IconEye, grouped: GroupedIconEye },
+  { name: "IconEyeAlt", legacy: IconEyeAlt, grouped: GroupedIconEyeAlt },
+  { name: "IconEyeClosed", legacy: IconEyeClosed, grouped: GroupedIconEyeClosed },
+  { name: "IconEyeAnimated", legacy: IconEyeAnimated, grouped: GroupedIconEyeAnimated },
+  { name: "IconPausePlayAnimated", legacy: IconPausePlayAnimated, grouped: GroupedIconPausePlayAnimated },
+  { name: "IconEyeMinus", legacy: IconEyeMinus, grouped: GroupedIconEyeMinus },
+  { name: "IconGear", legacy: IconGear, grouped: GroupedIconGear },
+  { name: "IconPauseAlt", legacy: IconPauseAlt, grouped: GroupedIconPauseAlt },
+  { name: "IconPause", legacy: IconPause, grouped: GroupedIconPause },
+  { name: "IconPlayAlt", legacy: IconPlayAlt, grouped: GroupedIconPlayAlt },
+  { name: "IconTrashAlt", legacy: IconTrashAlt, grouped: GroupedIconTrashAlt },
+  { name: "IconChatEllipsis", legacy: IconChatEllipsis, grouped: GroupedIconChatEllipsis },
+  { name: "IconCheckmark", legacy: IconCheckmark, grouped: GroupedIconCheckmark },
+  { name: "IconCheckmarkLarge", legacy: IconCheckmarkLarge, grouped: GroupedIconCheckmarkLarge },
+  { name: "IconCheckmarkCircle", legacy: IconCheckmarkCircle, grouped: GroupedIconCheckmarkCircle },
+  { name: "IconXmark", legacy: IconXmark, grouped: GroupedIconXmark },
+  { name: "IconXmarkLarge", legacy: IconXmarkLarge, grouped: GroupedIconXmarkLarge },
+  { name: "IconSun", legacy: IconSun, grouped: GroupedIconSun },
+  { name: "IconMoon", legacy: IconMoon, grouped: GroupedIconMoon },
+  { name: "IconEdit", legacy: IconEdit, grouped: GroupedIconEdit },
+  { name: "IconTrash", legacy: IconTrash, grouped: GroupedIconTrash },
+  { name: "IconChevronLeft", legacy: IconChevronLeft, grouped: GroupedIconChevronLeft },
+  { name: "IconChevronRight", legacy: IconChevronRight, grouped: GroupedIconChevronRight },
+  { name: "AnimatedBunny", legacy: AnimatedBunny, grouped: GroupedAnimatedBunny },
+] as const;
+
 describe("Icon components", () => {
+  describe.each(iconExportPairs)("$name export parity", ({ legacy, grouped }) => {
+    it("matches between legacy icons.tsx and grouped icons/index.ts", () => {
+      expect(grouped).toBe(legacy);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Simple icons: render with defaults and custom size
   // ---------------------------------------------------------------------------

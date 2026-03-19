@@ -9,7 +9,7 @@ export {
   IconCheckmarkCircle,
   IconXmark,
   IconXmarkLarge,
-} from "./icons/status-icons";
+} from "./status-icons";
 
 export {
   IconClose,
@@ -32,7 +32,7 @@ export {
   IconTrash,
   IconChevronLeft,
   IconChevronRight,
-} from "./icons/toolbar-icons";
+} from "./toolbar-icons";
 
 export {
   IconCheckSmallAnimated,
@@ -42,4 +42,4 @@ export {
   IconEyeAnimated,
   IconPausePlayAnimated,
   AnimatedBunny,
-} from "./icons/animated-icons";
+} from "./animated-icons";
