@@ -187,6 +187,33 @@ const DEFAULT_SETTINGS: ToolbarSettings = {
   webhooksEnabled: true,
 };
 
+function getLocalStorageItem(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function setLocalStorageItem(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // localStorage may be unavailable or blocked
+  }
+}
+
+function removeLocalStorageItem(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // localStorage may be unavailable or blocked
+  }
+}
+
 // Simple URL validation - checks for valid http(s) URL format
 const isValidUrl = (url: string): boolean => {
   if (!url || !url.trim()) return false;
@@ -1043,44 +1070,40 @@ export function PageFeedbackToolbarCSS({
       originalSetTimeout(() => setShowEntranceAnimation(false), 750);
     }
 
-    try {
-      const storedSettings = localStorage.getItem("feedback-toolbar-settings");
-      if (storedSettings) {
+    const storedSettings = getLocalStorageItem("feedback-toolbar-settings");
+    if (storedSettings) {
+      try {
         setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
+      } catch {
+        // Ignore parsing errors
       }
-    } catch (e) {
-      // Ignore parsing errors
     }
 
     // Load saved theme preference, default to dark mode
-    try {
-      const savedTheme = localStorage.getItem("feedback-toolbar-theme");
-      if (savedTheme !== null) {
-        setIsDarkMode(savedTheme === "dark");
-      }
-      // If no saved preference, keep default (dark mode)
-    } catch (e) {
-      // Ignore localStorage errors
+    const savedTheme = getLocalStorageItem("feedback-toolbar-theme");
+    if (savedTheme !== null) {
+      setIsDarkMode(savedTheme === "dark");
     }
+    // If no saved preference, keep default (dark mode)
 
     // Load saved toolbar position
-    try {
-      const savedPosition = localStorage.getItem("feedback-toolbar-position");
-      if (savedPosition) {
+    const savedPosition = getLocalStorageItem("feedback-toolbar-position");
+    if (savedPosition) {
+      try {
         const pos = JSON.parse(savedPosition);
         if (typeof pos.x === "number" && typeof pos.y === "number") {
           setToolbarPosition(pos);
         }
+      } catch {
+        // Ignore parsing errors
       }
-    } catch (e) {
-      // Ignore localStorage errors
     }
   }, [pathname]);
 
   // Save settings
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem(
+      setLocalStorageItem(
         "feedback-toolbar-settings",
         JSON.stringify(settings),
       );
@@ -1090,7 +1113,7 @@ export function PageFeedbackToolbarCSS({
   // Save theme preference
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem(
+      setLocalStorageItem(
         "feedback-toolbar-theme",
         isDarkMode ? "dark" : "light",
       );
@@ -1105,7 +1128,7 @@ export function PageFeedbackToolbarCSS({
 
     // Save position when dragging ends (transition from true to false)
     if (wasDragging && !isDraggingToolbar && toolbarPosition && mounted) {
-      localStorage.setItem(
+      setLocalStorageItem(
         "feedback-toolbar-position",
         JSON.stringify(toolbarPosition),
       );
@@ -1615,7 +1638,7 @@ export function PageFeedbackToolbarCSS({
         saveAnnotations(pathname, annotations);
       }
     } else if (mounted && annotations.length === 0) {
-      localStorage.removeItem(getStorageKey(pathname));
+      removeLocalStorageItem(getStorageKey(pathname));
     }
   }, [annotations, pathname, mounted, currentSessionId]);
 
@@ -3066,7 +3089,7 @@ export function PageFeedbackToolbarCSS({
     originalSetTimeout(() => {
       setAnnotations([]);
       setAnimatedMarkers(new Set()); // Reset animated markers
-      localStorage.removeItem(getStorageKey(pathname));
+      removeLocalStorageItem(getStorageKey(pathname));
       setIsClearing(false);
     }, totalAnimationTime);
 
