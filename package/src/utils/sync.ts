@@ -25,12 +25,17 @@ export async function listSessions(endpoint: string): Promise<Session[]> {
  */
 export async function createSession(
   endpoint: string,
-  url: string
+  url: string,
+  projectId?: string
 ): Promise<Session> {
+  const body = projectId
+    ? { url, projectId }
+    : { url };
+
   const response = await fetch(`${endpoint}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

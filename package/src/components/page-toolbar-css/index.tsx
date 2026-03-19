@@ -153,6 +153,7 @@ type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
 const neovimHeartbeatIntervalMs = 5000;
 const neovimConnectionTimeoutMs = 15000;
+const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
 
 function normalizeNeovimBridgeUrl(url: string): string {
   return url.replace(/\/+$/, "");
@@ -575,11 +576,13 @@ export type PageFeedbackToolbarCSSProps = {
   onSubmit?: (output: string, annotations: Annotation[]) => void;
   /** Whether to copy to clipboard when the copy button is clicked. Defaults to true. */
   copyToClipboard?: boolean;
-  /** Server URL for sync (e.g., "http://localhost:4747"). If not provided, uses localStorage only. */
+  /** Server URL for sync (e.g., "http://127.0.0.1:4747"). Optional; auto-defaults to local Agentation endpoint in development. */
   endpoint?: string;
-  /** Pre-existing session ID to join. If not provided with endpoint, creates a new session. */
+  /** Project identifier used to scope server sessions for multi-project agent loops. */
+  projectId?: string;
+  /** Pre-existing session ID to join. If not provided, creates or rejoins a project-scoped session. */
   sessionId?: string;
-  /** Called when a new session is created (only when endpoint is provided without sessionId). */
+  /** Called when a new session is created. */
   onSessionCreated?: (sessionId: string) => void;
   /** Webhook URL to receive annotation events. */
   webhookUrl?: string;
@@ -597,8 +600,10 @@ export type PageFeedbackToolbarCSSProps = {
   copyComponentSourcePath?: boolean;
 };
 
-/** Alias for PageFeedbackToolbarCSSProps */
-export type AgentationProps = PageFeedbackToolbarCSSProps;
+/** Public Agentation props require project scoping. */
+export type AgentationProps = Omit<PageFeedbackToolbarCSSProps, "projectId"> & {
+  projectId: string;
+};
 
 // =============================================================================
 // Component
@@ -616,6 +621,7 @@ export function PageFeedbackToolbarCSS({
   onSubmit,
   copyToClipboard = true,
   endpoint,
+  projectId,
   sessionId: initialSessionId,
   onSessionCreated,
   webhookUrl,
@@ -901,7 +907,7 @@ export function PageFeedbackToolbarCSS({
   const sessionInitializedRef = useRef(false);
   const [connectionStatus, setConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected"
-  >(endpoint ? "connecting" : "disconnected");
+  >("disconnected");
   const [neovimConnectionStatus, setNeovimConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected"
   >(componentEditor === "neovim" ? "connecting" : "disconnected");
@@ -949,6 +955,16 @@ export function PageFeedbackToolbarCSS({
 
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
+
+  const hasExplicitEndpoint =
+    typeof endpoint === "string" && endpoint.trim() !== "";
+  const shouldAutoDiscoverEndpoint =
+    typeof process !== "undefined" && process.env.NODE_ENV === "development";
+  const resolvedEndpoint = hasExplicitEndpoint
+    ? endpoint.trim()
+    : shouldAutoDiscoverEndpoint
+      ? DEFAULT_AGENTATION_ENDPOINT
+      : "";
 
   // Handle showSettings changes with exit animation
   useEffect(() => {
@@ -1096,9 +1112,9 @@ export function PageFeedbackToolbarCSS({
     }
   }, [isDraggingToolbar, toolbarPosition, mounted]);
 
-  // Initialize server session (when endpoint is provided)
+  // Initialize server session
   useEffect(() => {
-    if (!endpoint || !mounted || sessionInitializedRef.current) return;
+    if (!resolvedEndpoint || !mounted || sessionInitializedRef.current) return;
     sessionInitializedRef.current = true;
     setConnectionStatus("connecting");
 
@@ -1112,7 +1128,7 @@ export function PageFeedbackToolbarCSS({
         if (sessionIdToJoin) {
           // Join existing session - server annotations are authoritative
           try {
-            const session = await getSession(endpoint, sessionIdToJoin);
+            const session = await getSession(resolvedEndpoint, sessionIdToJoin);
             setCurrentSessionId(session.id);
             setConnectionStatus("connected");
             saveSessionId(pathname, session.id);
@@ -1140,7 +1156,7 @@ export function PageFeedbackToolbarCSS({
 
               const results = await Promise.allSettled(
                 localToMerge.map((annotation) =>
-                  syncAnnotation(endpoint, session.id, {
+                  syncAnnotation(resolvedEndpoint, session.id, {
                     ...annotation,
                     sessionId: session.id,
                     url: pageUrl,
@@ -1197,7 +1213,7 @@ export function PageFeedbackToolbarCSS({
           // Create new session for current page
           const currentUrl =
             typeof window !== "undefined" ? window.location.href : "/";
-          const session = await createSession(endpoint, currentUrl);
+          const session = await createSession(resolvedEndpoint, currentUrl, projectId);
           setCurrentSessionId(session.id);
           setConnectionStatus("connected");
           saveSessionId(pathname, session.id);
@@ -1226,11 +1242,11 @@ export function PageFeedbackToolbarCSS({
                   // Use current session for current page, create new sessions for other pages
                   const targetSession = isCurrentPage
                     ? session
-                    : await createSession(endpoint, pageUrl);
+                    : await createSession(resolvedEndpoint, pageUrl, projectId);
 
                   const results = await Promise.allSettled(
                     unsyncedAnnotations.map((annotation) =>
-                      syncAnnotation(endpoint, targetSession.id, {
+                      syncAnnotation(resolvedEndpoint, targetSession.id, {
                         ...annotation,
                         sessionId: targetSession.id,
                         url: pageUrl,
@@ -1295,15 +1311,15 @@ export function PageFeedbackToolbarCSS({
     };
 
     initSession();
-  }, [endpoint, initialSessionId, mounted, onSessionCreated, pathname]);
+  }, [resolvedEndpoint, projectId, initialSessionId, mounted, onSessionCreated, pathname]);
 
   // Periodic health check for server connection
   useEffect(() => {
-    if (!endpoint || !mounted) return;
+    if (!resolvedEndpoint || !mounted) return;
 
     const checkHealth = async () => {
       try {
-        const response = await fetch(`${endpoint}/health`);
+        const response = await fetch(`${resolvedEndpoint}/health`);
         if (response.ok) {
           setConnectionStatus("connected");
         } else {
@@ -1318,14 +1334,14 @@ export function PageFeedbackToolbarCSS({
     checkHealth();
     const interval = originalSetInterval(checkHealth, 10000);
     return () => clearInterval(interval);
-  }, [endpoint, mounted]);
+  }, [resolvedEndpoint, mounted]);
 
   // Listen for server-side annotation updates (e.g. resolved by agent)
   useEffect(() => {
-    if (!endpoint || !mounted || !currentSessionId) return;
+    if (!resolvedEndpoint || !mounted || !currentSessionId || typeof EventSource === "undefined") return;
 
     const eventSource = new EventSource(
-      `${endpoint}/sessions/${currentSessionId}/events`
+      `${resolvedEndpoint}/sessions/${currentSessionId}/events`
     );
 
     const removedStatuses = ["resolved", "dismissed"];
@@ -1379,11 +1395,11 @@ export function PageFeedbackToolbarCSS({
       eventSource.removeEventListener("thread.message", threadHandler);
       eventSource.close();
     };
-  }, [endpoint, mounted, currentSessionId]);
+  }, [resolvedEndpoint, mounted, currentSessionId]);
 
   // Sync local annotations when connection is restored
   useEffect(() => {
-    if (!endpoint || !mounted) return;
+    if (!resolvedEndpoint || !mounted) return;
 
     // Check if we just reconnected (was disconnected, now connected)
     const wasDisconnected = prevConnectionStatusRef.current === "disconnected";
@@ -1407,7 +1423,7 @@ export function PageFeedbackToolbarCSS({
           if (sessionId) {
             // Try to get existing session
             try {
-              const session = await getSession(endpoint, sessionId);
+              const session = await getSession(resolvedEndpoint, sessionId);
               serverAnnotations = session.annotations;
             } catch {
               // Session doesn't exist anymore, create new one
@@ -1417,7 +1433,7 @@ export function PageFeedbackToolbarCSS({
 
           if (!sessionId) {
             // Create new session
-            const newSession = await createSession(endpoint, pageUrl);
+            const newSession = await createSession(resolvedEndpoint, pageUrl, projectId);
             sessionId = newSession.id;
             setCurrentSessionId(sessionId);
             saveSessionId(pathname, sessionId);
@@ -1430,7 +1446,7 @@ export function PageFeedbackToolbarCSS({
           if (unsyncedLocal.length > 0) {
             const results = await Promise.allSettled(
               unsyncedLocal.map((annotation) =>
-                syncAnnotation(endpoint, sessionId!, {
+                syncAnnotation(resolvedEndpoint, sessionId!, {
                   ...annotation,
                   sessionId: sessionId!,
                   url: pageUrl,
@@ -1465,7 +1481,7 @@ export function PageFeedbackToolbarCSS({
 
       syncLocalAnnotations();
     }
-  }, [connectionStatus, endpoint, mounted, currentSessionId, pathname]);
+  }, [connectionStatus, resolvedEndpoint, projectId, mounted, currentSessionId, pathname]);
 
   const toggleReviewed = useCallback((id: string) => {
     setAnnotations((prev) =>
@@ -1482,10 +1498,10 @@ export function PageFeedbackToolbarCSS({
     if (toClear.length === 0) return;
 
     // Delete from server (non-blocking, same pattern as clearAll)
-    if (endpoint) {
+    if (resolvedEndpoint) {
       Promise.all(
         toClear.map((a) =>
-          deleteAnnotationFromServer(endpoint, a.id).catch((error) => {
+          deleteAnnotationFromServer(resolvedEndpoint, a.id).catch((error) => {
             console.warn("[Agentation] Failed to delete reviewed annotation:", error);
           })
         )
@@ -1494,7 +1510,7 @@ export function PageFeedbackToolbarCSS({
 
     setAnnotations((prev) => prev.filter((a) => !a._reviewedAt));
     setShowReviewQueue(false);
-  }, [annotations, endpoint]);
+  }, [annotations, resolvedEndpoint]);
 
   const hideToolbarTemporarily = useCallback(() => {
     if (isToolbarHiding) return;
@@ -2697,7 +2713,7 @@ export function PageFeedbackToolbarCSS({
         sourceFile: pendingAnnotation.sourceFile,
         elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
         // Protocol fields for server sync
-        ...(endpoint && currentSessionId
+        ...(currentSessionId
           ? {
               sessionId: currentSessionId,
               url:
@@ -2734,8 +2750,8 @@ export function PageFeedbackToolbarCSS({
       window.getSelection()?.removeAllRanges();
 
       // Sync to server (non-blocking, but update local ID with server's ID)
-      if (endpoint && currentSessionId) {
-        syncAnnotation(endpoint, currentSessionId, newAnnotation)
+      if (currentSessionId) {
+        syncAnnotation(resolvedEndpoint, currentSessionId, newAnnotation)
           .then((serverAnnotation) => {
             // Update local annotation with server-assigned ID
             if (serverAnnotation.id !== newAnnotation.id) {
@@ -2764,7 +2780,7 @@ export function PageFeedbackToolbarCSS({
       pendingAnnotation,
       onAnnotationAdd,
       fireWebhook,
-      endpoint,
+      resolvedEndpoint,
       currentSessionId,
     ],
   );
@@ -2805,8 +2821,8 @@ export function PageFeedbackToolbarCSS({
       }
 
       // Sync delete to server (non-blocking)
-      if (endpoint) {
-        deleteAnnotationFromServer(endpoint, id).catch((error) => {
+      if (resolvedEndpoint) {
+        deleteAnnotationFromServer(resolvedEndpoint, id).catch((error) => {
           console.warn(
             "[Agentation] Failed to delete annotation from server:",
             error,
@@ -2831,7 +2847,7 @@ export function PageFeedbackToolbarCSS({
         }
       }, 150);
     },
-    [annotations, editingAnnotation, onAnnotationDelete, fireWebhook, endpoint],
+    [annotations, editingAnnotation, onAnnotationDelete, fireWebhook, resolvedEndpoint],
   );
 
   // Start editing an annotation (right-click)
@@ -2962,8 +2978,8 @@ export function PageFeedbackToolbarCSS({
       fireWebhook("annotation.update", { annotation: updatedAnnotation });
 
       // Sync update to server (non-blocking)
-      if (endpoint) {
-        updateAnnotationOnServer(endpoint, editingAnnotation.id, {
+      if (resolvedEndpoint) {
+        updateAnnotationOnServer(resolvedEndpoint, editingAnnotation.id, {
           comment: newComment,
         }).catch((error) => {
           console.warn(
@@ -2982,17 +2998,17 @@ export function PageFeedbackToolbarCSS({
         setEditExiting(false);
       }, 150);
     },
-    [editingAnnotation, onAnnotationUpdate, fireWebhook, endpoint],
+    [editingAnnotation, onAnnotationUpdate, fireWebhook, resolvedEndpoint],
   );
 
   // Handle thread reply from edit popup
   const handleThreadReply = useCallback(
     async (content: string) => {
-      if (!editingAnnotation || !endpoint) return;
+      if (!editingAnnotation || !resolvedEndpoint) return;
 
       setIsReplySending(true);
       try {
-        const updated = await postThreadReply(endpoint, editingAnnotation.id, content);
+        const updated = await postThreadReply(resolvedEndpoint, editingAnnotation.id, content);
         // Update annotations array with server response
         setAnnotations((prev) =>
           prev.map((a) => (a.id === updated.id ? { ...a, thread: updated.thread } : a))
@@ -3006,7 +3022,7 @@ export function PageFeedbackToolbarCSS({
         setIsReplySending(false);
       }
     },
-    [editingAnnotation, endpoint],
+    [editingAnnotation, resolvedEndpoint],
   );
 
   // Cancel editing with exit animation
@@ -3030,10 +3046,10 @@ export function PageFeedbackToolbarCSS({
     fireWebhook("annotations.clear", { annotations });
 
     // Sync deletions to server (non-blocking)
-    if (endpoint) {
+    if (resolvedEndpoint) {
       Promise.all(
         annotations.map((a) =>
-          deleteAnnotationFromServer(endpoint, a.id).catch((error) => {
+          deleteAnnotationFromServer(resolvedEndpoint, a.id).catch((error) => {
             console.warn(
               "[Agentation] Failed to delete annotation from server:",
               error,
@@ -3055,7 +3071,7 @@ export function PageFeedbackToolbarCSS({
     }, totalAnimationTime);
 
     originalSetTimeout(() => setCleared(false), 1500);
-  }, [pathname, annotations, onAnnotationsClear, fireWebhook, endpoint]);
+  }, [pathname, annotations, onAnnotationsClear, fireWebhook, resolvedEndpoint]);
 
   // Copy output
   const copyOutput = useCallback(async () => {
@@ -3806,7 +3822,7 @@ export function PageFeedbackToolbarCSS({
               >
                 <IconGear size={24} />
               </button>
-              {endpoint && connectionStatus !== "disconnected" && (
+              {resolvedEndpoint && connectionStatus !== "disconnected" && (
                 <span
                   className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
                   title={
@@ -4124,7 +4140,7 @@ export function PageFeedbackToolbarCSS({
                   >
                     <span>Manage Connections</span>
                     <span className={styles.settingsNavLinkRight}>
-                      {endpoint && connectionStatus !== "disconnected" && (
+                      {resolvedEndpoint && connectionStatus !== "disconnected" && (
                         <span
                           className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
                         />
@@ -4164,7 +4180,7 @@ export function PageFeedbackToolbarCSS({
                         </span>
                       </Tooltip>
                     </span>
-                    {endpoint && (
+                    {resolvedEndpoint && (
                       <div
                         className={`${styles.mcpStatusDot} ${styles[connectionStatus]}`}
                         title={
@@ -5209,7 +5225,7 @@ export function PageFeedbackToolbarCSS({
                 isExiting={editExiting}
                 lightMode={!isDarkMode}
                 thread={editingAnnotation.thread}
-                onReply={endpoint ? handleThreadReply : undefined}
+                onReply={resolvedEndpoint ? handleThreadReply : undefined}
                 isReplySending={isReplySending}
                 accentColor={
                   editingAnnotation.isMultiSelect

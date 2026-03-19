@@ -158,6 +158,7 @@ afterEach(() => {
   sessionStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 // ---------------------------------------------------------------------------
@@ -420,17 +421,19 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       expect(toolbar).toBeTruthy();
     });
 
-    it("does not create session when endpoint is not provided", async () => {
+    it("uses default endpoint in development when endpoint prop is not provided", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      setupBasicServerMocks("session-default-endpoint");
       render(<PageFeedbackToolbarCSS />);
 
-      // Wait for mount
       await waitFor(() => {
-        const toolbar = document.querySelector("[data-feedback-toolbar]");
-        expect(toolbar).toBeTruthy();
+        const sessionCalls = mockFetch.mock.calls.filter(
+          ([url, opts]: [string, RequestInit?]) =>
+            url === "http://127.0.0.1:4747/sessions" &&
+            opts?.method === "POST"
+        );
+        expect(sessionCalls.length).toBeGreaterThanOrEqual(1);
       });
-
-      // No fetch calls should have been made
-      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 

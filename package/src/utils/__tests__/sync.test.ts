@@ -82,6 +82,25 @@ describe("createSession", () => {
     expect(result).toEqual(session);
   });
 
+  it("includes projectId in body when provided", async () => {
+    const session = {
+      id: "s1",
+      url: "/page",
+      status: "active",
+      createdAt: "2024-01-01",
+      projectId: "project-alpha",
+    };
+    mockFetchResponse(session);
+
+    await createSession(ENDPOINT, "/page", "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "/page", projectId: "project-alpha" }),
+    });
+  });
+
   it("throws on 409 conflict", async () => {
     mockFetchError(409);
     await expect(createSession(ENDPOINT, "/page")).rejects.toThrow("409");
