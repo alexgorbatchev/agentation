@@ -32,6 +32,8 @@ function rewriteStorybookSetupFile(): Plugin {
   };
 }
 
+const shouldSkipBrowserProjectForCoverage = process.argv.includes("--coverage");
+
 export default defineConfig({
   test: {
     projects: [
@@ -48,28 +50,32 @@ export default defineConfig({
           include: ["src/**/*.test.{ts,tsx}"],
         },
       },
-      {
-        plugins: [
-          react(),
-          storybookTest({ configDir: ".storybook" }),
-          rewriteStorybookSetupFile(),
-        ],
-        define: {
-          __VERSION__: JSON.stringify("test"),
-        },
-        test: {
-          name: "storybook",
-          globals: true,
-          browser: {
-            enabled: true,
-            headless: true,
-            provider: playwright({
-              launchOptions: { headless: true },
-            }),
-            instances: [{ browser: "chromium" }],
-          },
-        },
-      },
+      ...(shouldSkipBrowserProjectForCoverage
+        ? []
+        : [
+            {
+              plugins: [
+                react(),
+                storybookTest({ configDir: ".storybook" }),
+                rewriteStorybookSetupFile(),
+              ],
+              define: {
+                __VERSION__: JSON.stringify("test"),
+              },
+              test: {
+                name: "storybook",
+                globals: true,
+                browser: {
+                  enabled: true,
+                  headless: true,
+                  provider: playwright({
+                    launchOptions: { headless: true },
+                  }),
+                  instances: [{ browser: "chromium" }],
+                },
+              },
+            },
+          ]),
     ],
   },
 });
