@@ -1,59 +1,74 @@
 ---
 name: agentation
-description: Add Agentation visual feedback toolbar to a Next.js project
+description: Add Agentation visual feedback toolbar to a Next.js project, with optional Agentation CLI sync setup
 ---
 
 # Agentation Setup
 
-Set up the Agentation annotation toolbar in this project.
+Set up the Agentation annotation toolbar in this project, with optional local Agentation CLI sync.
 
 ## Steps
 
-1. **Check if already installed**
-   - Look for `agentation` in package.json dependencies
-   - If not found, run `npm install agentation` (or pnpm/yarn based on lockfile)
+1. **Check if package is already installed**
+   - Look for `agentation` in `package.json` dependencies/devDependencies.
+   - If missing, install with the project package manager (`npm`, `pnpm`, or `yarn`).
 
-2. **Check if already configured**
-   - Search for `<Agentation` or `import { Agentation }` in src/ or app/
-   - If found, report that Agentation is already set up and exit
+2. **Check if toolbar is already configured**
+   - Search for `<Agentation` or `import { Agentation } from "agentation"`.
+   - If found, report it is already configured and continue to CLI setup validation.
 
-3. **Detect framework**
-   - Next.js App Router: has `app/layout.tsx` or `app/layout.js`
-   - Next.js Pages Router: has `pages/_app.tsx` or `pages/_app.js`
+3. **Detect Next.js router type**
+   - App Router: `app/layout.tsx` or `app/layout.js`
+   - Pages Router: `pages/_app.tsx` or `pages/_app.js`
 
-4. **Add the component**
+4. **Add the toolbar component (development only)**
 
-   For Next.js App Router, add to the root layout:
+   For Next.js App Router, add to root layout:
    ```tsx
    import { Agentation } from "agentation";
 
-   // Add inside the body, after children:
+   // Add inside <body>, after children:
    {process.env.NODE_ENV === "development" && <Agentation />}
    ```
 
-   For Next.js Pages Router, add to _app:
+   For Next.js Pages Router, add to `_app`:
    ```tsx
    import { Agentation } from "agentation";
 
-   // Add after Component:
+   // Add after <Component {...pageProps} />:
    {process.env.NODE_ENV === "development" && <Agentation />}
    ```
 
-5. **Confirm component setup**
-   - Tell the user the Agentation toolbar component is configured
+5. **Optional: enable CLI/server sync**
+   - `endpoint` is optional. Without it, Agentation works with localStorage-only annotations.
+   - For real-time sync with the Agentation CLI, set:
+   ```tsx
+   <Agentation endpoint="http://127.0.0.1:4747" />
+   ```
 
-6. **Recommend local CLI/server setup**
-   - Explain that for real-time annotation syncing with AI agents, they should run the local Agentation server stack
-   - Recommend:
-     - Start both server + router: `agentation start`
-     - Optional router-only mode: `AGENTATION_SERVER_ADDR=0 agentation start`
-   - Tell the user they can point the toolbar endpoint at `http://127.0.0.1:4747`
-   - Explain that once running, annotations sync in real time and can be consumed via CLI commands (`pending`, `watch`, `ack`, `resolve`, `reply`)
+6. **If sync is enabled, validate and start the Agentation CLI stack**
+   - Ensure `agentation` is on `PATH` (`command -v agentation`).
+   - Start stack: `agentation start` (or `agentation start --background`).
+   - Verify: `agentation status`.
+   - Verify API reachability: `agentation pending --json`.
+
+7. **Confirm setup**
+   - Confirm toolbar renders in development.
+   - If sync mode is enabled, confirm annotations can be consumed via CLI (`pending`, `watch`, `ack`, `resolve`, `reply`).
+
+## Important
+
+- **Use the Agentation CLI for local sync workflows.**
+- **`endpoint` is optional by default.** Only set it when you want CLI/server-backed sync.
+- **One running `agentation start` instance is enough for multiple local projects/sessions.** Do not start one CLI stack per project unless intentionally isolating ports/storage.
+- `agentation start` manages server + router under a single process by default.
 
 ## Notes
 
-- The `NODE_ENV` check ensures Agentation only loads in development
-- Agentation requires React 18
-- The Agentation HTTP server runs on port 4747 by default
-- Use `agentation pending`, `agentation watch`, `agentation ack`, and `agentation resolve` for loop workflows
-- Use `agentation status` to verify the local stack is running
+- The `NODE_ENV` guard keeps Agentation development-only.
+- Agentation requires React 18+.
+- Default CLI server address (when sync is enabled) is `http://127.0.0.1:4747`.
+- Optional service toggles:
+  - Disable server: `AGENTATION_SERVER_ADDR=0 agentation start`
+  - Disable router: `AGENTATION_ROUTER_ADDR=0 agentation start`
+- Use `agentation status` to check lifecycle state.

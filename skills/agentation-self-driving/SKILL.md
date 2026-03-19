@@ -8,6 +8,23 @@ allowed-tools: Bash(agent-browser:*)
 
 Autonomously critique a web page by adding design annotations via the Agentation toolbar — in a visible headed browser so the user can watch the agent work in real time, like watching a self-driving car navigate.
 
+## CLI Sync Preflight (for MCP-connected / two-session workflows)
+
+If annotations should be consumed live by another coding-agent session, validate the Agentation CLI stack first.
+
+```bash
+command -v agentation >/dev/null || { echo "ERROR: agentation CLI not found on PATH"; exit 1; }
+agentation status
+agentation pending --json >/dev/null || agentation start --background
+agentation status
+```
+
+Notes:
+
+- `agentation start` manages server + router under one process by default.
+- One running Agentation stack is enough for multiple local projects/sessions.
+- If the page uses explicit sync config, point toolbar endpoint to `http://127.0.0.1:4747`.
+
 ## Launch — Always Headed
 
 The browser MUST be visible. Never run headless. The user watches you scan, hover, click, and annotate.
@@ -167,6 +184,7 @@ Restart Claude Code after installing. Verify with `/agentation-self-driving` —
 
 - **"Browser not launched. Call launch first."**: Stale session from a previous run — run `agent-browser close 2>/dev/null` then retry the `--headed open` command
 - **Toolbar not found on page**: Agentation isn't installed — run `/agentation` to set it up first
+- **CLI sync not working / no MCP handoff**: Verify `agentation status`; if stack is down run `agentation start --background` and re-check `agentation pending --json`
 - **No dialog after clicking**: Toolbar collapsed — re-expand with the state-aware eval (check `[class*=expanded]` first), retry
 - **Wrong element targeted**: Click Cancel, scroll to intended element, retry with correct coordinates
 - **Add button stays disabled**: Text wasn't filled — re-snapshot and fill the textbox
@@ -195,6 +213,8 @@ These will silently break the workflow if you're not aware of them:
 With MCP connected (toolbar shows "MCP Connected"), annotations auto-send to any listening agent. This enables:
 
 - **Session 1** (this skill): Watches the page, adds critique annotations in the visible browser
-- **Session 2**: Runs `agentation_watch_annotations` in a loop, receives annotations, edits code to address each one
+- **Session 2**: Runs the Agentation CLI loop (`agentation pending --json`, then `agentation watch --timeout 300 --batch-window 10 --json`) and fixes each annotation
+
+Before Session 2 starts, ensure the CLI stack is running (`agentation status`; if needed `agentation start --background`).
 
 The user watches Session 1 drive through the page in the browser while Session 2 fixes issues in the codebase — fully autonomous design review and implementation.
