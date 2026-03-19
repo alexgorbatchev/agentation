@@ -47,7 +47,7 @@ agentation stop`}
           <CodeBlock
             language="tsx"
             copyable
-            code={`<Agentation endpoint="http://127.0.0.1:4747" />`}
+            code={`<Agentation projectId="my-project" endpoint="http://127.0.0.1:4747" />`}
           />
 
           <h3>3. Process annotations from your agent</h3>
@@ -55,10 +55,10 @@ agentation stop`}
             language="bash"
             copyable
             code={`# fetch pending
-agentation pending --json
+agentation pending my-project --json
 
 # watch for new feedback
-agentation watch --timeout 300 --batch-window 10 --json
+agentation watch my-project --timeout 300 --batch-window 10 --json
 
 # resolve loop actions
 agentation ack <annotation-id>

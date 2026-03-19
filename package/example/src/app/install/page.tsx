@@ -247,7 +247,7 @@ function App() {
   return (
     <>
       <YourApp />
-      {process.env.NODE_ENV === "development" && <Agentation />}
+      {process.env.NODE_ENV === "development" && <Agentation projectId="my-project" />}
     </>
   );
 }`}
@@ -310,6 +310,7 @@ function App() {
           </p>
           <CodeBlock
             code={`<Agentation
+  projectId="my-project"
   endpoint="http://localhost:4747"
   onSessionCreated={(sessionId) => {
     console.log("Session started:", sessionId);

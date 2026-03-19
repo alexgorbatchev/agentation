@@ -19,5 +19,5 @@ export function ToolbarProvider() {
     ? "http://localhost:4747"
     : undefined;
 
-  return <Agentation endpoint={endpoint} />;
+  return <Agentation endpoint={endpoint} projectId="agentation-docs" />;
 }

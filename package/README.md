@@ -20,13 +20,15 @@ function App() {
   return (
     <>
       <YourApp />
-      <Agentation />
+      <Agentation projectId="my-project" />
     </>
   );
 }
 ```
 
 The toolbar appears in the bottom-right corner. Click to activate, then click any element to annotate it.
+
+`<Agentation />` is a production no-op: when `NODE_ENV === "production"` it returns `null`.
 
 ## Features
 
@@ -51,7 +53,8 @@ The toolbar appears in the bottom-right corner. Click to activate, then click an
 | `onCopy` | `(markdown: string) => void` | - | Callback with markdown output when copy is clicked |
 | `onSubmit` | `(output: string, annotations: Annotation[]) => void` | - | Called when "Send Annotations" is clicked |
 | `copyToClipboard` | `boolean` | `true` | Set to false to prevent writing to clipboard |
-| `endpoint` | `string` | - | Server URL for Agent Sync (e.g., `"http://localhost:4747"`) |
+| `endpoint` | `string` | _optional_ | Server URL for Agent Sync (auto-defaults to `http://127.0.0.1:4747` in development) |
+| `projectId` | `string` | _required_ | Project scope ID used by Agentation CLI/watch routing |
 | `sessionId` | `string` | - | Pre-existing session ID to join |
 | `onSessionCreated` | `(sessionId: string) => void` | - | Called when a new session is created |
 | `webhookUrl` | `string` | - | Webhook URL to receive annotation events |
@@ -79,6 +82,7 @@ function App() {
     <>
       <YourApp />
       <Agentation
+        projectId="my-project"
         onAnnotationAdd={handleAnnotation}
         copyToClipboard={false}  // Don't write to clipboard
       />

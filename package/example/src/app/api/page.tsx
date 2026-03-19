@@ -126,7 +126,7 @@ function App() {
   return (
     <>
       <YourApp />
-      <Agentation onAnnotationAdd={handleAnnotation} />
+      <Agentation projectId="my-project" onAnnotationAdd={handleAnnotation} />
     </>
   );
 }`}

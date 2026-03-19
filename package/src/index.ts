@@ -7,13 +7,13 @@
 //
 // Usage:
 //   import { Agentation } from 'agentation';
-//   <Agentation />
+//   <Agentation projectId="my-project" />
 //
 // =============================================================================
 
 // Main components
 // CSS-only version (default - zero runtime deps)
-export { PageFeedbackToolbarCSS as Agentation } from "./components/page-toolbar-css";
+export { Agentation } from "./components/Agentation";
 export { PageFeedbackToolbarCSS } from "./components/page-toolbar-css";
 export type { DemoAnnotation, AgentationProps } from "./components/page-toolbar-css";
 

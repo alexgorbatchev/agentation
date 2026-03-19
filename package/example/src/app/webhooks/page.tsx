@@ -43,7 +43,7 @@ function App() {
   return (
     <>
       <YourApp />
-      <Agentation webhookUrl="https://your-server.com/webhook" />
+      <Agentation projectId="my-project" webhookUrl="https://your-server.com/webhook" />
     </>
   );
 }`}
@@ -142,6 +142,7 @@ function App() {
             language="tsx"
             copyable
             code={`<Agentation
+  projectId="my-project"
   webhookUrl="https://your-server.com/webhook"
   onSubmit={(output, annotations) => {
     // This fires in addition to the webhook
@@ -265,7 +266,7 @@ app.post("/webhook/agentation", (req, res) => {
           <CodeBlock
             language="tsx"
             code={`// Use webhook.site for testing
-<Agentation webhookUrl="https://webhook.site/your-unique-id" />
+<Agentation projectId="my-project" webhookUrl="https://webhook.site/your-unique-id" />
 
 // Then create annotations and check webhook.site for payloads`}
           />

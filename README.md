@@ -29,13 +29,15 @@ function App() {
   return (
     <>
       <YourApp />
-      <Agentation />
+      <Agentation projectId="my-project" />
     </>
   );
 }
 ```
 
 The toolbar appears in the bottom-right corner. Click to activate, then click any element to annotate it.
+
+`<Agentation />` is a production no-op: when `NODE_ENV === "production"` it returns `null`.
 
 ## Features
 
