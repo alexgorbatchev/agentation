@@ -21,6 +21,8 @@ import {
   checkSourceLocationSupport,
 } from "../source-location";
 
+const probeFlagKey = "__AGENTATION_ENABLE_UNSAFE_SOURCE_PROBE__";
+
 // =============================================================================
 // Helpers — create mock fibers and attach to DOM elements
 // =============================================================================
@@ -58,10 +60,12 @@ beforeEach(() => {
   document.body.innerHTML = "";
   // Clean up any devtools hook
   delete (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
+  (globalThis as Record<string, unknown>)[probeFlagKey] = true;
 });
 
 afterEach(() => {
   delete (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
+  delete (globalThis as Record<string, unknown>)[probeFlagKey];
 });
 
 // =============================================================================

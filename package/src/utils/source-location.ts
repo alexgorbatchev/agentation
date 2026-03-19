@@ -381,14 +381,23 @@ function findDebugSourceReact19(
 // Stack-Trace Fallback for Source File Detection
 // =============================================================================
 //
-// When _debugSource is unavailable (e.g. Next.js with SWC), we fall back to
-// invoking the component function with a throwing hooks dispatcher, parsing
-// the error stack trace, and stripping bundler URL prefixes. In dev mode,
-// stack frames already contain original source paths.
+// When _debugSource is unavailable (e.g. Next.js with SWC), we can optionally
+// fall back to invoking the component function with a throwing hooks dispatcher,
+// parsing the error stack trace, and stripping bundler URL prefixes.
+//
+// IMPORTANT: this fallback executes user component functions and is therefore
+// disabled by default. Enable only in explicit debug/test scenarios.
 // =============================================================================
+
+const UNSAFE_SOURCE_PROBE_FLAG = "__AGENTATION_ENABLE_UNSAFE_SOURCE_PROBE__";
 
 /** Cache: component function → probed SourceLocation (or null if unresolvable) */
 const sourceProbeCache = new Map<Function, SourceLocation | null>();
+
+function isUnsafeSourceProbeEnabled(): boolean {
+  const globalRecord = globalThis as Record<string, unknown>;
+  return globalRecord[UNSAFE_SOURCE_PROBE_FLAG] === true;
+}
 
 /**
  * Extract the callable function from a fiber, handling wrappers.
@@ -707,10 +716,12 @@ export function getSourceLocation(element: HTMLElement): SourceLocationResult {
     };
   }
 
-  // Fallback: probe component via stack trace
-  const probed = probeSourceWalk(fiber);
-  if (probed) {
-    return { found: true, source: probed, isReactApp: true, isProduction: false };
+  // Optional fallback: probe component via stack trace (disabled by default).
+  if (isUnsafeSourceProbeEnabled()) {
+    const probed = probeSourceWalk(fiber);
+    if (probed) {
+      return { found: true, source: probed, isReactApp: true, isProduction: false };
+    }
   }
 
   return {
