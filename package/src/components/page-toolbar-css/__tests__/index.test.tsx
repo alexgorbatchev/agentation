@@ -1358,7 +1358,44 @@ describe("PageFeedbackToolbarCSS", () => {
   });
 
   // =============================================================================
-  // 15. Edge Cases
+  // 15. Review Queue
+  // =============================================================================
+
+  describe("Review queue", () => {
+    it("clears reviewed annotations from the review queue", async () => {
+      const annotations = [
+        makeAnnotation({
+          id: "rq1",
+          comment: "Resolved annotation",
+          status: "resolved",
+          _reviewedAt: Date.now(),
+        }),
+      ];
+      seedAnnotations(annotations);
+
+      render(<PageFeedbackToolbarCSS />);
+      await activateToolbar();
+
+      const reviewQueueBtn = findButtonByTooltip("Review queue");
+      expect(reviewQueueBtn).toBeTruthy();
+      fireEvent.click(reviewQueueBtn!);
+
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("Review Queue");
+        expect(document.body.textContent).toContain("Resolved annotation");
+      });
+
+      const clearSelectedButton = screen.getByText("Clear Selected");
+      fireEvent.click(clearSelectedButton);
+
+      await waitFor(() => {
+        expect(document.body.textContent).not.toContain("Resolved annotation");
+      });
+    });
+  });
+
+  // =============================================================================
+  // 16. Edge Cases
   // =============================================================================
 
   describe("Edge cases", () => {

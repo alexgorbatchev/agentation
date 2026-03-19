@@ -9,35 +9,21 @@ import {
 } from "../annotation-popup-css";
 import {
   IconListSparkle,
-  IconPlayAlt,
-  IconPauseAlt,
-  IconClose,
   IconPlus,
   IconGear,
-  IconCheck,
   IconCheckSmall,
   IconCheckSmallAnimated,
   IconHelp,
-  AnimatedBunny,
-  IconEye,
-  IconEyeMinus,
-  IconCopyAlt,
   IconCopyAnimated,
   IconSendArrow,
   IconTrashAlt,
-  IconXmark,
-  IconCheckmark,
-  IconCheckmarkLarge,
   IconCheckmarkCircle,
-  IconPause,
   IconEyeAnimated,
   IconPausePlayAnimated,
   IconSun,
   IconMoon,
   IconXmarkLarge,
-  IconEdit,
   IconChevronLeft,
-  IconChevronRight,
 } from "../icons";
 import {
   identifyElement,
@@ -52,24 +38,16 @@ import {
   closestCrossingShadow,
 } from "../../utils/element-identification";
 import {
-  loadAnnotations,
-  loadAllAnnotations,
   saveAnnotations,
   getStorageKey,
-  loadSessionId,
-  saveSessionId,
-  clearSessionId,
   saveAnnotationsWithSyncMarker,
   loadToolbarHidden,
   saveToolbarHidden,
 } from "../../utils/storage";
 import {
-  createSession,
-  getSession,
   syncAnnotation,
   updateAnnotation as updateAnnotationOnServer,
   deleteAnnotation as deleteAnnotationFromServer,
-  requestAction,
   postThreadReply,
 } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
@@ -90,10 +68,14 @@ import {
   freeze as freezeAll,
   unfreeze as unfreezeAll,
   originalSetTimeout,
-  originalSetInterval,
 } from "../../utils/freeze-animations";
 
 import type { Annotation } from "../../types";
+import { useAnnotationState } from "./hooks/useAnnotationState";
+import { useServerSync } from "./hooks/useServerSync";
+import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
+import { ToolbarShell } from "./render/ToolbarShell";
+import { MarkersLayer } from "./render/MarkersLayer";
 import styles from "./styles.module.scss";
 
 /**
@@ -151,8 +133,6 @@ type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
-const neovimHeartbeatIntervalMs = 5000;
-const neovimConnectionTimeoutMs = 15000;
 const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
 
 function normalizeNeovimBridgeUrl(url: string): string {
@@ -232,14 +212,6 @@ const OUTPUT_TO_REACT_MODE: Record<OutputDetailLevel, ReactComponentMode> = {
   detailed: "smart",
   forensic: "all",
 };
-
-const MARKER_CLICK_OPTIONS: {
-  value: MarkerClickBehavior;
-  label: string;
-}[] = [
-  { value: "edit", label: "Edit" },
-  { value: "delete", label: "Delete" },
-];
 
 const OUTPUT_DETAIL_OPTIONS: { value: OutputDetailLevel; label: string }[] = [
   { value: "compact", label: "Compact" },
@@ -392,63 +364,8 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString();
-}
-
 function isRenderableAnnotation(_annotation: Annotation): boolean {
   return true; // All annotations are renderable — resolved ones show as faded checkmarks
-}
-
-function truncateUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname;
-    // Show path, truncate if too long
-    if (path.length > 25) {
-      return "..." + path.slice(-22);
-    }
-    return path || "/";
-  } catch {
-    // If URL parsing fails, just truncate the string
-    if (url.length > 25) {
-      return "..." + url.slice(-22);
-    }
-    return url;
-  }
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-
-  return (
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  );
-}
-
-function getActiveButtonStyle(
-  isActive: boolean,
-  color: string,
-): React.CSSProperties | undefined {
-  if (!isActive) return undefined;
-  return {
-    color: color,
-    backgroundColor: hexToRgba(color, 0.25),
-  };
 }
 
 function detectSourceFile(element: Element): string | undefined {
@@ -660,10 +577,22 @@ export function PageFeedbackToolbarCSS({
   copyComponentSourcePath = true,
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showMarkers, setShowMarkers] = useState(true);
   const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
   const [isToolbarHiding, setIsToolbarHiding] = useState(false);
+
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "/";
+
+  const hasExplicitEndpoint =
+    typeof endpoint === "string" && endpoint.trim() !== "";
+  const shouldAutoDiscoverEndpoint =
+    typeof process !== "undefined" && process.env.NODE_ENV === "development";
+  const resolvedEndpoint = hasExplicitEndpoint
+    ? endpoint.trim()
+    : shouldAutoDiscoverEndpoint
+      ? DEFAULT_AGENTATION_ENDPOINT
+      : "";
 
   // Stop native events from bubbling past document.body when they originate
   // inside the toolbar portal. Without this, clicks on the toolbar propagate to
@@ -758,11 +687,6 @@ export function PageFeedbackToolbarCSS({
     "main",
   );
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [tooltipsHidden, setTooltipsHidden] = useState(false);
-  const [tooltipSessionActive, setTooltipSessionActive] = useState(false);
-  const tooltipSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
 
   // Cmd+shift+click multi-select state
   const [pendingMultiSelectElements, setPendingMultiSelectElements] = useState<
@@ -775,43 +699,16 @@ export function PageFeedbackToolbarCSS({
     }>
   >([]);
   const modifiersHeldRef = useRef({ cmd: false, shift: false });
-  const isAltSelectionHeldRef = useRef(false);
-  const didAltActivateToolbarRef = useRef(false);
-  const [isAltSelectionHeld, setIsAltSelectionHeld] = useState(false);
 
-  // Hide tooltips after button click until mouse leaves
-  const hideTooltipsUntilMouseLeave = () => {
-    setTooltipsHidden(true);
-  };
-
-  const showTooltipsAgain = () => {
-    setTooltipsHidden(false);
-  };
-
-  const handleControlsMouseEnter = () => {
-    if (!tooltipSessionActive) {
-      tooltipSessionTimerRef.current = setTimeout(
-        () => setTooltipSessionActive(true),
-        850,
-      );
-    }
-  };
-
-  const handleControlsMouseLeave = () => {
-    if (tooltipSessionTimerRef.current) {
-      clearTimeout(tooltipSessionTimerRef.current);
-      tooltipSessionTimerRef.current = null;
-    }
-    setTooltipSessionActive(false);
-    showTooltipsAgain();
-  };
-
-  useEffect(() => {
-    return () => {
-      if (tooltipSessionTimerRef.current)
-        clearTimeout(tooltipSessionTimerRef.current);
-    };
-  }, []);
+  const {
+    annotations,
+    setAnnotations,
+    toggleReviewed,
+    clearReviewedAnnotations,
+  } = useAnnotationState({
+    pathname,
+    resolvedEndpoint,
+  });
 
   // Tooltip component that renders via portal to escape overflow clipping
   const Tooltip = ({
@@ -927,18 +824,44 @@ export function PageFeedbackToolbarCSS({
       ? OUTPUT_TO_REACT_MODE[settings.outputDetail]
       : "off";
 
-  // Server sync state
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(
-    initialSessionId ?? null,
-  );
-  const sessionInitializedRef = useRef(false);
-  const [connectionStatus, setConnectionStatus] = useState<
-    "disconnected" | "connecting" | "connected"
-  >("disconnected");
-  const [neovimConnectionStatus, setNeovimConnectionStatus] = useState<
-    "disconnected" | "connecting" | "connected"
-  >(componentEditor === "neovim" ? "connecting" : "disconnected");
   const normalizedNeovimBridgeUrl = normalizeNeovimBridgeUrl(neovimBridgeUrl);
+
+  const {
+    currentSessionId,
+    connectionStatus,
+    neovimConnectionStatus,
+  } = useServerSync({
+    resolvedEndpoint,
+    mounted,
+    pathname,
+    projectId,
+    initialSessionId,
+    onSessionCreated,
+    setAnnotations,
+    isRenderableAnnotation,
+    componentEditor,
+    normalizedNeovimBridgeUrl,
+    neovimProjectId,
+  });
+
+  useEffect(() => {
+    if (!editingAnnotation) {
+      return;
+    }
+
+    const updated = annotations.find(
+      (annotation) => annotation.id === editingAnnotation.id,
+    );
+    if (!updated?.thread) {
+      return;
+    }
+
+    setEditingAnnotation((prev) =>
+      prev && prev.id === updated.id
+        ? { ...prev, thread: updated.thread }
+        : prev,
+    );
+  }, [annotations, editingAnnotation]);
 
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
@@ -972,26 +895,12 @@ export function PageFeedbackToolbarCSS({
   const justFinishedDragRef = useRef(false);
   const lastElementUpdateRef = useRef(0);
   const recentlyAddedIdRef = useRef<string | null>(null);
-  const prevConnectionStatusRef = useRef<typeof connectionStatus | null>(null);
   const DRAG_THRESHOLD = 8;
   const ELEMENT_UPDATE_THROTTLE = 50; // Faster updates since no React re-renders
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "/";
-
-  const hasExplicitEndpoint =
-    typeof endpoint === "string" && endpoint.trim() !== "";
-  const shouldAutoDiscoverEndpoint =
-    typeof process !== "undefined" && process.env.NODE_ENV === "development";
-  const resolvedEndpoint = hasExplicitEndpoint
-    ? endpoint.trim()
-    : shouldAutoDiscoverEndpoint
-      ? DEFAULT_AGENTATION_ENDPOINT
-      : "";
 
   // Handle showSettings changes with exit animation
   useEffect(() => {
@@ -1059,9 +968,6 @@ export function PageFeedbackToolbarCSS({
   useEffect(() => {
     setMounted(true);
     setScrollY(window.scrollY);
-    const stored = loadAnnotations<Annotation>(pathname);
-    setAnnotations(stored.filter(isRenderableAnnotation));
-
     // Trigger entrance animation only on first load (not on SPA navigation)
     if (!hasPlayedEntranceAnimation) {
       setShowEntranceAnimation(true);
@@ -1135,405 +1041,9 @@ export function PageFeedbackToolbarCSS({
     }
   }, [isDraggingToolbar, toolbarPosition, mounted]);
 
-  // Initialize server session
-  useEffect(() => {
-    if (!resolvedEndpoint || !mounted || sessionInitializedRef.current) return;
-    sessionInitializedRef.current = true;
-    setConnectionStatus("connecting");
-
-    const initSession = async () => {
-      try {
-        // Check for stored session ID to rejoin on refresh
-        const storedSessionId = loadSessionId(pathname);
-        const sessionIdToJoin = initialSessionId || storedSessionId;
-        let sessionEstablished = false;
-
-        if (sessionIdToJoin) {
-          // Join existing session - server annotations are authoritative
-          try {
-            const session = await getSession(resolvedEndpoint, sessionIdToJoin);
-            setCurrentSessionId(session.id);
-            setConnectionStatus("connected");
-            saveSessionId(pathname, session.id);
-            sessionEstablished = true;
-
-            // Find local annotations that need to be synced:
-            // 1. Annotations never synced to any session
-            // 2. Annotations synced to a different session
-            // 3. Annotations marked as synced to THIS session but missing from server
-            //    (handles server-side deletion)
-            const allLocalAnnotations = loadAnnotations<Annotation>(pathname);
-            const serverIds = new Set(session.annotations.map((a) => a.id));
-            const localToMerge = allLocalAnnotations.filter((a) => {
-              // If it exists on server, don't re-upload
-              if (serverIds.has(a.id)) return false;
-              // Otherwise, needs to be synced (whether never synced, synced elsewhere, or missing from server)
-              return true;
-            });
-
-            // Sync unsynced local annotations to this session
-            if (localToMerge.length > 0) {
-              const baseUrl =
-                typeof window !== "undefined" ? window.location.origin : "";
-              const pageUrl = `${baseUrl}${pathname}`;
-
-              const results = await Promise.allSettled(
-                localToMerge.map((annotation) =>
-                  syncAnnotation(resolvedEndpoint, session.id, {
-                    ...annotation,
-                    sessionId: session.id,
-                    url: pageUrl,
-                  }),
-                ),
-              );
-
-              const syncedAnnotations = results.map((result, i) => {
-                if (result.status === "fulfilled") {
-                  return result.value;
-                }
-                console.warn(
-                  "[Agentation] Failed to sync annotation:",
-                  result.reason,
-                );
-                return localToMerge[i];
-              });
-
-              // Mark merged annotations as synced
-              const allAnnotations = [
-                ...session.annotations,
-                ...syncedAnnotations,
-              ];
-              setAnnotations(allAnnotations.filter(isRenderableAnnotation));
-              saveAnnotationsWithSyncMarker(
-                pathname,
-                allAnnotations.filter(isRenderableAnnotation),
-                session.id,
-              );
-            } else {
-              setAnnotations(
-                session.annotations.filter(isRenderableAnnotation),
-              );
-              saveAnnotationsWithSyncMarker(
-                pathname,
-                session.annotations.filter(isRenderableAnnotation),
-                session.id,
-              );
-            }
-          } catch (joinError) {
-            // Session doesn't exist or expired - will create new below
-            console.warn(
-              "[Agentation] Could not join session, creating new:",
-              joinError,
-            );
-            // Clear the stored session ID since it's invalid
-            clearSessionId(pathname);
-            // sessionEstablished remains false, will create new session
-          }
-        }
-
-        // Create new session if we don't have one yet (either no stored ID, or rejoin failed)
-        if (!sessionEstablished) {
-          // Create new session for current page
-          const currentUrl =
-            typeof window !== "undefined" ? window.location.href : "/";
-          const session = await createSession(resolvedEndpoint, currentUrl, projectId);
-          setCurrentSessionId(session.id);
-          setConnectionStatus("connected");
-          saveSessionId(pathname, session.id);
-          onSessionCreated?.(session.id);
-
-          // Only sync annotations that have never been synced (no _syncedTo marker)
-          const allAnnotations = loadAllAnnotations<Annotation>();
-          const baseUrl =
-            typeof window !== "undefined" ? window.location.origin : "";
-
-          // Sync annotations from all pages in parallel
-          const syncPromises: Promise<void>[] = [];
-          for (const [pagePath, annotations] of allAnnotations) {
-            // Filter to only unsynced annotations
-            const unsyncedAnnotations = annotations.filter(
-              (a) => !(a as Annotation & { _syncedTo?: string })._syncedTo,
-            );
-            if (unsyncedAnnotations.length === 0) continue;
-
-            const pageUrl = `${baseUrl}${pagePath}`;
-            const isCurrentPage = pagePath === pathname;
-
-            syncPromises.push(
-              (async () => {
-                try {
-                  // Use current session for current page, create new sessions for other pages
-                  const targetSession = isCurrentPage
-                    ? session
-                    : await createSession(resolvedEndpoint, pageUrl, projectId);
-
-                  const results = await Promise.allSettled(
-                    unsyncedAnnotations.map((annotation) =>
-                      syncAnnotation(resolvedEndpoint, targetSession.id, {
-                        ...annotation,
-                        sessionId: targetSession.id,
-                        url: pageUrl,
-                      }),
-                    ),
-                  );
-
-                  // Mark synced annotations and update local state for current page
-                  const syncedAnnotations = results.map((result, i) => {
-                    if (result.status === "fulfilled") {
-                      return result.value;
-                    }
-                    console.warn(
-                      "[Agentation] Failed to sync annotation:",
-                      result.reason,
-                    );
-                    return unsyncedAnnotations[i];
-                  });
-
-                  const renderableSyncedAnnotations = syncedAnnotations.filter(
-                    isRenderableAnnotation,
-                  );
-
-                  // Save with sync marker
-                  saveAnnotationsWithSyncMarker(
-                    pagePath,
-                    renderableSyncedAnnotations,
-                    targetSession.id,
-                  );
-
-                  if (isCurrentPage) {
-                    const originalIds = new Set(
-                      unsyncedAnnotations.map((a) => a.id),
-                    );
-                    setAnnotations((prev) => {
-                      const newDuringSync = prev.filter(
-                        (a) => !originalIds.has(a.id),
-                      );
-                      return [...renderableSyncedAnnotations, ...newDuringSync];
-                    });
-                  }
-                } catch (err) {
-                  console.warn(
-                    `[Agentation] Failed to sync annotations for ${pagePath}:`,
-                    err,
-                  );
-                }
-              })(),
-            );
-          }
-
-          await Promise.allSettled(syncPromises);
-        }
-      } catch (error) {
-        // Network error - continue in local-only mode
-        setConnectionStatus("disconnected");
-        console.warn(
-          "[Agentation] Failed to initialize session, using local storage:",
-          error,
-        );
-      }
-    };
-
-    initSession();
-  }, [resolvedEndpoint, projectId, initialSessionId, mounted, onSessionCreated, pathname]);
-
-  // Periodic health check for server connection
-  useEffect(() => {
-    if (!resolvedEndpoint || !mounted) return;
-
-    const checkHealth = async () => {
-      try {
-        const response = await fetch(`${resolvedEndpoint}/health`);
-        if (response.ok) {
-          setConnectionStatus("connected");
-        } else {
-          setConnectionStatus("disconnected");
-        }
-      } catch {
-        setConnectionStatus("disconnected");
-      }
-    };
-
-    // Check immediately, then every 10 seconds
-    checkHealth();
-    const interval = originalSetInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
-  }, [resolvedEndpoint, mounted]);
-
-  // Listen for server-side annotation updates (e.g. resolved by agent)
-  useEffect(() => {
-    if (!resolvedEndpoint || !mounted || !currentSessionId || typeof EventSource === "undefined") return;
-
-    const eventSource = new EventSource(
-      `${resolvedEndpoint}/sessions/${currentSessionId}/events`
-    );
-
-    const removedStatuses = ["resolved", "dismissed"];
-
-    const handler = (e: MessageEvent) => {
-      try {
-        const event = JSON.parse(e.data);
-        if (removedStatuses.includes(event.payload?.status)) {
-          const { id, status, thread, resolvedAt, resolvedBy } = event.payload;
-          // Update annotation status in place (keep for review queue)
-          setAnnotations((prev) =>
-            prev.map((a) =>
-              a.id === id
-                ? { ...a, status, thread: thread ?? a.thread, resolvedAt, resolvedBy }
-                : a
-            )
-          );
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    };
-
-    eventSource.addEventListener("annotation.updated", handler);
-
-    // Listen for thread messages — payload is now the full Annotation
-    const threadHandler = (e: MessageEvent) => {
-      try {
-        const event = JSON.parse(e.data);
-        const updated = event.payload as Annotation;
-        if (!updated?.id || !updated?.thread) return;
-
-        // Update annotations array
-        setAnnotations((prev) =>
-          prev.map((a) => (a.id === updated.id ? { ...a, thread: updated.thread } : a))
-        );
-
-        // Update editingAnnotation if it's the same one
-        setEditingAnnotation((prev) =>
-          prev && prev.id === updated.id ? { ...prev, thread: updated.thread } : prev
-        );
-      } catch {
-        // Ignore parse errors
-      }
-    };
-
-    eventSource.addEventListener("thread.message", threadHandler);
-
-    return () => {
-      eventSource.removeEventListener("annotation.updated", handler);
-      eventSource.removeEventListener("thread.message", threadHandler);
-      eventSource.close();
-    };
-  }, [resolvedEndpoint, mounted, currentSessionId]);
-
-  // Sync local annotations when connection is restored
-  useEffect(() => {
-    if (!resolvedEndpoint || !mounted) return;
-
-    // Check if we just reconnected (was disconnected, now connected)
-    const wasDisconnected = prevConnectionStatusRef.current === "disconnected";
-    const isNowConnected = connectionStatus === "connected";
-    prevConnectionStatusRef.current = connectionStatus;
-
-    if (wasDisconnected && isNowConnected) {
-      // Sync any local annotations that aren't on the server
-      const syncLocalAnnotations = async () => {
-        try {
-          const localAnnotations = loadAnnotations<Annotation>(pathname);
-          if (localAnnotations.length === 0) return;
-
-          const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-          const pageUrl = `${baseUrl}${pathname}`;
-
-          // Get or create session
-          let sessionId = currentSessionId;
-          let serverAnnotations: Annotation[] = [];
-
-          if (sessionId) {
-            // Try to get existing session
-            try {
-              const session = await getSession(resolvedEndpoint, sessionId);
-              serverAnnotations = session.annotations;
-            } catch {
-              // Session doesn't exist anymore, create new one
-              sessionId = null;
-            }
-          }
-
-          if (!sessionId) {
-            // Create new session
-            const newSession = await createSession(resolvedEndpoint, pageUrl, projectId);
-            sessionId = newSession.id;
-            setCurrentSessionId(sessionId);
-            saveSessionId(pathname, sessionId);
-          }
-
-          // Find annotations that need syncing
-          const serverIds = new Set(serverAnnotations.map((a) => a.id));
-          const unsyncedLocal = localAnnotations.filter((a) => !serverIds.has(a.id));
-
-          if (unsyncedLocal.length > 0) {
-            const results = await Promise.allSettled(
-              unsyncedLocal.map((annotation) =>
-                syncAnnotation(resolvedEndpoint, sessionId!, {
-                  ...annotation,
-                  sessionId: sessionId!,
-                  url: pageUrl,
-                })
-              )
-            );
-
-            const syncedAnnotations = results.map((result, i) => {
-              if (result.status === "fulfilled") {
-                return result.value;
-              }
-              console.warn("[Agentation] Failed to sync annotation on reconnect:", result.reason);
-              return unsyncedLocal[i];
-            });
-
-            // Update local state with server + synced annotations
-            const allAnnotations = [...serverAnnotations, ...syncedAnnotations];
-            const renderableAnnotations = allAnnotations.filter(
-              isRenderableAnnotation,
-            );
-            setAnnotations(renderableAnnotations);
-            saveAnnotationsWithSyncMarker(
-              pathname,
-              renderableAnnotations,
-              sessionId!,
-            );
-          }
-        } catch (err) {
-          console.warn("[Agentation] Failed to sync on reconnect:", err);
-        }
-      };
-
-      syncLocalAnnotations();
-    }
-  }, [connectionStatus, resolvedEndpoint, projectId, mounted, currentSessionId, pathname]);
-
-  const toggleReviewed = useCallback((id: string) => {
-    setAnnotations((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, _reviewedAt: a._reviewedAt ? undefined : Date.now() }
-          : a
-      )
-    );
-  }, []);
-
-  const clearReviewedAnnotations = useCallback(() => {
-    const toClear = annotations.filter((a) => a._reviewedAt);
-    if (toClear.length === 0) return;
-
-    // Delete from server (non-blocking, same pattern as clearAll)
-    if (resolvedEndpoint) {
-      Promise.all(
-        toClear.map((a) =>
-          deleteAnnotationFromServer(resolvedEndpoint, a.id).catch((error) => {
-            console.warn("[Agentation] Failed to delete reviewed annotation:", error);
-          })
-        )
-      );
-    }
-
-    setAnnotations((prev) => prev.filter((a) => !a._reviewedAt));
-    setShowReviewQueue(false);
-  }, [annotations, resolvedEndpoint]);
+  const handleClearReviewedAnnotations = useCallback(() => {
+    clearReviewedAnnotations(() => setShowReviewQueue(false));
+  }, [clearReviewedAnnotations]);
 
   const hideToolbarTemporarily = useCallback(() => {
     if (isToolbarHiding) return;
@@ -1772,9 +1282,6 @@ export function PageFeedbackToolbarCSS({
   // Reset state when deactivating
   useEffect(() => {
     if (!isActive) {
-      isAltSelectionHeldRef.current = false;
-      didAltActivateToolbarRef.current = false;
-      setIsAltSelectionHeld(false);
       setComponentMenu(null);
       setHoveredComponentMenuIndex(null);
       setPendingAnnotation(null);
@@ -2123,83 +1630,6 @@ export function PageFeedbackToolbarCSS({
       document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [componentMenu]);
-
-  useEffect(() => {
-    if (componentEditor !== "neovim" || typeof fetch !== "function") {
-      setNeovimConnectionStatus("disconnected");
-      return;
-    }
-
-    let isDisposed = false;
-    let timeoutId: number | null = null;
-
-    const markDisconnected = (): void => {
-      setNeovimConnectionStatus("disconnected");
-    };
-
-    const scheduleDisconnect = (): void => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-      timeoutId = window.setTimeout(markDisconnected, neovimConnectionTimeoutMs);
-    };
-
-    let pingUrl: URL;
-    try {
-      pingUrl = new URL(`${normalizedNeovimBridgeUrl}/ping`);
-    } catch {
-      setNeovimConnectionStatus("disconnected");
-      return;
-    }
-    if (neovimProjectId) {
-      pingUrl.searchParams.set("projectId", neovimProjectId);
-    }
-    if (typeof window !== "undefined" && window.location.origin) {
-      pingUrl.searchParams.set("origin", window.location.origin);
-    }
-
-    async function pingBridge(): Promise<void> {
-      if (isDisposed) {
-        return;
-      }
-
-      setNeovimConnectionStatus((current) =>
-        current === "connected" ? current : "connecting",
-      );
-
-      try {
-        const response = await fetch(pingUrl.toString(), {
-          method: "GET",
-          mode: "cors",
-          keepalive: true,
-        });
-        if (!response.ok) {
-          throw new Error(`Neovim bridge ping failed with status ${response.status}`);
-        }
-        if (!isDisposed) {
-          setNeovimConnectionStatus("connected");
-          scheduleDisconnect();
-        }
-      } catch {
-        if (!isDisposed) {
-          setNeovimConnectionStatus("disconnected");
-        }
-      }
-    }
-
-    void pingBridge();
-    const interval = window.setInterval(() => {
-      void pingBridge();
-    }, neovimHeartbeatIntervalMs);
-
-    return () => {
-      isDisposed = true;
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-      window.clearInterval(interval);
-    };
-  }, [componentEditor, normalizedNeovimBridgeUrl, neovimProjectId]);
 
   // Cmd+shift+click multi-select: keyup listener for modifier release
   useEffect(() => {
@@ -3342,172 +2772,33 @@ export function PageFeedbackToolbarCSS({
     return () => window.removeEventListener("resize", constrainPosition);
   }, [toolbarPosition, isActive, connectionStatus]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isTyping = isTypingTarget(e.target);
-
-      if (e.key === "Alt") {
-        if (isTyping || e.repeat || isAltSelectionHeldRef.current) {
-          return;
-        }
-
-        setTooltipsHidden(true);
-        isAltSelectionHeldRef.current = true;
-        didAltActivateToolbarRef.current = !isActive;
-        setIsAltSelectionHeld(true);
-
-        if (!isActive) {
-          setIsActive(true);
-        }
-        return;
-      }
-
-      if (e.key === "Escape") {
-        // Clear multi-select if active
-        if (pendingMultiSelectElements.length > 0) {
-          setPendingMultiSelectElements([]);
-          return;
-        }
-        if (pendingAnnotation) {
-          // Let popup handle
-        } else if (isActive) {
-          hideTooltipsUntilMouseLeave();
-          setIsActive(false);
-        }
-      }
-
-      // Cmd+Shift+F / Ctrl+Shift+F to toggle feedback mode
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
-        e.preventDefault();
-        hideTooltipsUntilMouseLeave();
-        setIsActive((prev) => !prev);
-        return;
-      }
-
-      // Skip other shortcuts if typing or modifier keys are held
-      if (isTyping || e.metaKey || e.ctrlKey || e.altKey) return;
-
-      // "P" to toggle pause/freeze
-      if (e.key === "p" || e.key === "P") {
-        e.preventDefault();
-        hideTooltipsUntilMouseLeave();
-        toggleFreeze();
-      }
-
-      // "H" to toggle marker visibility
-      if (e.key === "h" || e.key === "H") {
-        if (annotations.length > 0) {
-          e.preventDefault();
-          hideTooltipsUntilMouseLeave();
-          setShowMarkers((prev) => !prev);
-        }
-      }
-
-      // "C" to copy output
-      if (e.key === "c" || e.key === "C") {
-        if (annotations.length > 0) {
-          e.preventDefault();
-          hideTooltipsUntilMouseLeave();
-          copyOutput();
-        }
-      }
-
-      // "X" to clear all
-      if (e.key === "x" || e.key === "X") {
-        if (annotations.length > 0) {
-          e.preventDefault();
-          hideTooltipsUntilMouseLeave();
-          clearAll();
-        }
-      }
-
-      // "Q" to toggle review queue
-      if (e.key === "q" || e.key === "Q") {
-        e.preventDefault();
-        hideTooltipsUntilMouseLeave();
-        setShowReviewQueue((prev) => !prev);
-      }
-
-      // "S" to send annotations
-      if (e.key === "s" || e.key === "S") {
-        const hasValidWebhook =
-          isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "");
-        if (
-          annotations.length > 0 &&
-          hasValidWebhook &&
-          sendState === "idle"
-        ) {
-          e.preventDefault();
-          hideTooltipsUntilMouseLeave();
-          sendToWebhook();
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key !== "Alt" || !isAltSelectionHeldRef.current) return;
-
-      isAltSelectionHeldRef.current = false;
-      const didAltActivateToolbar = didAltActivateToolbarRef.current;
-      didAltActivateToolbarRef.current = false;
-      setIsAltSelectionHeld(false);
-
-      const shouldKeepToolbarOpen =
-        pendingAnnotation !== null ||
-        editingAnnotation !== null ||
-        pendingMultiSelectElements.length > 0 ||
-        componentMenu !== null;
-
-      if (shouldKeepToolbarOpen || !didAltActivateToolbar) return;
-
-      setTooltipsHidden(true);
-      setIsActive(false);
-    };
-
-    const handleBlur = () => {
-      if (!isAltSelectionHeldRef.current) return;
-
-      isAltSelectionHeldRef.current = false;
-      const didAltActivateToolbar = didAltActivateToolbarRef.current;
-      didAltActivateToolbarRef.current = false;
-      setIsAltSelectionHeld(false);
-
-      const shouldKeepToolbarOpen =
-        pendingAnnotation !== null ||
-        editingAnnotation !== null ||
-        pendingMultiSelectElements.length > 0 ||
-        componentMenu !== null;
-
-      if (shouldKeepToolbarOpen || !didAltActivateToolbar) return;
-
-      setIsActive(false);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleBlur);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, [
-    isActive,
+  const {
     isAltSelectionHeld,
-    pendingAnnotation,
-    editingAnnotation,
-    annotations.length,
-    settings.webhookUrl,
+    tooltipsHidden,
+    setTooltipsHidden,
+    tooltipSessionActive,
+    hideTooltipsUntilMouseLeave,
+    handleControlsMouseEnter,
+    handleControlsMouseLeave,
+  } = useToolbarInteractions({
+    isActive,
+    setIsActive,
+    hasPendingAnnotation: pendingAnnotation !== null,
+    hasEditingAnnotation: editingAnnotation !== null,
+    pendingMultiSelectCount: pendingMultiSelectElements.length,
+    hasComponentMenu: componentMenu !== null,
+    annotationsCount: annotations.length,
+    settingsWebhookUrl: settings.webhookUrl,
     webhookUrl,
     sendState,
     sendToWebhook,
     toggleFreeze,
     copyOutput,
     clearAll,
-    pendingMultiSelectElements,
-    componentMenu,
-  ]);
+    toggleMarkers: () => setShowMarkers((prev) => !prev),
+    toggleReviewQueue: () => setShowReviewQueue((prev) => !prev),
+    clearPendingMultiSelect: () => setPendingMultiSelectElements([]),
+  });
 
   if (!mounted) return null;
   if (isToolbarHidden) return null;
@@ -3618,20 +2909,7 @@ export function PageFeedbackToolbarCSS({
   return createPortal(
     <div ref={portalWrapperRef} style={{ display: "contents" }}>
       {/* Toolbar */}
-      <div
-        className={`${styles.toolbar}${userClassName ? ` ${userClassName}` : ""}`}
-        data-feedback-toolbar
-        style={
-          toolbarPosition
-            ? {
-                left: toolbarPosition.x,
-                top: toolbarPosition.y,
-                right: "auto",
-                bottom: "auto",
-              }
-            : undefined
-        }
-      >
+      <ToolbarShell className={userClassName} toolbarPosition={toolbarPosition}>
         {/* Morphing container */}
         <div
           className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
@@ -4410,323 +3688,37 @@ export function PageFeedbackToolbarCSS({
               <button
                 className={`${styles.reviewQueueFooterButton} ${!isDarkMode ? styles.light : ""}`}
                 disabled={!resolvedAnnotations.some((a) => a._reviewedAt)}
-                onClick={clearReviewedAnnotations}
+                onClick={handleClearReviewedAnnotations}
               >
                 Clear Selected
               </button>
             </div>
           </div>
         </div>
-      </div>
+      </ToolbarShell>
 
-      {/* Markers layer - normal scrolling markers */}
-      <div className={styles.markersLayer} data-feedback-toolbar>
-        {markersVisible &&
-          visibleAnnotations
-            .filter((a) => !a.isFixed)
-            .map((annotation, index) => {
-              const isHovered =
-                !markersExiting && hoveredMarkerId === annotation.id;
-              const isDeleting = deletingMarkerId === annotation.id;
-              const showDeleteState =
-                (isHovered || isDeleting) && !editingAnnotation;
-              const isMulti = annotation.isMultiSelect;
-              const markerColor = isMulti
-                ? "#34C759"
-                : settings.annotationColor;
-              const globalIndex = activeAnnotations.findIndex(
-                (a) => a.id === annotation.id,
-              );
-              const needsEnterAnimation = !animatedMarkers.has(annotation.id);
-              const animClass = markersExiting
-                ? styles.exit
-                : isClearing
-                  ? styles.clearing
-                  : needsEnterAnimation
-                    ? styles.enter
-                    : "";
-
-              const showDeleteHover =
-                showDeleteState && settings.markerClickBehavior === "delete";
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${isMulti ? styles.multiSelect : ""} ${animClass} ${showDeleteHover ? styles.hovered : ""}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                    backgroundColor: showDeleteHover ? undefined : markerColor,
-                    animationDelay: markersExiting
-                      ? `${(visibleAnnotations.length - 1 - index) * 20}ms`
-                      : `${index * 20}ms`,
-                  }}
-                  onMouseEnter={() =>
-                    !markersExiting &&
-                    annotation.id !== recentlyAddedIdRef.current &&
-                    handleMarkerHover(annotation)
-                  }
-                  onMouseLeave={() => handleMarkerHover(null)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!markersExiting) {
-                      if (settings.markerClickBehavior === "delete") {
-                        deleteAnnotation(annotation.id);
-                      } else {
-                        startEditAnnotation(annotation);
-                      }
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    if (settings.markerClickBehavior === "delete") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (!markersExiting) startEditAnnotation(annotation);
-                    }
-                  }}
-                >
-                  {showDeleteState ? (
-                    showDeleteHover ? (
-                      <IconXmark size={isMulti ? 18 : 16} />
-                    ) : (
-                      <IconEdit size={16} />
-                    )
-                  ) : (
-                    <span
-                      className={
-                        renumberFrom !== null && globalIndex >= renumberFrom
-                          ? styles.renumber
-                          : undefined
-                      }
-                    >
-                      {globalIndex + 1}
-                    </span>
-                  )}
-                  {annotation.thread && annotation.thread.length > 0 && !showDeleteState && (
-                    <span className={styles.threadBadge}>
-                      {annotation.thread.length}
-                    </span>
-                  )}
-                  {isHovered && !editingAnnotation && (
-                    <div
-                      className={`${styles.markerTooltip} ${!isDarkMode ? styles.light : ""} ${styles.enter}`}
-                      style={getTooltipPosition(annotation)}
-                    >
-                      <span className={styles.markerQuote}>
-                        {annotation.element}
-                        {annotation.selectedText &&
-                          ` "${annotation.selectedText.slice(0, 30)}${annotation.selectedText.length > 30 ? "..." : ""}"`}
-                      </span>
-                      <span className={styles.markerNote}>
-                        {annotation.comment}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-        {/* Resolved markers (normal) - faded with checkmark */}
-        {markersVisible &&
-          !markersExiting &&
-          resolvedAnnotations
-            .filter((a) => !a.isFixed)
-            .map((annotation) => (
-              <div
-                key={annotation.id}
-                className={`${styles.marker} ${styles.resolved} ${annotation._reviewedAt ? styles.reviewed : ""} ${annotation.isMultiSelect ? styles.multiSelect : ""}`}
-                data-annotation-marker
-                style={{
-                  left: `${annotation.x}%`,
-                  top: annotation.y,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startEditAnnotation(annotation);
-                }}
-              >
-                <IconCheckSmall size={12} />
-              </div>
-            ))}
-
-        {/* Exiting markers (normal) - individual deletion animations */}
-        {markersVisible &&
-          !markersExiting &&
-          exitingAnnotationsList
-            .filter((a) => !a.isFixed)
-            .map((annotation) => {
-              const isMulti = annotation.isMultiSelect;
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                  }}
-                >
-                  <IconXmark size={isMulti ? 12 : 10} />
-                </div>
-              );
-            })}
-      </div>
-
-      {/* Fixed markers layer */}
-      <div className={styles.fixedMarkersLayer} data-feedback-toolbar>
-        {markersVisible &&
-          visibleAnnotations
-            .filter((a) => a.isFixed)
-            .map((annotation, index) => {
-              const fixedAnnotations = visibleAnnotations.filter(
-                (a) => a.isFixed,
-              );
-              const isHovered =
-                !markersExiting && hoveredMarkerId === annotation.id;
-              const isDeleting = deletingMarkerId === annotation.id;
-              const showDeleteState =
-                (isHovered || isDeleting) && !editingAnnotation;
-              const isMulti = annotation.isMultiSelect;
-              const markerColor = isMulti
-                ? "#34C759"
-                : settings.annotationColor;
-              const globalIndex = activeAnnotations.findIndex(
-                (a) => a.id === annotation.id,
-              );
-              const needsEnterAnimation = !animatedMarkers.has(annotation.id);
-              const animClass = markersExiting
-                ? styles.exit
-                : isClearing
-                  ? styles.clearing
-                  : needsEnterAnimation
-                    ? styles.enter
-                    : "";
-
-              const showDeleteHover =
-                showDeleteState && settings.markerClickBehavior === "delete";
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${styles.fixed} ${isMulti ? styles.multiSelect : ""} ${animClass} ${showDeleteHover ? styles.hovered : ""}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                    backgroundColor: showDeleteHover ? undefined : markerColor,
-                    animationDelay: markersExiting
-                      ? `${(fixedAnnotations.length - 1 - index) * 20}ms`
-                      : `${index * 20}ms`,
-                  }}
-                  onMouseEnter={() =>
-                    !markersExiting &&
-                    annotation.id !== recentlyAddedIdRef.current &&
-                    handleMarkerHover(annotation)
-                  }
-                  onMouseLeave={() => handleMarkerHover(null)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!markersExiting) {
-                      if (settings.markerClickBehavior === "delete") {
-                        deleteAnnotation(annotation.id);
-                      } else {
-                        startEditAnnotation(annotation);
-                      }
-                    }
-                  }}
-                  onContextMenu={(e) => {
-                    if (settings.markerClickBehavior === "delete") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (!markersExiting) startEditAnnotation(annotation);
-                    }
-                  }}
-                >
-                  {showDeleteState ? (
-                    showDeleteHover ? (
-                      <IconXmark size={isMulti ? 18 : 16} />
-                    ) : (
-                      <IconEdit size={16} />
-                    )
-                  ) : (
-                    <span
-                      className={
-                        renumberFrom !== null && globalIndex >= renumberFrom
-                          ? styles.renumber
-                          : undefined
-                      }
-                    >
-                      {globalIndex + 1}
-                    </span>
-                  )}
-                  {annotation.thread && annotation.thread.length > 0 && !showDeleteState && (
-                    <span className={styles.threadBadge}>
-                      {annotation.thread.length}
-                    </span>
-                  )}
-                  {isHovered && !editingAnnotation && (
-                    <div
-                      className={`${styles.markerTooltip} ${!isDarkMode ? styles.light : ""} ${styles.enter}`}
-                      style={getTooltipPosition(annotation)}
-                    >
-                      <span className={styles.markerQuote}>
-                        {annotation.element}
-                        {annotation.selectedText &&
-                          ` "${annotation.selectedText.slice(0, 30)}${annotation.selectedText.length > 30 ? "..." : ""}"`}
-                      </span>
-                      <span className={styles.markerNote}>
-                        {annotation.comment}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-        {/* Resolved markers (fixed) - faded with checkmark */}
-        {markersVisible &&
-          !markersExiting &&
-          resolvedAnnotations
-            .filter((a) => a.isFixed)
-            .map((annotation) => (
-              <div
-                key={annotation.id}
-                className={`${styles.marker} ${styles.fixed} ${styles.resolved} ${annotation._reviewedAt ? styles.reviewed : ""} ${annotation.isMultiSelect ? styles.multiSelect : ""}`}
-                data-annotation-marker
-                style={{
-                  left: `${annotation.x}%`,
-                  top: annotation.y,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startEditAnnotation(annotation);
-                }}
-              >
-                <IconCheckSmall size={12} />
-              </div>
-            ))}
-
-        {/* Exiting markers (fixed) - individual deletion animations */}
-        {markersVisible &&
-          !markersExiting &&
-          exitingAnnotationsList
-            .filter((a) => a.isFixed)
-            .map((annotation) => {
-              const isMulti = annotation.isMultiSelect;
-              return (
-                <div
-                  key={annotation.id}
-                  className={`${styles.marker} ${styles.fixed} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
-                  data-annotation-marker
-                  style={{
-                    left: `${annotation.x}%`,
-                    top: annotation.y,
-                  }}
-                >
-                  <IconClose size={isMulti ? 12 : 10} />
-                </div>
-              );
-            })}
-      </div>
+      <MarkersLayer
+        markersVisible={markersVisible}
+        markersExiting={markersExiting}
+        visibleAnnotations={visibleAnnotations}
+        activeAnnotations={activeAnnotations}
+        resolvedAnnotations={resolvedAnnotations}
+        exitingAnnotationsList={exitingAnnotationsList}
+        annotationColor={settings.annotationColor}
+        deletingMarkerId={deletingMarkerId}
+        editingAnnotation={editingAnnotation}
+        renumberFrom={renumberFrom}
+        animatedMarkers={animatedMarkers}
+        isClearing={isClearing}
+        recentlyAddedId={recentlyAddedIdRef.current}
+        hoveredMarkerId={hoveredMarkerId}
+        isDarkMode={isDarkMode}
+        markerClickBehavior={settings.markerClickBehavior}
+        getTooltipPosition={getTooltipPosition}
+        handleMarkerHover={handleMarkerHover}
+        deleteAnnotation={deleteAnnotation}
+        startEditAnnotation={startEditAnnotation}
+      />
 
       {/* Interactive overlay */}
       {isActive && (
