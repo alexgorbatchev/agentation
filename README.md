@@ -76,6 +76,21 @@ pnpm build
 pnpm test
 ```
 
+Coverage workflow:
+
+```bash
+# Stable package coverage run (unit project)
+pnpm --filter agentation exec vitest run --coverage
+
+# Explicit unit-only coverage
+pnpm --filter agentation exec vitest run --project unit --coverage
+```
+
+Notes:
+
+- `pnpm test` remains the full suite entry point (including browser/storybook tests).
+- Coverage runs are aligned to the supported Vitest coverage path above.
+
 CLI binaries are published via GitHub Actions on tags matching `cli-v*`.
 
 ## License
