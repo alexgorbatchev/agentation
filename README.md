@@ -6,15 +6,9 @@
 ---
 
 > [!WARNING]
-> Fork notice: this repository is a maintained fork of [benjitaylor/agentation](https://github.com/benjitaylor/agentation) with several additions on top of upstream:
-
-- Annotation thread and reply UI
-- Deep select for piercing overlays
-- Alt hold-to-select mode with a crosshair cursor
-- Review queue for resolved annotations
-- Local CLI/server support for surfacing human thread replies
-- Storybook plus expanded automated test coverage
-- Neovim integration ([`nvim/README.md`](nvim/README.md)) and a local router daemon managed by the Go CLI for multi-project Neovim routing
+> Fork notice: this repository is a maintained fork of [benjitaylor/agentation](https://github.com/benjitaylor/agentation).
+> 
+> For fork-specific changes and docs, see [`README-FORK.md`](README-FORK.md).
 
 ---
 
