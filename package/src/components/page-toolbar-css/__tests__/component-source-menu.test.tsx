@@ -32,6 +32,8 @@ vi.mock("../../../utils/component-inspector", async () => {
 
 import { PageFeedbackToolbarCSS } from "../index";
 
+const navigateToUrlMock = vi.fn<(url: string) => void>();
+
 async function activateToolbar(): Promise<void> {
   fireEvent.click(screen.getByTitle("Start feedback mode"));
   await waitFor(() => {
@@ -43,15 +45,12 @@ describe("component source menu", () => {
   beforeEach(() => {
     hooks.createUrl.mockClear();
     hooks.inspect.mockClear();
+    navigateToUrlMock.mockClear();
     document.elementFromPoint = vi.fn();
     Object.defineProperty(navigator, "clipboard", {
       value: {
         writeText: vi.fn().mockResolvedValue(undefined),
       },
-      configurable: true,
-    });
-    Object.defineProperty(Location.prototype, "assign", {
-      value: vi.fn(),
       configurable: true,
     });
     vi.stubGlobal(
@@ -63,7 +62,12 @@ describe("component source menu", () => {
   });
 
   it("opens a component menu on alt+right-click and navigates on selection", async () => {
-    render(<PageFeedbackToolbarCSS componentEditor="cursor" />);
+    render(
+      <PageFeedbackToolbarCSS
+        componentEditor="cursor"
+        navigateToUrl={navigateToUrlMock}
+      />,
+    );
     await activateToolbar();
 
     const target = document.createElement("button");
@@ -87,13 +91,22 @@ describe("component source menu", () => {
     });
     expect(hooks.inspect).toHaveBeenCalledWith(target);
     expect(hooks.createUrl).toHaveBeenCalled();
+    expect(navigateToUrlMock).toHaveBeenCalledWith(
+      "cursor://open?url=file:/src/Button.tsx&line=42&column=8",
+    );
     await waitFor(() => {
       expect(screen.queryByText("<Button>")).toBeNull();
     });
   });
 
   it("can skip clipboard copying when disabled", async () => {
-    render(<PageFeedbackToolbarCSS componentEditor="cursor" copyComponentSourcePath={false} />);
+    render(
+      <PageFeedbackToolbarCSS
+        componentEditor="cursor"
+        copyComponentSourcePath={false}
+        navigateToUrl={navigateToUrlMock}
+      />,
+    );
     await activateToolbar();
 
     const target = document.createElement("button");
@@ -111,13 +124,21 @@ describe("component source menu", () => {
     await waitFor(() => {
       expect(hooks.createUrl).toHaveBeenCalled();
     });
+    expect(navigateToUrlMock).toHaveBeenCalledWith(
+      "cursor://open?url=file:/src/Button.tsx&line=42&column=8",
+    );
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
   });
 
   it("uses location navigation for non-neovim editors even when URL is http", async () => {
     hooks.createUrl.mockReturnValueOnce("https://example.dev/open?path=src/Button.tsx");
 
-    render(<PageFeedbackToolbarCSS componentEditor="cursor" />);
+    render(
+      <PageFeedbackToolbarCSS
+        componentEditor="cursor"
+        navigateToUrl={navigateToUrlMock}
+      />,
+    );
     await activateToolbar();
 
     const target = document.createElement("button");
@@ -141,6 +162,9 @@ describe("component source menu", () => {
         ([url]) => url === "https://example.dev/open?path=src/Button.tsx",
       ),
     ).toBe(false);
+    expect(navigateToUrlMock).toHaveBeenCalledWith(
+      "https://example.dev/open?path=src/Button.tsx",
+    );
   });
 
   it("uses fetch instead of location navigation for neovim bridge requests", async () => {
@@ -148,7 +172,12 @@ describe("component source menu", () => {
       "http://127.0.0.1:8777/open?path=src%2FButton.tsx&line=42&column=8",
     );
 
-    render(<PageFeedbackToolbarCSS componentEditor="neovim" />);
+    render(
+      <PageFeedbackToolbarCSS
+        componentEditor="neovim"
+        navigateToUrl={navigateToUrlMock}
+      />,
+    );
     await activateToolbar();
 
     const target = document.createElement("button");
@@ -172,6 +201,6 @@ describe("component source menu", () => {
         ),
       ).toBe(true);
     });
-    expect(Location.prototype.assign).not.toHaveBeenCalled();
+    expect(navigateToUrlMock).not.toHaveBeenCalled();
   });
 });

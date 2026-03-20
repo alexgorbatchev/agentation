@@ -536,6 +536,8 @@ export type PageFeedbackToolbarCSSProps = {
   componentEditor?: ComponentEditor;
   /** Override editor URL generation for alt+right-click component navigation. */
   getComponentEditorUrl?: (params: ComponentSourceUrlParams) => string;
+  /** Override navigation side effects for opening component sources. */
+  navigateToUrl?: (url: string) => void;
   /** Base URL for the Neovim bridge/router when using componentEditor="neovim". */
   neovimBridgeUrl?: string;
   /** Optional project ID used by the Neovim router to resolve the target session. */
@@ -572,6 +574,9 @@ export function PageFeedbackToolbarCSS({
   className: userClassName,
   componentEditor = "vscode",
   getComponentEditorUrl,
+  navigateToUrl = (url: string): void => {
+    window.location.assign(url);
+  },
   neovimBridgeUrl = "http://127.0.0.1:8777",
   neovimProjectId,
   copyComponentSourcePath = true,
@@ -2905,12 +2910,7 @@ export function PageFeedbackToolbarCSS({
         // Ignore local bridge failures and keep the menu behavior predictable.
       }
     } else {
-      const isJsdomEnvironment =
-        typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
-
-      if (!isJsdomEnvironment) {
-        window.location.assign(url);
-      }
+      navigateToUrl(url);
     }
 
     setComponentMenu(null);
