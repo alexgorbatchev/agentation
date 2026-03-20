@@ -2113,6 +2113,17 @@ $green: #34c759;
   }
 }
 
+.settingsValue {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.0094em;
+  color: rgba(255, 255, 255, 0.85);
+
+  &.light {
+    color: rgba(0, 0, 0, 0.85);
+  }
+}
+
 .settingsLabelMarker {
   padding-top: 3px;
   margin-bottom: 10px;

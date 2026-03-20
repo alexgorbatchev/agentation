@@ -2043,6 +2043,23 @@ export function PageFeedbackToolbarCSS({
                     <div
                       className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
                     >
+                      Project ID
+                    </div>
+                    <span
+                      className={`${styles.settingsValue} ${!isDarkMode ? styles.light : ""}`}
+                    >
+                      {typeof projectId === "string" && projectId.trim() !== ""
+                        ? projectId.trim()
+                        : "Not set"}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`${styles.settingsRow} ${styles.settingsRowMarginTop}`}
+                  >
+                    <div
+                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
+                    >
                       Output Detail
                       <Tooltip content="Controls how much detail is included in the copied output">
                         <span className={styles.helpIcon}>

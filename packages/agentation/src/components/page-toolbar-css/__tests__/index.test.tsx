@@ -557,6 +557,29 @@ describe("PageFeedbackToolbarCSS", () => {
       });
     });
 
+    it("shows project id above output detail in settings", async () => {
+      render(<PageFeedbackToolbarCSS projectId="project-123" />);
+      await activateToolbar();
+
+      const settingsBtn = findButtonByTooltip("Settings");
+      fireEvent.click(settingsBtn!);
+
+      await waitFor(() => {
+        expect(screen.getByText("Project ID")).toBeTruthy();
+        expect(screen.getByText("project-123")).toBeTruthy();
+        expect(screen.getByText("Output Detail")).toBeTruthy();
+      });
+
+      const projectIdLabel = screen.getByText("Project ID");
+      const outputDetailLabel = screen.getByText("Output Detail");
+      const hasProjectIdFirst =
+        (projectIdLabel.compareDocumentPosition(outputDetailLabel) &
+          Node.DOCUMENT_POSITION_FOLLOWING) !==
+        0;
+
+      expect(hasProjectIdFirst).toBe(true);
+    });
+
     it("cycles output detail levels when clicking the cycle button", async () => {
       render(<PageFeedbackToolbarCSS />);
       await activateToolbar();
