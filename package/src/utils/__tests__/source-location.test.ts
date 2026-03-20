@@ -22,6 +22,7 @@ import {
 } from "../source-location";
 
 const probeFlagKey = "__AGENTATION_ENABLE_UNSAFE_SOURCE_PROBE__";
+const probeAllowlistKey = "__AGENTATION_UNSAFE_SOURCE_PROBE_ALLOWLIST__";
 
 // =============================================================================
 // Helpers — create mock fibers and attach to DOM elements
@@ -60,12 +61,16 @@ beforeEach(() => {
   document.body.innerHTML = "";
   // Clean up any devtools hook
   delete (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-  (globalThis as Record<string, unknown>)[probeFlagKey] = true;
+  const globalRecord = globalThis as Record<string, unknown>;
+  globalRecord[probeFlagKey] = true;
+  globalRecord[probeAllowlistKey] = ["localhost", "http://localhost"];
 });
 
 afterEach(() => {
   delete (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-  delete (globalThis as Record<string, unknown>)[probeFlagKey];
+  const globalRecord = globalThis as Record<string, unknown>;
+  delete globalRecord[probeFlagKey];
+  delete globalRecord[probeAllowlistKey];
 });
 
 // =============================================================================

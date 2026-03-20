@@ -33,9 +33,10 @@ Derived from `REVIEW.md` findings and lifecycle state.
     - Latency is reduced for large projects without changing output semantics.
     - Add tests for ordering + error handling under concurrent fetches.
 
-- [ ] **[REV-001] Complete source probing hardening by removing/containing fallback invocation path**
+- [x] **[REV-001] Complete source probing hardening by removing/containing fallback invocation path**
   - **Status from review:** partially fixed
   - **Goal:** Eliminate remaining risky fallback path or fully guard it behind explicit safety checks.
+  - **Progress:** Completed — unsafe fallback probing now requires both the probe flag and an explicit validated allowlist (`__AGENTATION_UNSAFE_SOURCE_PROBE_ALLOWLIST__`), and tests now cover missing/invalid allowlist failure paths.
   - **Acceptance criteria:**
     - Fallback invocation path is either removed or restricted with explicit allowlist/validation.
     - Tests cover the guarded path and expected failure modes.

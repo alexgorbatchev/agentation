@@ -390,13 +390,72 @@ function findDebugSourceReact19(
 // =============================================================================
 
 const UNSAFE_SOURCE_PROBE_FLAG = "__AGENTATION_ENABLE_UNSAFE_SOURCE_PROBE__";
+const UNSAFE_SOURCE_PROBE_ALLOWLIST = "__AGENTATION_UNSAFE_SOURCE_PROBE_ALLOWLIST__";
 
 /** Cache: component function → probed SourceLocation (or null if unresolvable) */
 const sourceProbeCache = new Map<Function, SourceLocation | null>();
 
+function resolveUnsafeProbeOrigin(): { origin: string; host: string } | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const origin = window.location.origin;
+  if (!origin || origin === "null") {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    return { origin: parsed.origin.toLowerCase(), host: parsed.hostname.toLowerCase() };
+  } catch {
+    return null;
+  }
+}
+
+function parseUnsafeProbeAllowlist(value: unknown): Set<string> | null {
+  if (value === undefined) {
+    return new Set();
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const entries = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      return null;
+    }
+
+    const normalized = entry.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    entries.add(normalized);
+  }
+
+  return entries;
+}
+
 function isUnsafeSourceProbeEnabled(): boolean {
   const globalRecord = globalThis as Record<string, unknown>;
-  return globalRecord[UNSAFE_SOURCE_PROBE_FLAG] === true;
+  if (globalRecord[UNSAFE_SOURCE_PROBE_FLAG] !== true) {
+    return false;
+  }
+
+  const originInfo = resolveUnsafeProbeOrigin();
+  if (!originInfo) {
+    return false;
+  }
+
+  const allowlist = parseUnsafeProbeAllowlist(globalRecord[UNSAFE_SOURCE_PROBE_ALLOWLIST]);
+  if (!allowlist || allowlist.size === 0) {
+    return false;
+  }
+
+  return allowlist.has(originInfo.host) || allowlist.has(originInfo.origin);
 }
 
 /**
