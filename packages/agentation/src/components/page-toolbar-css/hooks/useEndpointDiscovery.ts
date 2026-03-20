@@ -7,17 +7,15 @@ export function useEndpointDiscovery(endpoint?: string): string {
 
   const hasExplicitEndpoint =
     typeof endpoint === "string" && endpoint.trim() !== "";
-  const shouldAutoConnectOnce =
-    !hasExplicitEndpoint &&
-    typeof process !== "undefined" &&
-    process.env.NODE_ENV !== "test";
+  const canProbeDefaultEndpoint =
+    !hasExplicitEndpoint && typeof fetch === "function";
 
   const resolvedEndpoint = hasExplicitEndpoint
     ? endpoint.trim()
     : autoDiscoveredEndpoint;
 
   useEffect(() => {
-    if (!shouldAutoConnectOnce || autoDiscoveredEndpoint) {
+    if (!canProbeDefaultEndpoint || autoDiscoveredEndpoint) {
       return;
     }
 
@@ -39,7 +37,7 @@ export function useEndpointDiscovery(endpoint?: string): string {
     return () => {
       cancelled = true;
     };
-  }, [autoDiscoveredEndpoint, shouldAutoConnectOnce]);
+  }, [autoDiscoveredEndpoint, canProbeDefaultEndpoint]);
 
   return resolvedEndpoint;
 }
