@@ -27,6 +27,8 @@
     "build": "tsup",
     "watch": "tsup --watch",
     "dev": "pnpm build && pnpm watch",
+    "typecheck": "tsc --noEmit",
+    "pretest": "pnpm run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "pnpm build",

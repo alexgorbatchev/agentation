@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "pnpm --filter agentation watch & pnpm --filter feedback-tool-example dev",
     "storybook": "pnpm --filter agentation storybook",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "pretest": "pnpm typecheck",
     "test": "pnpm -r run test",
     "test:watch": "pnpm -r run test:watch",
     "build": "pnpm -r run build",
