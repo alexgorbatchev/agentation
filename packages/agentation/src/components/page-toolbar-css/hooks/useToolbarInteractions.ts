@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
+import { isValidUrl } from "../utils/isValidUrl";
+
 type SendState = "idle" | "sending" | "sent" | "failed";
 
 type UseToolbarInteractionsParams = {
@@ -33,19 +35,6 @@ type UseToolbarInteractionsResult = {
   handleControlsMouseEnter: () => void;
   handleControlsMouseLeave: () => void;
 };
-
-function isValidUrl(url: string): boolean {
-  if (!url || !url.trim()) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(url.trim());
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
 import type { AnnotationPopupCSSHandle } from "../annotation-popup-css";
@@ -8,12 +9,6 @@ import {
   identifyElement,
   getNearbyText,
   getElementClasses,
-  getDetailedComputedStyles,
-  getForensicComputedStyles,
-  getFullElementPath,
-  getAccessibilityInfo,
-  getNearbyElements,
-  closestCrossingShadow,
 } from "../../utils/element-identification";
 import {
   saveAnnotations,
@@ -54,7 +49,10 @@ import {
   type PendingAnnotationState,
   type PendingMultiSelectElement,
 } from "./hooks/useInteractionLifecycle";
+import { usePendingMultiSelectAnnotation } from "./hooks/usePendingMultiSelectAnnotation";
+import { usePortalEventBoundary } from "./hooks/usePortalEventBoundary";
 import { useServerSync } from "./hooks/useServerSync";
+import { useToolbarActiveLifecycle } from "./hooks/useToolbarActiveLifecycle";
 import { useToolbarDragging } from "./hooks/useToolbarDragging";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
 import { useToolbarPreferences } from "./hooks/useToolbarPreferences";
@@ -66,6 +64,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { ToolbarControls } from "./components/ToolbarControls";
 import { ToolbarShell } from "./components/ToolbarShell";
 import { type OutputDetailLevel } from "./state/toolbar-settings";
+import { isValidUrl } from "./utils/isValidUrl";
 import {
   deepElementFromPoint,
   isElementFixed,
@@ -128,17 +127,6 @@ function removeLocalStorageItem(key: string): void {
   }
 }
 
-// Simple URL validation - checks for valid http(s) URL format
-const isValidUrl = (url: string): boolean => {
-  if (!url || !url.trim()) return false;
-  try {
-    const parsed = new URL(url.trim());
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-};
-
 // Maps output detail level to React detection mode
 const OUTPUT_TO_REACT_MODE: Record<OutputDetailLevel, ReactComponentMode> = {
   compact: "off",
@@ -167,10 +155,6 @@ const COLOR_OPTIONS = [
 // =============================================================================
 // Utils
 // =============================================================================
-
-function isRenderableAnnotation(_annotation: Annotation): boolean {
-  return true; // All annotations are renderable — resolved ones show as faded checkmarks
-}
 
 function detectSourceFile(element: Element): string | undefined {
   const result = getSourceLocation(element as HTMLElement);
@@ -279,27 +263,7 @@ export function PageFeedbackToolbarCSS({
     typeof window !== "undefined" ? window.location.pathname : "/";
 
   const resolvedEndpoint = useEndpointDiscovery(endpoint);
-
-  // Stop native events from bubbling past document.body when they originate
-  // inside the toolbar portal. Without this, clicks on the toolbar propagate to
-  // document-level listeners, triggering "click outside" handlers that close
-  // modals, dropdowns, and drawers. We attach to body (not a wrapper div) so
-  // React's synthetic event delegation (which also listens on body/root) still
-  // works — we only block propagation from body → document/window.
-  const portalWrapperRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const stop = (e: Event) => {
-      const wrapper = portalWrapperRef.current;
-      if (wrapper && wrapper.contains(e.target as Node)) {
-        e.stopPropagation();
-      }
-    };
-    const events = ["mousedown", "click", "pointerdown"] as const;
-    events.forEach((evt) => document.body.addEventListener(evt, stop));
-    return () => {
-      events.forEach((evt) => document.body.removeEventListener(evt, stop));
-    };
-  }, []);
+  const portalWrapperRef = usePortalEventBoundary();
 
   // Unified marker visibility state - controls both toolbar and eye toggle
   const [markersVisible, setMarkersVisible] = useState(false);
@@ -393,7 +357,6 @@ export function PageFeedbackToolbarCSS({
     initialSessionId,
     onSessionCreated,
     setAnnotations,
-    isRenderableAnnotation,
     componentEditor,
     normalizedNeovimBridgeUrl,
     neovimProjectId,
@@ -577,137 +540,31 @@ export function PageFeedbackToolbarCSS({
     }
   }, [isFrozen, freezeAnimations, unfreezeAnimations]);
 
-  // Create pending annotation from cmd+shift+click multi-select
-  const createMultiSelectPendingAnnotation = useCallback(() => {
-    if (pendingMultiSelectElements.length === 0) return;
+  const { createMultiSelectPendingAnnotation } = usePendingMultiSelectAnnotation({
+    pendingMultiSelectElements,
+    setPendingAnnotation,
+    setHoverInfo,
+    setPendingMultiSelectElements,
+    isElementFixed,
+    detectSourceFile,
+  });
 
-    const firstItem = pendingMultiSelectElements[0];
-    const firstEl = firstItem.element;
-    const isMulti = pendingMultiSelectElements.length > 1;
-
-    // Get fresh rects for all elements
-    const freshRects = pendingMultiSelectElements.map((item) =>
-      item.element.getBoundingClientRect(),
-    );
-
-    if (!isMulti) {
-      // Single element - treat as regular annotation (not multi-select)
-      const rect = freshRects[0];
-      const isFixed = isElementFixed(firstEl);
-
-      setPendingAnnotation({
-        x: (rect.left / window.innerWidth) * 100,
-        y: isFixed ? rect.top : rect.top + window.scrollY,
-        clientY: rect.top,
-        element: firstItem.name,
-        elementPath: firstItem.path,
-        boundingBox: {
-          x: rect.left,
-          y: isFixed ? rect.top : rect.top + window.scrollY,
-          width: rect.width,
-          height: rect.height,
-        },
-        isFixed,
-        fullPath: getFullElementPath(firstEl),
-        accessibility: getAccessibilityInfo(firstEl),
-        computedStyles: getForensicComputedStyles(firstEl),
-        computedStylesObj: getDetailedComputedStyles(firstEl),
-        nearbyElements: getNearbyElements(firstEl),
-        cssClasses: getElementClasses(firstEl),
-        nearbyText: getNearbyText(firstEl),
-        reactComponents: firstItem.reactComponents,
-        sourceFile: detectSourceFile(firstEl),
-      });
-    } else {
-      // Multiple elements - multi-select annotation
-      const bounds = {
-        left: Math.min(...freshRects.map((r) => r.left)),
-        top: Math.min(...freshRects.map((r) => r.top)),
-        right: Math.max(...freshRects.map((r) => r.right)),
-        bottom: Math.max(...freshRects.map((r) => r.bottom)),
-      };
-
-      const names = pendingMultiSelectElements
-        .slice(0, 5)
-        .map((item) => item.name)
-        .join(", ");
-      const suffix =
-        pendingMultiSelectElements.length > 5
-          ? ` +${pendingMultiSelectElements.length - 5} more`
-          : "";
-
-      const elementBoundingBoxes = freshRects.map((rect) => ({
-        x: rect.left,
-        y: rect.top + window.scrollY,
-        width: rect.width,
-        height: rect.height,
-      }));
-
-      // Position marker near the last selected element (most recent click)
-      const lastItem = pendingMultiSelectElements[pendingMultiSelectElements.length - 1];
-      const lastEl = lastItem.element;
-      const lastRect = freshRects[freshRects.length - 1];
-      const lastCenterX = lastRect.left + lastRect.width / 2;
-      const lastCenterY = lastRect.top + lastRect.height / 2;
-      const lastIsFixed = isElementFixed(lastEl);
-
-      setPendingAnnotation({
-        x: (lastCenterX / window.innerWidth) * 100,
-        y: lastIsFixed ? lastCenterY : lastCenterY + window.scrollY,
-        clientY: lastCenterY,
-        element: `${pendingMultiSelectElements.length} elements: ${names}${suffix}`,
-        elementPath: "multi-select",
-        boundingBox: {
-          x: bounds.left,
-          y: bounds.top + window.scrollY,
-          width: bounds.right - bounds.left,
-          height: bounds.bottom - bounds.top,
-        },
-        isMultiSelect: true,
-        isFixed: lastIsFixed,
-        elementBoundingBoxes,
-        multiSelectElements: pendingMultiSelectElements.map((item) => item.element),
-        targetElement: lastEl, // Anchor marker/popup to last clicked element
-        fullPath: getFullElementPath(firstEl),
-        accessibility: getAccessibilityInfo(firstEl),
-        computedStyles: getForensicComputedStyles(firstEl),
-        computedStylesObj: getDetailedComputedStyles(firstEl),
-        nearbyElements: getNearbyElements(firstEl),
-        cssClasses: getElementClasses(firstEl),
-        nearbyText: getNearbyText(firstEl),
-        sourceFile: detectSourceFile(firstEl),
-      });
-    }
-
-    setPendingMultiSelectElements([]);
-    setHoverInfo(null);
-  }, [pendingMultiSelectElements]);
-
-  // Reset state when deactivating
-  useEffect(() => {
-    if (!isActive) {
-      setComponentMenu(null);
-      setHoveredComponentMenuIndex(null);
-      setPendingAnnotation(null);
-      setEditingAnnotation(null);
-      setEditingTargetElement(null);
-      setEditingTargetElements([]);
-      setHoverInfo(null);
-      setShowSettings(false); // Close settings when toolbar closes
-      setShowReviewQueue(false); // Close review queue when toolbar closes
-      setPendingMultiSelectElements([]); // Clear multi-select
-      if (isFrozen) {
-        unfreezeAnimations();
-      }
-    }
-  }, [isActive, isFrozen, unfreezeAnimations]);
-
-  // Unmount safety — if component is removed while frozen, unfreeze the page
-  useEffect(() => {
-    return () => {
-      unfreezeAll();
-    };
-  }, []);
+  useToolbarActiveLifecycle({
+    isActive,
+    isFrozen,
+    unfreezeAnimations,
+    cleanupUnfreeze: unfreezeAll,
+    setComponentMenu,
+    setHoveredComponentMenuIndex,
+    setPendingAnnotation,
+    setEditingAnnotation,
+    setEditingTargetElement,
+    setEditingTargetElements,
+    setHoverInfo,
+    setShowSettings,
+    setShowReviewQueue,
+    setPendingMultiSelectElements,
+  });
 
   const {
     copied,
@@ -866,7 +723,7 @@ export function PageFeedbackToolbarCSS({
 
   // Helper function to calculate viewport-aware tooltip positioning
   // Helper function to calculate viewport-aware tooltip positioning
-  const getTooltipPosition = (annotation: Annotation): React.CSSProperties => {
+  const getTooltipPosition = (annotation: Annotation): CSSProperties => {
     // Tooltip dimensions (from CSS)
     const tooltipMaxWidth = 200;
     const tooltipEstimatedHeight = 80; // Estimated max height
@@ -880,7 +737,7 @@ export function PageFeedbackToolbarCSS({
         ? parseFloat(annotation.y)
         : annotation.y;
 
-    const styles: React.CSSProperties = {};
+    const styles: CSSProperties = {};
 
     // Vertical positioning: flip if near bottom
     const spaceBelow = window.innerHeight - markerY - markerSize - gap;
@@ -1027,7 +884,6 @@ export function PageFeedbackToolbarCSS({
             connectionStatus={connectionStatus}
             onToggleSettings={() => setShowSettings((previous) => !previous)}
             onDeactivate={() => setIsActive(false)}
-            isValidUrl={isValidUrl}
           />
 
           <SettingsPanel
@@ -1087,41 +943,47 @@ export function PageFeedbackToolbarCSS({
       />
 
       <InteractionOverlay
-        isActive={isActive}
-        pendingAnnotation={pendingAnnotation}
-        editingAnnotation={editingAnnotation}
-        hoverInfo={hoverInfo}
-        isScrolling={isScrolling}
-        isDragging={isDragging}
-        annotationColor={settings.annotationColor}
-        pendingMultiSelectElements={pendingMultiSelectElements}
-        hoveredMarkerId={hoveredMarkerId}
-        annotations={annotations}
-        hoveredTargetElement={hoveredTargetElement}
-        hoveredTargetElements={hoveredTargetElements}
-        scrollY={scrollY}
-        hoverPosition={hoverPosition}
-        componentMenu={componentMenu}
-        isDarkMode={isDarkMode}
-        hoveredComponentMenuIndex={hoveredComponentMenuIndex}
-        setHoveredComponentMenuIndex={setHoveredComponentMenuIndex}
-        openComponentSource={openComponentSource}
-        pendingExiting={pendingExiting}
-        popupRef={popupRef}
-        addAnnotation={addAnnotation}
-        cancelAnnotation={cancelAnnotation}
-        editingTargetElement={editingTargetElement}
-        editingTargetElements={editingTargetElements}
-        editPopupRef={editPopupRef}
-        updateAnnotation={updateAnnotation}
-        cancelEditAnnotation={cancelEditAnnotation}
-        deleteAnnotation={deleteAnnotation}
-        editExiting={editExiting}
-        resolvedEndpoint={resolvedEndpoint}
-        handleThreadReply={handleThreadReply}
-        isReplySending={isReplySending}
-        dragRectRef={dragRectRef}
-        highlightsContainerRef={highlightsContainerRef}
+        state={{
+          isActive,
+          pendingAnnotation,
+          editingAnnotation,
+          hoverInfo,
+          isScrolling,
+          isDragging,
+          annotationColor: settings.annotationColor,
+          pendingMultiSelectElements,
+          hoveredMarkerId,
+          annotations,
+          hoveredTargetElement,
+          hoveredTargetElements,
+          scrollY,
+          hoverPosition,
+          componentMenu,
+          isDarkMode,
+          hoveredComponentMenuIndex,
+          pendingExiting,
+          editingTargetElement,
+          editingTargetElements,
+          editExiting,
+          resolvedEndpoint,
+          isReplySending,
+        }}
+        actions={{
+          setHoveredComponentMenuIndex,
+          openComponentSource,
+          addAnnotation,
+          cancelAnnotation,
+          updateAnnotation,
+          cancelEditAnnotation,
+          deleteAnnotation,
+          handleThreadReply,
+        }}
+        refs={{
+          popupRef,
+          editPopupRef,
+          dragRectRef,
+          highlightsContainerRef,
+        }}
       />
     </div>,
     document.body,

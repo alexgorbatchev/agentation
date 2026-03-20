@@ -10,6 +10,7 @@ import {
   IconXmarkLarge,
 } from "../../icons";
 import type { Annotation } from "../../../types";
+import { isValidUrl } from "../utils/isValidUrl";
 import styles from "../styles.module.scss";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected";
@@ -50,7 +51,6 @@ type ToolbarControlsProps = {
   connectionStatus: ConnectionStatus;
   onToggleSettings: () => void;
   onDeactivate: () => void;
-  isValidUrl: (url: string) => boolean;
 };
 
 export function ToolbarControls({
@@ -87,7 +87,6 @@ export function ToolbarControls({
   connectionStatus,
   onToggleSettings,
   onDeactivate,
-  isValidUrl,
 }: ToolbarControlsProps): JSX.Element {
   const hasWebhookUrl =
     isValidUrl(settingsWebhookUrl) || isValidUrl(webhookUrl || "");

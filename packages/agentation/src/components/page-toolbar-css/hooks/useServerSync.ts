@@ -30,7 +30,6 @@ type UseServerSyncParams = {
   initialSessionId?: string;
   onSessionCreated?: (sessionId: string) => void;
   setAnnotations: Dispatch<SetStateAction<Annotation[]>>;
-  isRenderableAnnotation: (annotation: Annotation) => boolean;
   componentEditor: ComponentEditor;
   normalizedNeovimBridgeUrl: string;
   neovimProjectId?: string;
@@ -50,7 +49,6 @@ export function useServerSync({
   initialSessionId,
   onSessionCreated,
   setAnnotations,
-  isRenderableAnnotation,
   componentEditor,
   normalizedNeovimBridgeUrl,
   neovimProjectId,
@@ -124,21 +122,13 @@ export function useServerSync({
               });
 
               const allAnnotations = [...session.annotations, ...syncedAnnotations];
-              const renderableAnnotations = allAnnotations.filter(isRenderableAnnotation);
-              setAnnotations(renderableAnnotations);
-              saveAnnotationsWithSyncMarker(
-                pathname,
-                renderableAnnotations,
-                session.id,
-              );
+              setAnnotations(allAnnotations);
+              saveAnnotationsWithSyncMarker(pathname, allAnnotations, session.id);
             } else {
-              const renderableAnnotations = session.annotations.filter(
-                isRenderableAnnotation,
-              );
-              setAnnotations(renderableAnnotations);
+              setAnnotations(session.annotations);
               saveAnnotationsWithSyncMarker(
                 pathname,
-                renderableAnnotations,
+                session.annotations,
                 session.id,
               );
             }
@@ -210,13 +200,9 @@ export function useServerSync({
                     return unsyncedAnnotations[index];
                   });
 
-                  const renderableSyncedAnnotations = syncedAnnotations.filter(
-                    isRenderableAnnotation,
-                  );
-
                   saveAnnotationsWithSyncMarker(
                     pagePath,
-                    renderableSyncedAnnotations,
+                    syncedAnnotations,
                     targetSession.id,
                   );
 
@@ -228,7 +214,7 @@ export function useServerSync({
                       const newDuringSync = prev.filter(
                         (annotation) => !originalIds.has(annotation.id),
                       );
-                      return [...renderableSyncedAnnotations, ...newDuringSync];
+                      return [...syncedAnnotations, ...newDuringSync];
                     });
                   }
                 } catch (error) {
@@ -255,7 +241,6 @@ export function useServerSync({
     void initSession();
   }, [
     initialSessionId,
-    isRenderableAnnotation,
     mounted,
     onSessionCreated,
     pathname,
@@ -432,9 +417,8 @@ export function useServerSync({
           });
 
           const allAnnotations = [...serverAnnotations, ...syncedAnnotations];
-          const renderableAnnotations = allAnnotations.filter(isRenderableAnnotation);
-          setAnnotations(renderableAnnotations);
-          saveAnnotationsWithSyncMarker(pathname, renderableAnnotations, sessionId!);
+          setAnnotations(allAnnotations);
+          saveAnnotationsWithSyncMarker(pathname, allAnnotations, sessionId!);
         }
       } catch (error) {
         console.warn("[Agentation] Failed to sync on reconnect:", error);
@@ -445,7 +429,6 @@ export function useServerSync({
   }, [
     connectionStatus,
     currentSessionId,
-    isRenderableAnnotation,
     mounted,
     pathname,
     projectId,

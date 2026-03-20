@@ -1,8 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
-import {
-  type AnnotationPopupCSSHandle,
-} from "../../annotation-popup-css";
+import type { AnnotationPopupCSSHandle } from "../../annotation-popup-css";
 import type { Annotation } from "../../../types";
 import type { ComponentInspection } from "../../../utils/component-inspector";
 import type {
@@ -21,7 +19,7 @@ import { MultiSelectHighlights } from "./MultiSelectHighlights";
 import { PendingAnnotationOverlay } from "./PendingAnnotationOverlay";
 import styles from "../styles.module.scss";
 
-type InteractionOverlayProps = {
+export type InteractionOverlayState = {
   isActive: boolean;
   pendingAnnotation: PendingAnnotationState | null;
   editingAnnotation: Annotation | null;
@@ -39,64 +37,44 @@ type InteractionOverlayProps = {
   componentMenu: ComponentMenuState | null;
   isDarkMode: boolean;
   hoveredComponentMenuIndex: number | null;
-  setHoveredComponentMenuIndex: Dispatch<SetStateAction<number | null>>;
-  openComponentSource: (item: ComponentInspection) => Promise<void>;
   pendingExiting: boolean;
-  popupRef: MutableRefObject<AnnotationPopupCSSHandle | null>;
-  addAnnotation: (comment: string) => void;
-  cancelAnnotation: () => void;
   editingTargetElement: HTMLElement | null;
   editingTargetElements: HTMLElement[];
-  editPopupRef: MutableRefObject<AnnotationPopupCSSHandle | null>;
+  editExiting: boolean;
+  resolvedEndpoint: string;
+  isReplySending: boolean;
+};
+
+export type InteractionOverlayActions = {
+  setHoveredComponentMenuIndex: Dispatch<SetStateAction<number | null>>;
+  openComponentSource: (item: ComponentInspection) => Promise<void>;
+  addAnnotation: (comment: string) => void;
+  cancelAnnotation: () => void;
   updateAnnotation: (newComment: string) => void;
   cancelEditAnnotation: () => void;
   deleteAnnotation: (id: string) => void;
-  editExiting: boolean;
-  resolvedEndpoint: string;
   handleThreadReply: (content: string) => Promise<void>;
-  isReplySending: boolean;
+};
+
+export type InteractionOverlayRefs = {
+  popupRef: MutableRefObject<AnnotationPopupCSSHandle | null>;
+  editPopupRef: MutableRefObject<AnnotationPopupCSSHandle | null>;
   dragRectRef: MutableRefObject<HTMLDivElement | null>;
   highlightsContainerRef: MutableRefObject<HTMLDivElement | null>;
 };
 
+type InteractionOverlayProps = {
+  state: InteractionOverlayState;
+  actions: InteractionOverlayActions;
+  refs: InteractionOverlayRefs;
+};
+
 export function InteractionOverlay({
-  isActive,
-  pendingAnnotation,
-  editingAnnotation,
-  hoverInfo,
-  isScrolling,
-  isDragging,
-  annotationColor,
-  pendingMultiSelectElements,
-  hoveredMarkerId,
-  annotations,
-  hoveredTargetElement,
-  hoveredTargetElements,
-  scrollY,
-  hoverPosition,
-  componentMenu,
-  isDarkMode,
-  hoveredComponentMenuIndex,
-  setHoveredComponentMenuIndex,
-  openComponentSource,
-  pendingExiting,
-  popupRef,
-  addAnnotation,
-  cancelAnnotation,
-  editingTargetElement,
-  editingTargetElements,
-  editPopupRef,
-  updateAnnotation,
-  cancelEditAnnotation,
-  deleteAnnotation,
-  editExiting,
-  resolvedEndpoint,
-  handleThreadReply,
-  isReplySending,
-  dragRectRef,
-  highlightsContainerRef,
+  state,
+  actions,
+  refs,
 }: InteractionOverlayProps): JSX.Element | null {
-  if (!isActive) {
+  if (!state.isActive) {
     return null;
   }
 
@@ -104,79 +82,79 @@ export function InteractionOverlay({
     <div
       className={styles.overlay}
       data-feedback-toolbar
-      style={pendingAnnotation || editingAnnotation ? { zIndex: 99999 } : undefined}
+      style={state.pendingAnnotation || state.editingAnnotation ? { zIndex: 99999 } : undefined}
     >
       <HoverHighlight
-        hoverInfo={hoverInfo}
-        pendingAnnotation={pendingAnnotation}
-        isScrolling={isScrolling}
-        isDragging={isDragging}
-        annotationColor={annotationColor}
+        hoverInfo={state.hoverInfo}
+        pendingAnnotation={state.pendingAnnotation}
+        isScrolling={state.isScrolling}
+        isDragging={state.isDragging}
+        annotationColor={state.annotationColor}
       />
 
       <MultiSelectHighlights
-        pendingMultiSelectElements={pendingMultiSelectElements}
-        annotationColor={annotationColor}
+        pendingMultiSelectElements={state.pendingMultiSelectElements}
+        annotationColor={state.annotationColor}
       />
 
       <MarkerHoverOutline
-        hoveredMarkerId={hoveredMarkerId}
-        pendingAnnotation={pendingAnnotation}
-        annotations={annotations}
-        hoveredTargetElement={hoveredTargetElement}
-        hoveredTargetElements={hoveredTargetElements}
-        scrollY={scrollY}
-        annotationColor={annotationColor}
+        hoveredMarkerId={state.hoveredMarkerId}
+        pendingAnnotation={state.pendingAnnotation}
+        annotations={state.annotations}
+        hoveredTargetElement={state.hoveredTargetElement}
+        hoveredTargetElements={state.hoveredTargetElements}
+        scrollY={state.scrollY}
+        annotationColor={state.annotationColor}
       />
 
       <HoverTooltip
-        hoverInfo={hoverInfo}
-        pendingAnnotation={pendingAnnotation}
-        isScrolling={isScrolling}
-        isDragging={isDragging}
-        hoverPosition={hoverPosition}
+        hoverInfo={state.hoverInfo}
+        pendingAnnotation={state.pendingAnnotation}
+        isScrolling={state.isScrolling}
+        isDragging={state.isDragging}
+        hoverPosition={state.hoverPosition}
       />
 
       <ComponentSourceMenu
-        componentMenu={componentMenu}
-        isDarkMode={isDarkMode}
-        hoveredComponentMenuIndex={hoveredComponentMenuIndex}
-        setHoveredComponentMenuIndex={setHoveredComponentMenuIndex}
-        openComponentSource={openComponentSource}
+        componentMenu={state.componentMenu}
+        isDarkMode={state.isDarkMode}
+        hoveredComponentMenuIndex={state.hoveredComponentMenuIndex}
+        setHoveredComponentMenuIndex={actions.setHoveredComponentMenuIndex}
+        openComponentSource={actions.openComponentSource}
       />
 
       <PendingAnnotationOverlay
-        pendingAnnotation={pendingAnnotation}
-        pendingExiting={pendingExiting}
-        scrollY={scrollY}
-        annotationColor={annotationColor}
-        isDarkMode={isDarkMode}
-        popupRef={popupRef}
-        addAnnotation={addAnnotation}
-        cancelAnnotation={cancelAnnotation}
+        pendingAnnotation={state.pendingAnnotation}
+        pendingExiting={state.pendingExiting}
+        scrollY={state.scrollY}
+        annotationColor={state.annotationColor}
+        isDarkMode={state.isDarkMode}
+        popupRef={refs.popupRef}
+        addAnnotation={actions.addAnnotation}
+        cancelAnnotation={actions.cancelAnnotation}
       />
 
       <EditAnnotationOverlay
-        editingAnnotation={editingAnnotation}
-        editingTargetElement={editingTargetElement}
-        editingTargetElements={editingTargetElements}
-        scrollY={scrollY}
-        annotationColor={annotationColor}
-        isDarkMode={isDarkMode}
-        editPopupRef={editPopupRef}
-        updateAnnotation={updateAnnotation}
-        cancelEditAnnotation={cancelEditAnnotation}
-        deleteAnnotation={deleteAnnotation}
-        editExiting={editExiting}
-        resolvedEndpoint={resolvedEndpoint}
-        handleThreadReply={handleThreadReply}
-        isReplySending={isReplySending}
+        editingAnnotation={state.editingAnnotation}
+        editingTargetElement={state.editingTargetElement}
+        editingTargetElements={state.editingTargetElements}
+        scrollY={state.scrollY}
+        annotationColor={state.annotationColor}
+        isDarkMode={state.isDarkMode}
+        editPopupRef={refs.editPopupRef}
+        updateAnnotation={actions.updateAnnotation}
+        cancelEditAnnotation={actions.cancelEditAnnotation}
+        deleteAnnotation={actions.deleteAnnotation}
+        editExiting={state.editExiting}
+        resolvedEndpoint={state.resolvedEndpoint}
+        handleThreadReply={actions.handleThreadReply}
+        isReplySending={state.isReplySending}
       />
 
       <DragSelectionOverlay
-        isDragging={isDragging}
-        dragRectRef={dragRectRef}
-        highlightsContainerRef={highlightsContainerRef}
+        isDragging={state.isDragging}
+        dragRectRef={refs.dragRectRef}
+        highlightsContainerRef={refs.highlightsContainerRef}
       />
     </div>
   );
