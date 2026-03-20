@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 
+import { buildProjectScopedUrl } from "../../../utils/sync";
+
 const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
 
-export function useEndpointDiscovery(endpoint?: string): string {
+export function useEndpointDiscovery(endpoint?: string, projectId?: string): string {
   const [autoDiscoveredEndpoint, setAutoDiscoveredEndpoint] = useState("");
 
   const hasExplicitEndpoint =
@@ -23,7 +25,9 @@ export function useEndpointDiscovery(endpoint?: string): string {
 
     const probeDefaultEndpoint = async (): Promise<void> => {
       try {
-        const response = await fetch(`${DEFAULT_AGENTATION_ENDPOINT}/health`);
+        const response = await fetch(
+          buildProjectScopedUrl(`${DEFAULT_AGENTATION_ENDPOINT}/health`, projectId),
+        );
         if (!cancelled && response.ok) {
           setAutoDiscoveredEndpoint(DEFAULT_AGENTATION_ENDPOINT);
         }
@@ -37,7 +41,7 @@ export function useEndpointDiscovery(endpoint?: string): string {
     return () => {
       cancelled = true;
     };
-  }, [autoDiscoveredEndpoint, canProbeDefaultEndpoint]);
+  }, [autoDiscoveredEndpoint, canProbeDefaultEndpoint, projectId]);
 
   return resolvedEndpoint;
 }

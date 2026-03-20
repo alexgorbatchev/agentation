@@ -11,6 +11,7 @@ import {
   saveSessionId,
 } from "../../../utils/storage";
 import {
+  buildProjectScopedUrl,
   createSession,
   getSession,
   syncAnnotation,
@@ -82,7 +83,7 @@ export function useServerSync({
 
         if (sessionIdToJoin) {
           try {
-            const session = await getSession(resolvedEndpoint, sessionIdToJoin);
+            const session = await getSession(resolvedEndpoint, sessionIdToJoin, projectId);
             setCurrentSessionId(session.id);
             setConnectionStatus("connected");
             saveSessionId(pathname, session.id);
@@ -101,11 +102,16 @@ export function useServerSync({
 
               const results = await Promise.allSettled(
                 localToMerge.map((annotation) =>
-                  syncAnnotation(resolvedEndpoint, session.id, {
-                    ...annotation,
-                    sessionId: session.id,
-                    url: pageUrl,
-                  }),
+                  syncAnnotation(
+                    resolvedEndpoint,
+                    session.id,
+                    {
+                      ...annotation,
+                      sessionId: session.id,
+                      url: pageUrl,
+                    },
+                    projectId,
+                  ),
                 ),
               );
 
@@ -180,11 +186,16 @@ export function useServerSync({
 
                   const results = await Promise.allSettled(
                     unsyncedAnnotations.map((annotation) =>
-                      syncAnnotation(resolvedEndpoint, targetSession.id, {
-                        ...annotation,
-                        sessionId: targetSession.id,
-                        url: pageUrl,
-                      }),
+                      syncAnnotation(
+                        resolvedEndpoint,
+                        targetSession.id,
+                        {
+                          ...annotation,
+                          sessionId: targetSession.id,
+                          url: pageUrl,
+                        },
+                        projectId,
+                      ),
                     ),
                   );
 
@@ -256,7 +267,7 @@ export function useServerSync({
 
     const checkHealth = async (): Promise<void> => {
       try {
-        const response = await fetch(`${resolvedEndpoint}/health`);
+        const response = await fetch(buildProjectScopedUrl(`${resolvedEndpoint}/health`, projectId));
         setConnectionStatus(response.ok ? "connected" : "disconnected");
       } catch {
         setConnectionStatus("disconnected");
@@ -270,7 +281,7 @@ export function useServerSync({
     return () => {
       window.clearInterval(interval);
     };
-  }, [mounted, resolvedEndpoint]);
+  }, [mounted, projectId, resolvedEndpoint]);
 
   useEffect(() => {
     if (
@@ -283,7 +294,7 @@ export function useServerSync({
     }
 
     const eventSource = new EventSource(
-      `${resolvedEndpoint}/sessions/${currentSessionId}/events`,
+      buildProjectScopedUrl(`${resolvedEndpoint}/sessions/${currentSessionId}/events`, projectId),
     );
 
     const removedStatuses = ["resolved", "dismissed"];
@@ -345,7 +356,7 @@ export function useServerSync({
       eventSource.removeEventListener("thread.message", threadHandler);
       eventSource.close();
     };
-  }, [currentSessionId, mounted, resolvedEndpoint, setAnnotations]);
+  }, [currentSessionId, mounted, projectId, resolvedEndpoint, setAnnotations]);
 
   useEffect(() => {
     if (!resolvedEndpoint || !mounted) {
@@ -375,7 +386,7 @@ export function useServerSync({
 
         if (sessionId) {
           try {
-            const session = await getSession(resolvedEndpoint, sessionId);
+            const session = await getSession(resolvedEndpoint, sessionId, projectId);
             serverAnnotations = session.annotations;
           } catch {
             sessionId = null;
@@ -397,11 +408,16 @@ export function useServerSync({
         if (unsyncedLocal.length > 0) {
           const results = await Promise.allSettled(
             unsyncedLocal.map((annotation) =>
-              syncAnnotation(resolvedEndpoint, sessionId!, {
-                ...annotation,
-                sessionId: sessionId!,
-                url: pageUrl,
-              }),
+              syncAnnotation(
+                resolvedEndpoint,
+                sessionId!,
+                {
+                  ...annotation,
+                  sessionId: sessionId!,
+                  url: pageUrl,
+                },
+                projectId,
+              ),
             ),
           );
 

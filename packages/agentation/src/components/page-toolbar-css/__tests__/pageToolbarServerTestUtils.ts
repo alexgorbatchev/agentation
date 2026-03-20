@@ -107,6 +107,14 @@ function parseRequestBody(body: BodyInit | null | undefined): unknown {
   return parsed;
 }
 
+function getRequestPath(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
 function buildSessionPayload(sessionId: string, annotations: Annotation[] = []): SessionPayload {
   return {
     id: sessionId,
@@ -196,10 +204,11 @@ export function setupPageToolbarServerMock({
   const mockFetch: PageToolbarServerFetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const body = parseRequestBody(init?.body);
+    const requestPath = getRequestPath(url);
     const request: PageToolbarServerMockRequest = { url, method, body, fetchCalls };
     fetchCalls.push({ url, method, body });
 
-    if (url.includes("/health")) {
+    if (requestPath.endsWith("/health")) {
       const overrideResponse = await onHealthRequest?.({
         ...request,
         healthCallIndex: healthResponseIndex,
@@ -213,8 +222,8 @@ export function setupPageToolbarServerMock({
       return mockHealthResponse(healthStatus);
     }
 
-    if (url.match(/\/sessions\/([\w-]+)$/) && method === "GET") {
-      const requestedSessionId = url.match(/\/sessions\/([\w-]+)$/)?.[1] ?? sessionId;
+    if (requestPath.match(/\/sessions\/([\w-]+)$/) && method === "GET") {
+      const requestedSessionId = requestPath.match(/\/sessions\/([\w-]+)$/)?.[1] ?? sessionId;
       const overrideResponse = await onGetSessionRequest?.({
         ...request,
         requestedSessionId,
@@ -226,7 +235,7 @@ export function setupPageToolbarServerMock({
       return mockGetSessionResponse(requestedSessionId, annotations);
     }
 
-    if (url.endsWith("/sessions") && method === "POST") {
+    if (requestPath.endsWith("/sessions") && method === "POST") {
       const overrideResponse = await onCreateSessionRequest?.(request);
       if (overrideResponse !== undefined) {
         return overrideResponse;
@@ -235,8 +244,8 @@ export function setupPageToolbarServerMock({
       return mockCreateSessionResponse(sessionId, annotations);
     }
 
-    if (includeThreadReplies && url.match(/\/annotations\/[^/]+\/thread$/) && method === "POST") {
-      const annotationId = url.match(/annotations\/([^/]+)\/thread$/)?.[1] ?? "unknown";
+    if (includeThreadReplies && requestPath.match(/\/annotations\/[^/]+\/thread$/) && method === "POST") {
+      const annotationId = requestPath.match(/annotations\/([^/]+)\/thread$/)?.[1] ?? "unknown";
       const matchingAnnotation = annotations.find((annotation) => annotation.id === annotationId);
       const threadBody = isRecord(body) ? (body as ThreadReplyBody) : {};
       const nextThread = [
@@ -259,7 +268,7 @@ export function setupPageToolbarServerMock({
       };
     }
 
-    if (url.match(/\/sessions\/[\w-]+\/annotations$/) && method === "POST") {
+    if (requestPath.match(/\/sessions\/[\w-]+\/annotations$/) && method === "POST") {
       const parsedAnnotation = isRecord(body) ? body : {};
       const annotation = {
         ...parsedAnnotation,

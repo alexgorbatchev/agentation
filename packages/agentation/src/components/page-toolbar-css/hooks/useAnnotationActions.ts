@@ -18,6 +18,7 @@ type UseAnnotationActionsParams = {
   effectiveReactMode: ReactComponentMode;
   copyToClipboard: boolean;
   resolvedEndpoint: string;
+  projectId?: string;
   webhookUrl?: string;
   onAnnotationsClear?: (annotations: Annotation[]) => void;
   onCopy?: (markdown: string) => void;
@@ -48,6 +49,7 @@ export function useAnnotationActions({
   effectiveReactMode,
   copyToClipboard,
   resolvedEndpoint,
+  projectId,
   webhookUrl,
   onAnnotationsClear,
   onCopy,
@@ -103,7 +105,7 @@ export function useAnnotationActions({
     if (resolvedEndpoint) {
       void Promise.all(
         annotations.map((annotation) =>
-          deleteAnnotationFromServer(resolvedEndpoint, annotation.id).catch((error) => {
+          deleteAnnotationFromServer(resolvedEndpoint, annotation.id, projectId).catch((error) => {
             console.warn(
               "[Agentation] Failed to delete annotation from server:",
               error,
@@ -127,6 +129,7 @@ export function useAnnotationActions({
     annotations,
     onAnnotationsClear,
     fireWebhook,
+    projectId,
     resolvedEndpoint,
     setIsClearing,
     setAnnotations,

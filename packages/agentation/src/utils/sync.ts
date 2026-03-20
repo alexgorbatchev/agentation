@@ -9,11 +9,22 @@
 
 import type { Annotation, Session, SessionWithAnnotations } from "../types";
 
+export function buildProjectScopedUrl(url: string, projectId?: string): string {
+  const trimmedProjectId = projectId?.trim();
+  if (!trimmedProjectId) {
+    return url;
+  }
+
+  const scopedUrl = new URL(url);
+  scopedUrl.searchParams.set("projectId", trimmedProjectId);
+  return scopedUrl.toString();
+}
+
 /**
  * List all sessions from the server.
  */
-export async function listSessions(endpoint: string): Promise<Session[]> {
-  const response = await fetch(`${endpoint}/sessions`);
+export async function listSessions(endpoint: string, projectId?: string): Promise<Session[]> {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/sessions`, projectId));
   if (!response.ok) {
     throw new Error(`Failed to list sessions: ${response.status}`);
   }
@@ -26,13 +37,11 @@ export async function listSessions(endpoint: string): Promise<Session[]> {
 export async function createSession(
   endpoint: string,
   url: string,
-  projectId?: string
+  projectId?: string,
 ): Promise<Session> {
-  const body = projectId
-    ? { url, projectId }
-    : { url };
+  const body = projectId ? { url, projectId } : { url };
 
-  const response = await fetch(`${endpoint}/sessions`, {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/sessions`, projectId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -50,9 +59,10 @@ export async function createSession(
  */
 export async function getSession(
   endpoint: string,
-  sessionId: string
+  sessionId: string,
+  projectId?: string,
 ): Promise<SessionWithAnnotations> {
-  const response = await fetch(`${endpoint}/sessions/${sessionId}`);
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/sessions/${sessionId}`, projectId));
 
   if (!response.ok) {
     throw new Error(`Failed to get session: ${response.status}`);
@@ -68,9 +78,10 @@ export async function getSession(
 export async function syncAnnotation(
   endpoint: string,
   sessionId: string,
-  annotation: Annotation
+  annotation: Annotation,
+  projectId?: string,
 ): Promise<Annotation> {
-  const response = await fetch(`${endpoint}/sessions/${sessionId}/annotations`, {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/sessions/${sessionId}/annotations`, projectId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(annotation),
@@ -89,9 +100,10 @@ export async function syncAnnotation(
 export async function updateAnnotation(
   endpoint: string,
   annotationId: string,
-  data: Partial<Annotation>
+  data: Partial<Annotation>,
+  projectId?: string,
 ): Promise<Annotation> {
-  const response = await fetch(`${endpoint}/annotations/${annotationId}`, {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/annotations/${annotationId}`, projectId), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -109,9 +121,10 @@ export async function updateAnnotation(
  */
 export async function deleteAnnotation(
   endpoint: string,
-  annotationId: string
+  annotationId: string,
+  projectId?: string,
 ): Promise<void> {
-  const response = await fetch(`${endpoint}/annotations/${annotationId}`, {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/annotations/${annotationId}`, projectId), {
     method: "DELETE",
   });
 
@@ -126,9 +139,10 @@ export async function deleteAnnotation(
 export async function postThreadReply(
   endpoint: string,
   annotationId: string,
-  content: string
+  content: string,
+  projectId?: string,
 ): Promise<Annotation> {
-  const response = await fetch(`${endpoint}/annotations/${annotationId}/thread`, {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/annotations/${annotationId}/thread`, projectId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role: "human", content }),
@@ -159,9 +173,10 @@ export type ActionResponse = {
 export async function requestAction(
   endpoint: string,
   sessionId: string,
-  output: string
+  output: string,
+  projectId?: string,
 ): Promise<ActionResponse> {
-  const response = await fetch(`${endpoint}/sessions/${sessionId}/action`, {
+  const response = await fetch(buildProjectScopedUrl(`${endpoint}/sessions/${sessionId}/action`, projectId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ output }),

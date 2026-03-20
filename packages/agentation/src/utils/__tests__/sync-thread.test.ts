@@ -55,6 +55,18 @@ describe("postThreadReply", () => {
     expect(result).toEqual(updatedAnnotation);
   });
 
+  it("adds projectId query parameter when provided", async () => {
+    mockFetchResponse({ id: "a1", thread: [] });
+
+    await postThreadReply(ENDPOINT, "a1", "my reply", "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/annotations/a1/thread?projectId=project-alpha`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "human", content: "my reply" }),
+    });
+  });
+
   it("always sends role as 'human'", async () => {
     mockFetchResponse({ id: "a1", thread: [] });
     await postThreadReply(ENDPOINT, "a1", "test");

@@ -170,7 +170,7 @@ export function PageFeedbackToolbarCSS({
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
 
-  const resolvedEndpoint = useEndpointDiscovery(endpoint);
+  const resolvedEndpoint = useEndpointDiscovery(endpoint, projectId);
   const portalWrapperRef = usePortalEventBoundary();
 
   const {
@@ -354,6 +354,7 @@ export function PageFeedbackToolbarCSS({
     effectiveReactMode,
     copyToClipboard,
     resolvedEndpoint,
+    projectId,
     webhookUrl,
     onAnnotationsClear,
     onCopy,
@@ -394,6 +395,7 @@ export function PageFeedbackToolbarCSS({
     setIsReplySending,
     currentSessionId,
     resolvedEndpoint,
+    projectId,
     fireWebhook,
     deepElementFromPoint,
     recentlyAddedIdRef,

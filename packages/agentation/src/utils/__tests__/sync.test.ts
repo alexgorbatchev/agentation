@@ -58,6 +58,14 @@ describe("listSessions", () => {
     expect(result).toEqual(sessions);
   });
 
+  it("adds projectId query parameter when provided", async () => {
+    mockFetchResponse([]);
+
+    await listSessions(ENDPOINT, "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions?projectId=project-alpha`);
+  });
+
   it("throws with status code on failure", async () => {
     mockFetchError(500);
     await expect(listSessions(ENDPOINT)).rejects.toThrow("500");
@@ -82,7 +90,7 @@ describe("createSession", () => {
     expect(result).toEqual(session);
   });
 
-  it("includes projectId in body when provided", async () => {
+  it("includes projectId in URL and body when provided", async () => {
     const session = {
       id: "s1",
       url: "/page",
@@ -94,7 +102,7 @@ describe("createSession", () => {
 
     await createSession(ENDPOINT, "/page", "project-alpha");
 
-    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions`, {
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions?projectId=project-alpha`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: "/page", projectId: "project-alpha" }),
@@ -125,6 +133,14 @@ describe("getSession", () => {
     expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions/s1`);
     expect(result).toEqual(sessionWithAnnotations);
     expect(result.annotations).toEqual([]);
+  });
+
+  it("adds projectId query parameter when provided", async () => {
+    mockFetchResponse({ id: "s1", annotations: [] });
+
+    await getSession(ENDPOINT, "s1", "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions/s1?projectId=project-alpha`);
   });
 
   it("throws on 404", async () => {
@@ -163,6 +179,21 @@ describe("syncAnnotation", () => {
     expect(result.sessionId).toBe("s1");
   });
 
+  it("adds projectId query parameter when provided", async () => {
+    mockFetchResponse({ ...annotation, sessionId: "s1" });
+
+    await syncAnnotation(ENDPOINT, "s1", annotation, "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `${ENDPOINT}/sessions/s1/annotations?projectId=project-alpha`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(annotation),
+      },
+    );
+  });
+
   it("throws on server error", async () => {
     mockFetchError(503);
     await expect(syncAnnotation(ENDPOINT, "s1", annotation)).rejects.toThrow("503");
@@ -183,6 +214,18 @@ describe("updateAnnotation", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(update),
+    });
+  });
+
+  it("adds projectId query parameter when provided", async () => {
+    mockFetchResponse({ id: "a1", comment: "updated comment" });
+
+    await updateAnnotation(ENDPOINT, "a1", { comment: "updated comment" }, "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/annotations/a1?projectId=project-alpha`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comment: "updated comment" }),
     });
   });
 
@@ -207,6 +250,16 @@ describe("deleteAnnotation", () => {
     // Verify no body was sent
     const callArgs = fetchSpy.mock.calls[0][1];
     expect(callArgs.body).toBeUndefined();
+  });
+
+  it("adds projectId query parameter when provided", async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: true, status: 204 });
+
+    await deleteAnnotation(ENDPOINT, "a1", "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/annotations/a1?projectId=project-alpha`, {
+      method: "DELETE",
+    });
   });
 
   it("throws on 404", async () => {
@@ -236,6 +289,22 @@ describe("requestAction", () => {
     });
     expect(result.success).toBe(true);
     expect(result.delivered.total).toBe(1);
+  });
+
+  it("adds projectId query parameter when provided", async () => {
+    mockFetchResponse({
+      success: true,
+      annotationCount: 1,
+      delivered: { sseListeners: 1, webhooks: 0, total: 1 },
+    });
+
+    await requestAction(ENDPOINT, "s1", "fix the button color", "project-alpha");
+
+    expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions/s1/action?projectId=project-alpha`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ output: "fix the button color" }),
+    });
   });
 
   it("throws on server error with status code in message", async () => {

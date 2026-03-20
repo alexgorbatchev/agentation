@@ -38,6 +38,7 @@ type UseAnnotationPopupStateParams = {
   setIsReplySending: Dispatch<SetStateAction<boolean>>;
   currentSessionId: string | null;
   resolvedEndpoint: string;
+  projectId?: string;
   fireWebhook: FireWebhook;
   deepElementFromPoint: (x: number, y: number) => HTMLElement | null;
   recentlyAddedIdRef: MutableRefObject<string | null>;
@@ -93,6 +94,7 @@ export function useAnnotationPopupState({
   setIsReplySending,
   currentSessionId,
   resolvedEndpoint,
+  projectId,
   fireWebhook,
   deepElementFromPoint,
   recentlyAddedIdRef,
@@ -185,7 +187,7 @@ export function useAnnotationPopupState({
       window.getSelection()?.removeAllRanges();
 
       if (currentSessionId) {
-        syncAnnotation(resolvedEndpoint, currentSessionId, newAnnotation)
+        syncAnnotation(resolvedEndpoint, currentSessionId, newAnnotation, projectId)
           .then((serverAnnotation) => {
             if (serverAnnotation.id !== newAnnotation.id) {
               setAnnotations((prev) =>
@@ -213,6 +215,7 @@ export function useAnnotationPopupState({
       fireWebhook,
       onAnnotationAdd,
       pendingAnnotation,
+      projectId,
       recentlyAddedIdRef,
       resolvedEndpoint,
       setAnimatedMarkers,
@@ -253,7 +256,7 @@ export function useAnnotationPopupState({
       }
 
       if (resolvedEndpoint) {
-        deleteAnnotationFromServer(resolvedEndpoint, id).catch((error) => {
+        deleteAnnotationFromServer(resolvedEndpoint, id, projectId).catch((error) => {
           console.warn(
             "[Agentation] Failed to delete annotation from server:",
             error,
@@ -281,6 +284,7 @@ export function useAnnotationPopupState({
       editingAnnotation,
       fireWebhook,
       onAnnotationDelete,
+      projectId,
       resolvedEndpoint,
       setAnnotations,
       setDeletingMarkerId,
@@ -438,9 +442,14 @@ export function useAnnotationPopupState({
       void fireWebhook("annotation.update", { annotation: updatedAnnotation });
 
       if (resolvedEndpoint) {
-        updateAnnotationOnServer(resolvedEndpoint, editingAnnotation.id, {
-          comment: newComment,
-        }).catch((error) => {
+        updateAnnotationOnServer(
+          resolvedEndpoint,
+          editingAnnotation.id,
+          {
+            comment: newComment,
+          },
+          projectId,
+        ).catch((error) => {
           console.warn(
             "[Agentation] Failed to update annotation on server:",
             error,
@@ -459,6 +468,7 @@ export function useAnnotationPopupState({
       editingAnnotation,
       fireWebhook,
       onAnnotationUpdate,
+      projectId,
       resolvedEndpoint,
       setAnnotations,
       setEditExiting,
@@ -480,6 +490,7 @@ export function useAnnotationPopupState({
           resolvedEndpoint,
           editingAnnotation.id,
           content,
+          projectId,
         );
         setAnnotations((prev) =>
           prev.map((annotation) =>
@@ -501,6 +512,7 @@ export function useAnnotationPopupState({
     },
     [
       editingAnnotation,
+      projectId,
       resolvedEndpoint,
       setAnnotations,
       setEditingAnnotation,
