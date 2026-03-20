@@ -1,7 +1,6 @@
 import type { Annotation } from "../../../types";
 import type { OutputDetailLevel } from "../state/toolbar-settings";
-
-export type ReactComponentMode = "smart" | "filtered" | "all" | "off";
+import type { ReactComponentMode } from "../types";
 
 export function generateOutput(
   annotations: Annotation[],

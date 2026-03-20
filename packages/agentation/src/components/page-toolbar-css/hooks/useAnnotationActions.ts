@@ -6,7 +6,8 @@ import type { ToolbarSettings } from "../state/toolbar-settings";
 import { deleteAnnotation as deleteAnnotationFromServer } from "../../../utils/sync";
 import { getStorageKey } from "../../../utils/storage";
 import { originalSetTimeout } from "../../../utils/freeze-animations";
-import { generateOutput, type ReactComponentMode } from "../utils/generateOutput";
+import type { ReactComponentMode } from "../types";
+import { generateOutput } from "../utils/generateOutput";
 
 type SendState = "idle" | "sending" | "sent" | "failed";
 
