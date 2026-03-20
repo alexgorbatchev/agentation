@@ -44,12 +44,7 @@ import {
   loadToolbarHidden,
   saveToolbarHidden,
 } from "../../utils/storage";
-import {
-  syncAnnotation,
-  updateAnnotation as updateAnnotationOnServer,
-  deleteAnnotation as deleteAnnotationFromServer,
-  postThreadReply,
-} from "../../utils/sync";
+import { deleteAnnotation as deleteAnnotationFromServer } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
 import {
   getSourceLocation,
@@ -59,7 +54,6 @@ import {
 import {
   createComponentSourceUrl,
   formatComponentSourcePath,
-  inspectComponentElement,
   type ComponentEditor,
   type ComponentInspection,
   type ComponentSourceUrlParams,
@@ -72,6 +66,14 @@ import {
 
 import type { Annotation } from "../../types";
 import { useAnnotationState } from "./hooks/useAnnotationState";
+import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
+import {
+  useInteractionLifecycle,
+  type ComponentMenuState,
+  type HoverInfo,
+  type PendingAnnotationState,
+  type PendingMultiSelectElement,
+} from "./hooks/useInteractionLifecycle";
 import { useServerSync } from "./hooks/useServerSync";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
 import { ToolbarShell } from "./render/ToolbarShell";
@@ -135,15 +137,6 @@ let hasPlayedEntranceAnimation = false;
 // Types
 // =============================================================================
 
-type HoverInfo = {
-  element: string;
-  elementName: string;
-  elementPath: string;
-  rect: DOMRect | null;
-  reactComponents?: string | null;
-  isPiercing?: boolean;
-};
-
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
@@ -151,12 +144,6 @@ const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
 function normalizeNeovimBridgeUrl(url: string): string {
   return url.replace(/\/+$/, "");
 }
-
-type ComponentMenuState = {
-  items: ComponentInspection[];
-  x: number;
-  y: number;
-};
 
 function getLocalStorageItem(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -616,36 +603,8 @@ export function PageFeedbackToolbarCSS({
   const [markersExiting, setMarkersExiting] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
-  const [pendingAnnotation, setPendingAnnotation] = useState<{
-    x: number;
-    y: number;
-    clientY: number;
-    element: string;
-    elementPath: string;
-    selectedText?: string;
-    boundingBox?: { x: number; y: number; width: number; height: number };
-    nearbyText?: string;
-    cssClasses?: string;
-    isMultiSelect?: boolean;
-    isFixed?: boolean;
-    fullPath?: string;
-    accessibility?: string;
-    computedStyles?: string;
-    computedStylesObj?: Record<string, string>;
-    nearbyElements?: string;
-    reactComponents?: string;
-    sourceFile?: string;
-    elementBoundingBoxes?: Array<{
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }>;
-    // Element references for cmd+shift+click multi-select (for live position queries)
-    multiSelectElements?: HTMLElement[];
-    // Element reference for single-select (for live position queries)
-    targetElement?: HTMLElement;
-  } | null>(null);
+  const [pendingAnnotation, setPendingAnnotation] =
+    useState<PendingAnnotationState | null>(null);
   const [copied, setCopied] = useState(false);
   const [sendState, setSendState] = useState<
     "idle" | "sending" | "sent" | "failed"
@@ -686,15 +645,8 @@ export function PageFeedbackToolbarCSS({
 
   // Cmd+shift+click multi-select state
   const [pendingMultiSelectElements, setPendingMultiSelectElements] = useState<
-    Array<{
-      element: HTMLElement;
-      rect: DOMRect;
-      name: string;
-      path: string;
-      reactComponents?: string;
-    }>
+    PendingMultiSelectElement[]
   >([]);
-  const modifiersHeldRef = useRef({ cmd: false, shift: false });
 
   const {
     annotations,
@@ -841,31 +793,6 @@ export function PageFeedbackToolbarCSS({
     normalizedNeovimBridgeUrl,
     neovimProjectId,
   });
-
-  useEffect(() => {
-    if (!editingAnnotation) {
-      return;
-    }
-
-    const updated = annotations.find(
-      (annotation) => annotation.id === editingAnnotation.id,
-    );
-    if (!updated?.thread) {
-      return;
-    }
-
-    setEditingAnnotation((prev) => {
-      if (!prev || prev.id !== updated.id) {
-        return prev;
-      }
-
-      if (prev.thread === updated.thread) {
-        return prev;
-      }
-
-      return { ...prev, thread: updated.thread };
-    });
-  }, [annotations, editingAnnotation]);
 
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
@@ -1276,7 +1203,6 @@ export function PageFeedbackToolbarCSS({
       setShowSettings(false); // Close settings when toolbar closes
       setShowReviewQueue(false); // Close review queue when toolbar closes
       setPendingMultiSelectElements([]); // Clear multi-select
-      modifiersHeldRef.current = { cmd: false, shift: false }; // Reset modifier tracking
       if (isFrozen) {
         unfreezeAnimations();
       }
@@ -1290,375 +1216,14 @@ export function PageFeedbackToolbarCSS({
     };
   }, []);
 
-  // Custom cursor
-  useEffect(() => {
-    if (!isActive) return;
+  const consumeJustFinishedDrag = useCallback((): boolean => {
+    if (!justFinishedDragRef.current) {
+      return false;
+    }
 
-    const style = document.createElement("style");
-    style.id = "feedback-cursor-styles";
-    style.textContent = `
-      body * {
-        cursor: crosshair !important;
-      }
-      ${
-        isAltSelectionHeld
-          ? ""
-          : `body p, body span, body h1, body h2, body h3, body h4, body h5, body h6,
-      body li, body td, body th, body label, body blockquote, body figcaption,
-      body caption, body legend, body dt, body dd, body pre, body code,
-      body em, body strong, body b, body i, body u, body s, body a,
-      body time, body address, body cite, body q, body abbr, body dfn,
-      body mark, body small, body sub, body sup, body [contenteditable],
-      body p *, body span *, body h1 *, body h2 *, body h3 *, body h4 *,
-      body h5 *, body h6 *, body li *, body a *, body label *, body pre *,
-      body code *, body blockquote *, body [contenteditable] * {
-        cursor: text !important;
-      }`
-      }
-      [data-feedback-toolbar], [data-feedback-toolbar] * {
-        cursor: default !important;
-      }
-      [data-feedback-toolbar] textarea,
-      [data-feedback-toolbar] input[type="text"],
-      [data-feedback-toolbar] input[type="url"] {
-        cursor: text !important;
-      }
-      [data-feedback-toolbar] button,
-      [data-feedback-toolbar] button *,
-      [data-feedback-toolbar] label,
-      [data-feedback-toolbar] label *,
-      [data-feedback-toolbar] a,
-      [data-feedback-toolbar] a *,
-      [data-feedback-toolbar] [role="button"],
-      [data-feedback-toolbar] [role="button"] * {
-        cursor: pointer !important;
-      }
-      [data-annotation-marker], [data-annotation-marker] * {
-        cursor: pointer !important;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      const existingStyle = document.getElementById("feedback-cursor-styles");
-      if (existingStyle) existingStyle.remove();
-    };
-  }, [isActive]);
-
-  // Handle mouse move
-  useEffect(() => {
-    if (!isActive || pendingAnnotation) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      // Use composedPath to get actual target inside shadow DOM
-      const target = (e.composedPath()[0] || e.target) as HTMLElement;
-      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) {
-        setHoverInfo(null);
-        return;
-      }
-
-      // Cmd (Mac) / Ctrl (Win) = pierce mode: scan through overlays
-      const piercing = e.metaKey || e.ctrlKey;
-      const elementUnder = piercing
-        ? pierceElementFromPoint(e.clientX, e.clientY)
-        : deepElementFromPoint(e.clientX, e.clientY);
-      if (
-        !elementUnder ||
-        closestCrossingShadow(elementUnder, "[data-feedback-toolbar]")
-      ) {
-        setHoverInfo(null);
-        return;
-      }
-
-      const { name, elementName, path, reactComponents } =
-        identifyElementWithReact(elementUnder, effectiveReactMode);
-      const rect = elementUnder.getBoundingClientRect();
-
-      setHoverInfo({
-        element: name,
-        elementName,
-        elementPath: path,
-        rect,
-        reactComponents,
-        isPiercing: piercing,
-      });
-      setHoverPosition({ x: e.clientX, y: e.clientY });
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    return () => document.removeEventListener("mousemove", handleMouseMove);
-  }, [isActive, pendingAnnotation, effectiveReactMode]);
-
-  // Handle click
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleClick = (e: MouseEvent) => {
-      if (justFinishedDragRef.current) {
-        justFinishedDragRef.current = false;
-        return;
-      }
-
-      // Use composedPath to get actual target inside shadow DOM, falling back to e.target
-      const target = (e.composedPath()[0] || e.target) as HTMLElement;
-
-      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) return;
-      if (closestCrossingShadow(target, "[data-annotation-popup]")) return;
-      if (closestCrossingShadow(target, "[data-annotation-marker]")) return;
-
-      // Handle cmd+shift+click for multi-element selection
-      // Cmd is held so pierce mode is active — use pierceElementFromPoint
-      if (e.metaKey && e.shiftKey && !pendingAnnotation && !editingAnnotation) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const elementUnder = pierceElementFromPoint(e.clientX, e.clientY);
-        if (!elementUnder) return;
-
-        const rect = elementUnder.getBoundingClientRect();
-        const { name, path, reactComponents } = identifyElementWithReact(
-          elementUnder,
-          effectiveReactMode,
-        );
-
-        // Toggle: check if already selected
-        const existingIndex = pendingMultiSelectElements.findIndex(
-          (item) => item.element === elementUnder,
-        );
-
-        if (existingIndex >= 0) {
-          // Deselect
-          setPendingMultiSelectElements((prev) =>
-            prev.filter((_, i) => i !== existingIndex),
-          );
-        } else {
-          // Select
-          setPendingMultiSelectElements((prev) => [
-            ...prev,
-            {
-              element: elementUnder,
-              rect,
-              name,
-              path,
-              reactComponents: reactComponents ?? undefined,
-            },
-          ]);
-        }
-        return;
-      }
-
-      const isInteractive = closestCrossingShadow(
-        target,
-        "button, a, input, select, textarea, [role='button'], [onclick]",
-      );
-
-      // Block interactions on interactive elements when enabled
-      if (settings.blockInteractions && isInteractive) {
-        e.preventDefault();
-        e.stopPropagation();
-        // Still create annotation on the interactive element
-      }
-
-      if (pendingAnnotation) {
-        if (isInteractive && !settings.blockInteractions) {
-          return;
-        }
-        e.preventDefault();
-        popupRef.current?.shake();
-        return;
-      }
-
-      if (editingAnnotation) {
-        if (isInteractive && !settings.blockInteractions) {
-          return;
-        }
-        e.preventDefault();
-        editPopupRef.current?.shake();
-        return;
-      }
-
-      e.preventDefault();
-
-      // Cmd (Mac) / Ctrl (Win) without Shift = pierce mode click
-      const piercing = (e.metaKey || e.ctrlKey) && !e.shiftKey;
-      const elementUnder = piercing
-        ? pierceElementFromPoint(e.clientX, e.clientY)
-        : deepElementFromPoint(e.clientX, e.clientY);
-      if (!elementUnder) return;
-
-      const { name, path, reactComponents } = identifyElementWithReact(
-        elementUnder,
-        effectiveReactMode,
-      );
-      const rect = elementUnder.getBoundingClientRect();
-      const x = (e.clientX / window.innerWidth) * 100;
-
-      const isFixed = isElementFixed(elementUnder);
-      const y = isFixed ? e.clientY : e.clientY + window.scrollY;
-
-      const selection = window.getSelection();
-      let selectedText: string | undefined;
-      if (selection && selection.toString().trim().length > 0) {
-        selectedText = selection.toString().trim().slice(0, 500);
-      }
-
-      // Capture computed styles - filtered for popup, full for forensic output
-      const computedStylesObj = getDetailedComputedStyles(elementUnder);
-      const computedStylesStr = getForensicComputedStyles(elementUnder);
-
-      setPendingAnnotation({
-        x,
-        y,
-        clientY: e.clientY,
-        element: name,
-        elementPath: path,
-        selectedText,
-        boundingBox: {
-          x: rect.left,
-          y: isFixed ? rect.top : rect.top + window.scrollY,
-          width: rect.width,
-          height: rect.height,
-        },
-        nearbyText: getNearbyText(elementUnder),
-        cssClasses: getElementClasses(elementUnder),
-        isFixed,
-        fullPath: getFullElementPath(elementUnder),
-        accessibility: getAccessibilityInfo(elementUnder),
-        computedStyles: computedStylesStr,
-        computedStylesObj,
-        nearbyElements: getNearbyElements(elementUnder),
-        reactComponents: reactComponents ?? undefined,
-        sourceFile: detectSourceFile(elementUnder),
-        targetElement: elementUnder, // Store for live position queries
-      });
-      setHoverInfo(null);
-    };
-
-    // Use capture phase to intercept before element handlers
-    document.addEventListener("click", handleClick, true);
-    return () => document.removeEventListener("click", handleClick, true);
-  }, [
-    isActive,
-    pendingAnnotation,
-    editingAnnotation,
-    settings.blockInteractions,
-    effectiveReactMode,
-    pendingMultiSelectElements,
-  ]);
-
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleContextMenu = (e: MouseEvent) => {
-      const target = (e.composedPath()[0] || e.target) as HTMLElement;
-
-      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) return;
-      if (closestCrossingShadow(target, "[data-annotation-popup]")) return;
-      if (closestCrossingShadow(target, "[data-annotation-marker]")) return;
-
-      if (!e.altKey) {
-        setComponentMenu(null);
-        return;
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      const piercing = e.metaKey || e.ctrlKey;
-      const elementUnder = piercing
-        ? pierceElementFromPoint(e.clientX, e.clientY)
-        : deepElementFromPoint(e.clientX, e.clientY);
-      if (!elementUnder) {
-        setComponentMenu(null);
-        return;
-      }
-
-      const items = inspectComponentElement(elementUnder);
-      if (items.length === 0) {
-        setComponentMenu(null);
-        return;
-      }
-
-      setComponentMenu({ items, x: e.clientX, y: e.clientY });
-      setHoverInfo(null);
-    };
-
-    document.addEventListener("contextmenu", handleContextMenu, true);
-    return () => document.removeEventListener("contextmenu", handleContextMenu, true);
-  }, [isActive]);
-
-  useEffect(() => {
-    if (!componentMenu) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && closestCrossingShadow(target, "[data-component-source-menu]")) {
-        return;
-      }
-      setComponentMenu(null);
-      setHoveredComponentMenuIndex(null);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setComponentMenu(null);
-        setHoveredComponentMenuIndex(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown, true);
-    document.addEventListener("keydown", handleKeyDown, true);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown, true);
-      document.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [componentMenu]);
-
-  // Cmd+shift+click multi-select: keyup listener for modifier release
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Meta") modifiersHeldRef.current.cmd = true;
-      if (e.key === "Shift") modifiersHeldRef.current.shift = true;
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      const wasHoldingBoth =
-        modifiersHeldRef.current.cmd && modifiersHeldRef.current.shift;
-
-      if (e.key === "Meta") modifiersHeldRef.current.cmd = false;
-      if (e.key === "Shift") modifiersHeldRef.current.shift = false;
-
-      const nowHoldingBoth =
-        modifiersHeldRef.current.cmd && modifiersHeldRef.current.shift;
-
-      // Released modifier while holding elements → trigger popup
-      if (
-        wasHoldingBoth &&
-        !nowHoldingBoth &&
-        pendingMultiSelectElements.length > 0
-      ) {
-        createMultiSelectPendingAnnotation();
-      }
-    };
-
-    // Reset modifier state AND clear selection when window loses focus (e.g., cmd+tab away)
-    const handleBlur = () => {
-      modifiersHeldRef.current = { cmd: false, shift: false };
-      setPendingMultiSelectElements([]);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleBlur);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, [isActive, pendingMultiSelectElements, createMultiSelectPendingAnnotation]);
+    justFinishedDragRef.current = false;
+    return true;
+  }, []);
 
   // Multi-select drag - mousedown
   useEffect(() => {
@@ -2123,355 +1688,43 @@ export function PageFeedbackToolbarCSS({
     [webhookUrl, settings.webhookUrl, settings.webhooksEnabled],
   );
 
-  // Add annotation
-  const addAnnotation = useCallback(
-    (comment: string) => {
-      if (!pendingAnnotation) return;
-
-      const newAnnotation: Annotation = {
-        id: Date.now().toString(),
-        x: pendingAnnotation.x,
-        y: pendingAnnotation.y,
-        comment,
-        element: pendingAnnotation.element,
-        elementPath: pendingAnnotation.elementPath,
-        timestamp: Date.now(),
-        selectedText: pendingAnnotation.selectedText,
-        boundingBox: pendingAnnotation.boundingBox,
-        nearbyText: pendingAnnotation.nearbyText,
-        cssClasses: pendingAnnotation.cssClasses,
-        isMultiSelect: pendingAnnotation.isMultiSelect,
-        isFixed: pendingAnnotation.isFixed,
-        fullPath: pendingAnnotation.fullPath,
-        accessibility: pendingAnnotation.accessibility,
-        computedStyles: pendingAnnotation.computedStyles,
-        nearbyElements: pendingAnnotation.nearbyElements,
-        reactComponents: pendingAnnotation.reactComponents,
-        sourceFile: pendingAnnotation.sourceFile,
-        elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
-        // Protocol fields for server sync
-        ...(currentSessionId
-          ? {
-              sessionId: currentSessionId,
-              url:
-                typeof window !== "undefined"
-                  ? window.location.href
-                  : undefined,
-              status: "pending" as const,
-            }
-          : {}),
-      };
-
-      setAnnotations((prev) => [...prev, newAnnotation]);
-      // Prevent immediate hover on newly added marker
-      recentlyAddedIdRef.current = newAnnotation.id;
-      originalSetTimeout(() => {
-        recentlyAddedIdRef.current = null;
-      }, 300);
-      // Mark as needing animation (will be set to animated after animation completes)
-      originalSetTimeout(() => {
-        setAnimatedMarkers((prev) => new Set(prev).add(newAnnotation.id));
-      }, 250);
-
-      // Fire callback
-      onAnnotationAdd?.(newAnnotation);
-      fireWebhook("annotation.add", { annotation: newAnnotation });
-
-      // Animate out the pending annotation UI
-      setPendingExiting(true);
-      originalSetTimeout(() => {
-        setPendingAnnotation(null);
-        setPendingExiting(false);
-      }, 150);
-
-      window.getSelection()?.removeAllRanges();
-
-      // Sync to server (non-blocking, but update local ID with server's ID)
-      if (currentSessionId) {
-        syncAnnotation(resolvedEndpoint, currentSessionId, newAnnotation)
-          .then((serverAnnotation) => {
-            // Update local annotation with server-assigned ID
-            if (serverAnnotation.id !== newAnnotation.id) {
-              setAnnotations((prev) =>
-                prev.map((a) =>
-                  a.id === newAnnotation.id
-                    ? { ...a, id: serverAnnotation.id }
-                    : a,
-                ),
-              );
-              // Also update the animated markers set
-              setAnimatedMarkers((prev) => {
-                const next = new Set(prev);
-                next.delete(newAnnotation.id);
-                next.add(serverAnnotation.id);
-                return next;
-              });
-            }
-          })
-          .catch((error) => {
-            console.warn("[Agentation] Failed to sync annotation:", error);
-          });
-      }
-    },
-    [
-      pendingAnnotation,
-      onAnnotationAdd,
-      fireWebhook,
-      resolvedEndpoint,
-      currentSessionId,
-    ],
-  );
-
-  // Cancel annotation with exit animation
-  const cancelAnnotation = useCallback(() => {
-    setPendingExiting(true);
-    originalSetTimeout(() => {
-      setPendingAnnotation(null);
-      setPendingExiting(false);
-    }, 150); // Match exit animation duration
-  }, []);
-
-  // Delete annotation with exit animation
-  const deleteAnnotation = useCallback(
-    (id: string) => {
-      const deletedIndex = annotations.findIndex((a) => a.id === id);
-      const deletedAnnotation = annotations[deletedIndex];
-
-      // Close edit panel with exit animation if deleting the annotation being edited
-      if (editingAnnotation?.id === id) {
-        setEditExiting(true);
-        originalSetTimeout(() => {
-          setEditingAnnotation(null);
-          setEditingTargetElement(null);
-          setEditingTargetElements([]);
-          setEditExiting(false);
-        }, 150);
-      }
-
-      setDeletingMarkerId(id);
-      setExitingMarkers((prev) => new Set(prev).add(id));
-
-      // Fire callback
-      if (deletedAnnotation) {
-        onAnnotationDelete?.(deletedAnnotation);
-        fireWebhook("annotation.delete", { annotation: deletedAnnotation });
-      }
-
-      // Sync delete to server (non-blocking)
-      if (resolvedEndpoint) {
-        deleteAnnotationFromServer(resolvedEndpoint, id).catch((error) => {
-          console.warn(
-            "[Agentation] Failed to delete annotation from server:",
-            error,
-          );
-        });
-      }
-
-      // Wait for exit animation then remove
-      originalSetTimeout(() => {
-        setAnnotations((prev) => prev.filter((a) => a.id !== id));
-        setExitingMarkers((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        setDeletingMarkerId(null);
-
-        // Trigger renumber animation for markers after deleted one
-        if (deletedIndex < annotations.length - 1) {
-          setRenumberFrom(deletedIndex);
-          originalSetTimeout(() => setRenumberFrom(null), 200);
-        }
-      }, 150);
-    },
-    [annotations, editingAnnotation, onAnnotationDelete, fireWebhook, resolvedEndpoint],
-  );
-
-  // Start editing an annotation (right-click)
-  const startEditAnnotation = useCallback((annotation: Annotation) => {
-    setEditingAnnotation(annotation);
-    setHoveredMarkerId(null);
-    setHoveredTargetElement(null);
-    setHoveredTargetElements([]);
-
-    // Try to find elements at the annotation's position(s) for live tracking
-    if (annotation.elementBoundingBoxes?.length) {
-      // Cmd+shift+click: find element at each bounding box center
-      const elements: HTMLElement[] = [];
-      for (const bb of annotation.elementBoundingBoxes) {
-        const centerX = bb.x + bb.width / 2;
-        const centerY = bb.y + bb.height / 2 - window.scrollY;
-        const el = deepElementFromPoint(centerX, centerY);
-        if (el) elements.push(el);
-      }
-      setEditingTargetElements(elements);
-      setEditingTargetElement(null);
-    } else if (annotation.boundingBox) {
-      // Single element
-      const bb = annotation.boundingBox;
-      const centerX = bb.x + bb.width / 2;
-      // Convert document coords to viewport coords (unless fixed)
-      const centerY = annotation.isFixed
-        ? bb.y + bb.height / 2
-        : bb.y + bb.height / 2 - window.scrollY;
-      const el = deepElementFromPoint(centerX, centerY);
-
-      // Validate found element's size roughly matches stored bounding box
-      if (el) {
-        const elRect = el.getBoundingClientRect();
-        const widthRatio = elRect.width / bb.width;
-        const heightRatio = elRect.height / bb.height;
-        if (widthRatio < 0.5 || heightRatio < 0.5) {
-          setEditingTargetElement(null);
-        } else {
-          setEditingTargetElement(el);
-        }
-      } else {
-        setEditingTargetElement(null);
-      }
-      setEditingTargetElements([]);
-    } else {
-      setEditingTargetElement(null);
-      setEditingTargetElements([]);
-    }
-  }, []);
-
-  // Handle marker hover - finds element(s) for live position tracking
-  const handleMarkerHover = useCallback(
-    (annotation: Annotation | null) => {
-      if (!annotation) {
-        setHoveredMarkerId(null);
-        setHoveredTargetElement(null);
-        setHoveredTargetElements([]);
-        return;
-      }
-
-      setHoveredMarkerId(annotation.id);
-
-      // Find elements at the annotation's position(s) for live tracking
-      if (annotation.elementBoundingBoxes?.length) {
-        // Cmd+shift+click: find element at each bounding box center
-        const elements: HTMLElement[] = [];
-        for (const bb of annotation.elementBoundingBoxes) {
-          const centerX = bb.x + bb.width / 2;
-          const centerY = bb.y + bb.height / 2 - window.scrollY;
-          // Use elementsFromPoint to look through the marker if it's covering
-          const allEls = document.elementsFromPoint(centerX, centerY);
-          const el = allEls.find(
-            (e) => !e.closest('[data-annotation-marker]') && !e.closest('[data-agentation-root]'),
-          ) as HTMLElement | undefined;
-          if (el) elements.push(el);
-        }
-        setHoveredTargetElements(elements);
-        setHoveredTargetElement(null);
-      } else if (annotation.boundingBox) {
-        // Single element
-        const bb = annotation.boundingBox;
-        const centerX = bb.x + bb.width / 2;
-        const centerY = annotation.isFixed
-          ? bb.y + bb.height / 2
-          : bb.y + bb.height / 2 - window.scrollY;
-        const el = deepElementFromPoint(centerX, centerY);
-
-        // Validate found element's size roughly matches stored bounding box
-        // (prevents using wrong child element when clicking center of a container)
-        if (el) {
-          const elRect = el.getBoundingClientRect();
-          const widthRatio = elRect.width / bb.width;
-          const heightRatio = elRect.height / bb.height;
-          // If found element is much smaller than stored, it's probably a child - don't use it
-          if (widthRatio < 0.5 || heightRatio < 0.5) {
-            setHoveredTargetElement(null);
-          } else {
-            setHoveredTargetElement(el);
-          }
-        } else {
-          setHoveredTargetElement(null);
-        }
-        setHoveredTargetElements([]);
-      } else {
-        setHoveredTargetElement(null);
-        setHoveredTargetElements([]);
-      }
-    },
-    [],
-  );
-
-  // Update annotation (edit mode submit)
-  const updateAnnotation = useCallback(
-    (newComment: string) => {
-      if (!editingAnnotation) return;
-
-      const updatedAnnotation = { ...editingAnnotation, comment: newComment };
-
-      setAnnotations((prev) =>
-        prev.map((a) =>
-          a.id === editingAnnotation.id ? updatedAnnotation : a,
-        ),
-      );
-
-      // Fire callback
-      onAnnotationUpdate?.(updatedAnnotation);
-      fireWebhook("annotation.update", { annotation: updatedAnnotation });
-
-      // Sync update to server (non-blocking)
-      if (resolvedEndpoint) {
-        updateAnnotationOnServer(resolvedEndpoint, editingAnnotation.id, {
-          comment: newComment,
-        }).catch((error) => {
-          console.warn(
-            "[Agentation] Failed to update annotation on server:",
-            error,
-          );
-        });
-      }
-
-      // Animate out the edit popup
-      setEditExiting(true);
-      originalSetTimeout(() => {
-        setEditingAnnotation(null);
-        setEditingTargetElement(null);
-        setEditingTargetElements([]);
-        setEditExiting(false);
-      }, 150);
-    },
-    [editingAnnotation, onAnnotationUpdate, fireWebhook, resolvedEndpoint],
-  );
-
-  // Handle thread reply from edit popup
-  const handleThreadReply = useCallback(
-    async (content: string) => {
-      if (!editingAnnotation || !resolvedEndpoint) return;
-
-      setIsReplySending(true);
-      try {
-        const updated = await postThreadReply(resolvedEndpoint, editingAnnotation.id, content);
-        // Update annotations array with server response
-        setAnnotations((prev) =>
-          prev.map((a) => (a.id === updated.id ? { ...a, thread: updated.thread } : a))
-        );
-        setEditingAnnotation((prev) =>
-          prev && prev.id === updated.id ? { ...prev, thread: updated.thread } : prev
-        );
-      } catch (error) {
-        console.warn("[Agentation] Failed to post thread reply:", error);
-      } finally {
-        setIsReplySending(false);
-      }
-    },
-    [editingAnnotation, resolvedEndpoint],
-  );
-
-  // Cancel editing with exit animation
-  const cancelEditAnnotation = useCallback(() => {
-    setEditExiting(true);
-    originalSetTimeout(() => {
-      setEditingAnnotation(null);
-      setEditingTargetElement(null);
-      setEditingTargetElements([]);
-      setEditExiting(false);
-    }, 150);
-  }, []);
+  const {
+    addAnnotation,
+    cancelAnnotation,
+    deleteAnnotation,
+    startEditAnnotation,
+    handleMarkerHover,
+    updateAnnotation,
+    handleThreadReply,
+    cancelEditAnnotation,
+  } = useAnnotationPopupState({
+    annotations,
+    setAnnotations,
+    pendingAnnotation,
+    setPendingAnnotation,
+    setPendingExiting,
+    setEditingAnnotation,
+    editingAnnotation,
+    setEditingTargetElement,
+    setEditingTargetElements,
+    setHoveredMarkerId,
+    setHoveredTargetElement,
+    setHoveredTargetElements,
+    setDeletingMarkerId,
+    setExitingMarkers,
+    setRenumberFrom,
+    setAnimatedMarkers,
+    setEditExiting,
+    setIsReplySending,
+    currentSessionId,
+    resolvedEndpoint,
+    fireWebhook,
+    deepElementFromPoint,
+    recentlyAddedIdRef,
+    onAnnotationAdd,
+    onAnnotationDelete,
+    onAnnotationUpdate,
+  });
 
   // Clear all with staggered animation
   const clearAll = useCallback(() => {
@@ -2782,6 +2035,32 @@ export function PageFeedbackToolbarCSS({
     toggleMarkers: () => setShowMarkers((prev) => !prev),
     toggleReviewQueue: () => setShowReviewQueue((prev) => !prev),
     clearPendingMultiSelect: () => setPendingMultiSelectElements([]),
+  });
+
+  useInteractionLifecycle({
+    isActive,
+    isAltSelectionHeld,
+    pendingAnnotation,
+    setPendingAnnotation,
+    editingAnnotation,
+    settingsBlockInteractions: settings.blockInteractions,
+    effectiveReactMode,
+    pendingMultiSelectElements,
+    setPendingMultiSelectElements,
+    createMultiSelectPendingAnnotation,
+    setHoverInfo,
+    setHoverPosition,
+    componentMenu,
+    setComponentMenu,
+    setHoveredComponentMenuIndex,
+    popupRef,
+    editPopupRef,
+    consumeJustFinishedDrag,
+    identifyElementWithReact,
+    detectSourceFile,
+    isElementFixed,
+    deepElementFromPoint,
+    pierceElementFromPoint,
   });
 
   if (!mounted) return null;
