@@ -76,6 +76,21 @@ import { useServerSync } from "./hooks/useServerSync";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
 import { ToolbarShell } from "./render/ToolbarShell";
 import { MarkersLayer } from "./render/MarkersLayer";
+import {
+  DEFAULT_TOOLBAR_SETTINGS,
+  parseToolbarPosition,
+  parseToolbarSettings,
+  parseToolbarTheme,
+  serializeToolbarPosition,
+  serializeToolbarSettings,
+  serializeToolbarTheme,
+  TOOLBAR_POSITION_STORAGE_KEY,
+  TOOLBAR_SETTINGS_STORAGE_KEY,
+  TOOLBAR_THEME_STORAGE_KEY,
+  type MarkerClickBehavior,
+  type OutputDetailLevel,
+  type ToolbarSettings,
+} from "./state/toolbar-settings";
 import styles from "./styles.module.scss";
 
 /**
@@ -129,10 +144,8 @@ type HoverInfo = {
   isPiercing?: boolean;
 };
 
-type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
-type MarkerClickBehavior = "edit" | "delete";
 const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
 
 function normalizeNeovimBridgeUrl(url: string): string {
@@ -143,28 +156,6 @@ type ComponentMenuState = {
   items: ComponentInspection[];
   x: number;
   y: number;
-};
-
-type ToolbarSettings = {
-  outputDetail: OutputDetailLevel;
-  autoClearAfterCopy: boolean;
-  annotationColor: string;
-  blockInteractions: boolean;
-  reactEnabled: boolean; // Simple toggle - mode derived from outputDetail
-  markerClickBehavior: MarkerClickBehavior;
-  webhookUrl: string; // Overrides prop if set
-  webhooksEnabled: boolean;
-};
-
-const DEFAULT_SETTINGS: ToolbarSettings = {
-  outputDetail: "standard",
-  autoClearAfterCopy: false,
-  annotationColor: "#3c82f7",
-  blockInteractions: true,
-  reactEnabled: true,
-  markerClickBehavior: "edit",
-  webhookUrl: "",
-  webhooksEnabled: true,
 };
 
 function getLocalStorageItem(key: string): string | null {
@@ -816,7 +807,9 @@ export function PageFeedbackToolbarCSS({
     );
   };
 
-  const [settings, setSettings] = useState<ToolbarSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ToolbarSettings>(
+    DEFAULT_TOOLBAR_SETTINGS,
+  );
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showEntranceAnimation, setShowEntranceAnimation] = useState(false);
 
@@ -987,42 +980,22 @@ export function PageFeedbackToolbarCSS({
       originalSetTimeout(() => setShowEntranceAnimation(false), 750);
     }
 
-    const storedSettings = getLocalStorageItem("feedback-toolbar-settings");
-    if (storedSettings) {
-      try {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
-      } catch {
-        // Ignore parsing errors
-      }
-    }
+    const storedSettings = getLocalStorageItem(TOOLBAR_SETTINGS_STORAGE_KEY);
+    setSettings(parseToolbarSettings(storedSettings));
 
-    // Load saved theme preference, default to dark mode
-    const savedTheme = getLocalStorageItem("feedback-toolbar-theme");
-    if (savedTheme !== null) {
-      setIsDarkMode(savedTheme === "dark");
-    }
-    // If no saved preference, keep default (dark mode)
+    const savedTheme = getLocalStorageItem(TOOLBAR_THEME_STORAGE_KEY);
+    setIsDarkMode(parseToolbarTheme(savedTheme));
 
-    // Load saved toolbar position
-    const savedPosition = getLocalStorageItem("feedback-toolbar-position");
-    if (savedPosition) {
-      try {
-        const pos = JSON.parse(savedPosition);
-        if (typeof pos.x === "number" && typeof pos.y === "number") {
-          setToolbarPosition(pos);
-        }
-      } catch {
-        // Ignore parsing errors
-      }
-    }
+    const savedPosition = getLocalStorageItem(TOOLBAR_POSITION_STORAGE_KEY);
+    setToolbarPosition(parseToolbarPosition(savedPosition));
   }, [pathname]);
 
   // Save settings
   useEffect(() => {
     if (mounted) {
       setLocalStorageItem(
-        "feedback-toolbar-settings",
-        JSON.stringify(settings),
+        TOOLBAR_SETTINGS_STORAGE_KEY,
+        serializeToolbarSettings(settings),
       );
     }
   }, [settings, mounted]);
@@ -1031,8 +1004,8 @@ export function PageFeedbackToolbarCSS({
   useEffect(() => {
     if (mounted) {
       setLocalStorageItem(
-        "feedback-toolbar-theme",
-        isDarkMode ? "dark" : "light",
+        TOOLBAR_THEME_STORAGE_KEY,
+        serializeToolbarTheme(isDarkMode),
       );
     }
   }, [isDarkMode, mounted]);
@@ -1046,8 +1019,8 @@ export function PageFeedbackToolbarCSS({
     // Save position when dragging ends (transition from true to false)
     if (wasDragging && !isDraggingToolbar && toolbarPosition && mounted) {
       setLocalStorageItem(
-        "feedback-toolbar-position",
-        JSON.stringify(toolbarPosition),
+        TOOLBAR_POSITION_STORAGE_KEY,
+        serializeToolbarPosition(toolbarPosition),
       );
     }
   }, [isDraggingToolbar, toolbarPosition, mounted]);
