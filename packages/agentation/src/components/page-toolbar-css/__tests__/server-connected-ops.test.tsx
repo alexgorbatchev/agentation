@@ -11,13 +11,7 @@ import {
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
-import {
-  mockCreateSessionResponse,
-  mockGetSessionResponse,
-  mockHealthResponse,
-  mockSyncAnnotationResponse,
-  setupPageToolbarServerMock,
-} from "./pageToolbarServerTestUtils";
+import { setupPageToolbarServerMock } from "./pageToolbarServerTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -654,68 +648,55 @@ describe("Scroll tracking clears isScrolling", () => {
 
 describe("Reconnection sync", () => {
   it("syncs local annotations when connection status goes from disconnected to connected", async () => {
-    const ann = makeAnnotation({ id: "local-1" });
-    seedAnnotations([ann]);
+    vi.useFakeTimers();
 
-    const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
-      const method = init?.method || "GET";
+    try {
+      const ann = makeAnnotation({ id: "local-1" });
+      seedAnnotations([ann]);
 
-      // Health check — first fails, then succeeds
-      if (url.includes("/health")) {
-        if (
-          mockFetch.mock.calls.filter((call) => call[0].includes("/health")).length <= 1
-        ) {
-          return mockHealthResponse(false);
-        }
-        return mockHealthResponse(true);
-      }
+      const setup = setupPageToolbarServerMock({
+        annotations: [],
+        sessionId: "session-r",
+        healthResponses: [false, true],
+      });
 
-      if (url.includes("/sessions/") && method === "GET") {
-        return mockGetSessionResponse("session-r");
-      }
+      vi.stubGlobal(
+        "EventSource",
+        class {
+          addEventListener() {}
+          removeEventListener() {}
+          close() {}
+        },
+      );
 
-      if (url.endsWith("/sessions") && method === "POST") {
-        return mockCreateSessionResponse("session-r");
-      }
+      render(
+        <PageFeedbackToolbarCSS
+          endpoint="http://reconnect-test"
+          sessionId="session-r"
+        />,
+      );
 
-      if (url.includes("/annotations") && method === "POST") {
-        const requestBody = init?.body;
-        const parsedBody = typeof requestBody === "string" ? JSON.parse(requestBody) : {};
-        return mockSyncAnnotationResponse({
-          ...ann,
-          ...(typeof parsedBody === "object" && parsedBody !== null ? parsedBody : {}),
-          id: ann.id,
-        });
-      }
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-      return mockCreateSessionResponse("session-r");
-    });
+      expect(setup.mockFetch).toHaveBeenCalled();
 
-    vi.stubGlobal("fetch", mockFetch);
-    vi.stubGlobal(
-      "EventSource",
-      class {
-        addEventListener() {}
-        removeEventListener() {}
-        close() {}
-      },
-    );
+      await act(async () => {
+        vi.advanceTimersByTime(10000);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-    render(
-      <PageFeedbackToolbarCSS
-        endpoint="http://reconnect-test"
-        sessionId="session-r"
-      />,
-    );
-
-    // Wait for initial session connection attempt
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalled();
-    });
-
-    // The component should eventually try health check and sync
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 500));
-    });
+      const syncCall = setup.fetchCalls.find(
+        (call) => call.url.includes("/annotations") && call.method === "POST",
+      );
+      expect(syncCall).toBeTruthy();
+      expect(syncCall?.body).toMatchObject({ id: "local-1" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

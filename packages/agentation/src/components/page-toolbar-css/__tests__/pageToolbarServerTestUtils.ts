@@ -24,6 +24,7 @@ type SetupPageToolbarServerMockOptions = {
   eventSourceClass?: EventSourceConstructor;
   includeThreadReplies?: boolean;
   healthOk?: boolean;
+  healthResponses?: boolean[];
   allowWebhookPosts?: boolean;
   syncIdPrefix?: string;
   syncedToSessionId?: string;
@@ -131,12 +132,14 @@ export function setupPageToolbarServerMock({
   eventSourceClass,
   includeThreadReplies = false,
   healthOk = true,
+  healthResponses,
   allowWebhookPosts = false,
   syncIdPrefix = "server-sync-",
   syncedToSessionId,
 }: SetupPageToolbarServerMockOptions = {}): SetupPageToolbarServerMockResult {
   const fetchCalls: PageToolbarServerFetchCall[] = [];
   let syncIdCounter = 0;
+  let healthResponseIndex = 0;
 
   const mockFetch: PageToolbarServerFetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -144,7 +147,9 @@ export function setupPageToolbarServerMock({
     fetchCalls.push({ url, method, body });
 
     if (url.includes("/health")) {
-      return mockHealthResponse(healthOk);
+      const healthStatus = healthResponses?.[healthResponseIndex] ?? healthOk;
+      healthResponseIndex += 1;
+      return mockHealthResponse(healthStatus);
     }
 
     if (url.match(/\/sessions\/[\w-]+$/) && method === "GET") {
