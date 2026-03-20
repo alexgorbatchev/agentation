@@ -67,6 +67,7 @@ import {
 import type { Annotation } from "../../types";
 import { useAnnotationState } from "./hooks/useAnnotationState";
 import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
+import { useDragSelectionLifecycle } from "./hooks/useDragSelectionLifecycle";
 import {
   useInteractionLifecycle,
   type ComponentMenuState,
@@ -76,6 +77,7 @@ import {
 } from "./hooks/useInteractionLifecycle";
 import { useServerSync } from "./hooks/useServerSync";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
+import { useToolbarRenderTransitions } from "./hooks/useToolbarRenderTransitions";
 import { ToolbarShell } from "./render/ToolbarShell";
 import { MarkersLayer } from "./render/MarkersLayer";
 import {
@@ -817,83 +819,25 @@ export function PageFeedbackToolbarCSS({
   const [pendingExiting, setPendingExiting] = useState(false);
   const [editExiting, setEditExiting] = useState(false);
 
-  // Multi-select drag state - use refs for all drag visuals to avoid re-renders
-  const [isDragging, setIsDragging] = useState(false);
-  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const dragRectRef = useRef<HTMLDivElement | null>(null);
-  const highlightsContainerRef = useRef<HTMLDivElement | null>(null);
-  const justFinishedDragRef = useRef(false);
-  const lastElementUpdateRef = useRef(0);
   const recentlyAddedIdRef = useRef<string | null>(null);
-  const DRAG_THRESHOLD = 8;
-  const ELEMENT_UPDATE_THROTTLE = 50; // Faster updates since no React re-renders
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Handle showSettings changes with exit animation
-  useEffect(() => {
-    if (showSettings) {
-      setShowSettingsVisible(true);
-      setShowReviewQueue(false); // Mutual exclusivity
-    } else {
-      // Reset tooltips when settings close (fixes tooltips not showing after closing settings)
-      setTooltipsHidden(false);
-      // Reset to main page when settings close
-      setSettingsPage("main");
-      const timer = originalSetTimeout(() => setShowSettingsVisible(false), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [showSettings]);
-
-  // Handle showReviewQueue changes with exit animation
-  useEffect(() => {
-    if (showReviewQueue) {
-      setShowReviewQueueVisible(true);
-      setShowSettings(false); // Mutual exclusivity
-    } else {
-      const timer = originalSetTimeout(() => setShowReviewQueueVisible(false), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [showReviewQueue]);
-
-  useEffect(() => {
-    setIsTransitioning(true);
-    const timer = originalSetTimeout(() => setIsTransitioning(false), 350);
-    return () => clearTimeout(timer);
-  }, [settingsPage]);
-
-  // Unified marker visibility - depends on BOTH toolbar active AND showMarkers toggle
-  // This single effect handles all marker show/hide animations
-  const shouldShowMarkers = isActive && showMarkers;
-  useEffect(() => {
-    if (shouldShowMarkers) {
-      // Show markers - reset animations and make visible
-      setMarkersExiting(false);
-      setMarkersVisible(true);
-      setAnimatedMarkers(new Set());
-      // After enter animations complete, mark all as animated
-      const timer = originalSetTimeout(() => {
-        setAnimatedMarkers((prev) => {
-          const newSet = new Set(prev);
-          annotations.forEach((a) => newSet.add(a.id));
-          return newSet;
-        });
-      }, 350);
-      return () => clearTimeout(timer);
-    } else if (markersVisible) {
-      // Hide markers - start exit animation, then unmount
-      setMarkersExiting(true);
-      const timer = originalSetTimeout(() => {
-        setMarkersVisible(false);
-        setMarkersExiting(false);
-      }, 250);
-      return () => clearTimeout(timer);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldShowMarkers]);
+  const {
+    isDragging,
+    dragRectRef,
+    highlightsContainerRef,
+    consumeJustFinishedDrag,
+  } = useDragSelectionLifecycle({
+    isActive,
+    pendingAnnotation,
+    detectSourceFile,
+    setPendingAnnotation,
+    setHoverInfo,
+    selectedElementHighlightClassName: styles.selectedElementHighlight,
+  });
 
   // Mount and load
   useEffect(() => {
@@ -1215,445 +1159,6 @@ export function PageFeedbackToolbarCSS({
       unfreezeAll();
     };
   }, []);
-
-  const consumeJustFinishedDrag = useCallback((): boolean => {
-    if (!justFinishedDragRef.current) {
-      return false;
-    }
-
-    justFinishedDragRef.current = false;
-    return true;
-  }, []);
-
-  // Multi-select drag - mousedown
-  useEffect(() => {
-    if (!isActive || pendingAnnotation) return;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      // Use composedPath to get actual target inside shadow DOM
-      const target = (e.composedPath()[0] || e.target) as HTMLElement;
-
-      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) return;
-      if (closestCrossingShadow(target, "[data-annotation-marker]")) return;
-      if (closestCrossingShadow(target, "[data-annotation-popup]")) return;
-
-      // Don't start drag on text elements - allow native text selection
-      const textTags = new Set([
-        "P",
-        "SPAN",
-        "H1",
-        "H2",
-        "H3",
-        "H4",
-        "H5",
-        "H6",
-        "LI",
-        "TD",
-        "TH",
-        "LABEL",
-        "BLOCKQUOTE",
-        "FIGCAPTION",
-        "CAPTION",
-        "LEGEND",
-        "DT",
-        "DD",
-        "PRE",
-        "CODE",
-        "EM",
-        "STRONG",
-        "B",
-        "I",
-        "U",
-        "S",
-        "A",
-        "TIME",
-        "ADDRESS",
-        "CITE",
-        "Q",
-        "ABBR",
-        "DFN",
-        "MARK",
-        "SMALL",
-        "SUB",
-        "SUP",
-      ]);
-
-      if (textTags.has(target.tagName) || target.isContentEditable) {
-        return;
-      }
-
-      mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
-    };
-
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [isActive, pendingAnnotation]);
-
-  // Multi-select drag - mousemove (fully optimized with direct DOM updates)
-  useEffect(() => {
-    if (!isActive || pendingAnnotation) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!mouseDownPosRef.current) return;
-
-      const dx = e.clientX - mouseDownPosRef.current.x;
-      const dy = e.clientY - mouseDownPosRef.current.y;
-      const distance = dx * dx + dy * dy;
-      const thresholdSq = DRAG_THRESHOLD * DRAG_THRESHOLD;
-
-      if (!isDragging && distance >= thresholdSq) {
-        dragStartRef.current = mouseDownPosRef.current;
-        setIsDragging(true);
-      }
-
-      if ((isDragging || distance >= thresholdSq) && dragStartRef.current) {
-        // Direct DOM update for drag rectangle - no React state
-        if (dragRectRef.current) {
-          const left = Math.min(dragStartRef.current.x, e.clientX);
-          const top = Math.min(dragStartRef.current.y, e.clientY);
-          const width = Math.abs(e.clientX - dragStartRef.current.x);
-          const height = Math.abs(e.clientY - dragStartRef.current.y);
-          dragRectRef.current.style.transform = `translate(${left}px, ${top}px)`;
-          dragRectRef.current.style.width = `${width}px`;
-          dragRectRef.current.style.height = `${height}px`;
-        }
-
-        // Throttle element detection (still no React re-renders)
-        const now = Date.now();
-        if (now - lastElementUpdateRef.current < ELEMENT_UPDATE_THROTTLE) {
-          return;
-        }
-        lastElementUpdateRef.current = now;
-
-        const startX = dragStartRef.current.x;
-        const startY = dragStartRef.current.y;
-        const left = Math.min(startX, e.clientX);
-        const top = Math.min(startY, e.clientY);
-        const right = Math.max(startX, e.clientX);
-        const bottom = Math.max(startY, e.clientY);
-        const midX = (left + right) / 2;
-        const midY = (top + bottom) / 2;
-
-        // Sample corners, edges, and center for element detection
-        const candidateElements = new Set<HTMLElement>();
-        const points = [
-          [left, top],
-          [right, top],
-          [left, bottom],
-          [right, bottom],
-          [midX, midY],
-          [midX, top],
-          [midX, bottom],
-          [left, midY],
-          [right, midY],
-        ];
-
-        for (const [x, y] of points) {
-          const elements = document.elementsFromPoint(x, y);
-          for (const el of elements) {
-            if (el instanceof HTMLElement) candidateElements.add(el);
-          }
-        }
-
-        // Also check nearby elements
-        const nearbyElements = document.querySelectorAll(
-          "button, a, input, img, p, h1, h2, h3, h4, h5, h6, li, label, td, th, div, span, section, article, aside, nav",
-        );
-        for (const el of nearbyElements) {
-          if (el instanceof HTMLElement) {
-            const rect = el.getBoundingClientRect();
-            // Check if element's center point is inside or if it overlaps significantly
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const centerInside =
-              centerX >= left &&
-              centerX <= right &&
-              centerY >= top &&
-              centerY <= bottom;
-
-            const overlapX =
-              Math.min(rect.right, right) - Math.max(rect.left, left);
-            const overlapY =
-              Math.min(rect.bottom, bottom) - Math.max(rect.top, top);
-            const overlapArea =
-              overlapX > 0 && overlapY > 0 ? overlapX * overlapY : 0;
-            const elementArea = rect.width * rect.height;
-            const overlapRatio =
-              elementArea > 0 ? overlapArea / elementArea : 0;
-
-            if (centerInside || overlapRatio > 0.5) {
-              candidateElements.add(el);
-            }
-          }
-        }
-
-        const allMatching: DOMRect[] = [];
-        const meaningfulTags = new Set([
-          "BUTTON",
-          "A",
-          "INPUT",
-          "IMG",
-          "P",
-          "H1",
-          "H2",
-          "H3",
-          "H4",
-          "H5",
-          "H6",
-          "LI",
-          "LABEL",
-          "TD",
-          "TH",
-          "SECTION",
-          "ARTICLE",
-          "ASIDE",
-          "NAV",
-        ]);
-
-        for (const el of candidateElements) {
-          if (
-            closestCrossingShadow(el, "[data-feedback-toolbar]") ||
-            closestCrossingShadow(el, "[data-annotation-marker]")
-          )
-            continue;
-
-          const rect = el.getBoundingClientRect();
-          if (
-            rect.width > window.innerWidth * 0.8 &&
-            rect.height > window.innerHeight * 0.5
-          )
-            continue;
-          if (rect.width < 10 || rect.height < 10) continue;
-
-          if (
-            rect.left < right &&
-            rect.right > left &&
-            rect.top < bottom &&
-            rect.bottom > top
-          ) {
-            const tagName = el.tagName;
-            let shouldInclude = meaningfulTags.has(tagName);
-
-            // For divs and spans, only include if they have meaningful content
-            if (!shouldInclude && (tagName === "DIV" || tagName === "SPAN")) {
-              const hasText =
-                el.textContent && el.textContent.trim().length > 0;
-              const isInteractive =
-                el.onclick !== null ||
-                el.getAttribute("role") === "button" ||
-                el.getAttribute("role") === "link" ||
-                el.classList.contains("clickable") ||
-                el.hasAttribute("data-clickable");
-
-              if (
-                (hasText || isInteractive) &&
-                !el.querySelector("p, h1, h2, h3, h4, h5, h6, button, a")
-              ) {
-                shouldInclude = true;
-              }
-            }
-
-            if (shouldInclude) {
-              // Check if any existing match contains this element (filter children)
-              let dominated = false;
-              for (const existingRect of allMatching) {
-                if (
-                  existingRect.left <= rect.left &&
-                  existingRect.right >= rect.right &&
-                  existingRect.top <= rect.top &&
-                  existingRect.bottom >= rect.bottom
-                ) {
-                  // Existing rect contains this one - keep the smaller one
-                  dominated = true;
-                  break;
-                }
-              }
-              if (!dominated) allMatching.push(rect);
-            }
-          }
-        }
-
-        // Direct DOM update for highlights - no React state
-        if (highlightsContainerRef.current) {
-          const container = highlightsContainerRef.current;
-          // Reuse existing divs or create new ones
-          while (container.children.length > allMatching.length) {
-            container.removeChild(container.lastChild!);
-          }
-          allMatching.forEach((rect, i) => {
-            let div = container.children[i] as HTMLDivElement;
-            if (!div) {
-              div = document.createElement("div");
-              div.className = styles.selectedElementHighlight;
-              container.appendChild(div);
-            }
-            div.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
-            div.style.width = `${rect.width}px`;
-            div.style.height = `${rect.height}px`;
-          });
-        }
-      }
-    };
-
-    document.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => document.removeEventListener("mousemove", handleMouseMove);
-  }, [isActive, pendingAnnotation, isDragging, DRAG_THRESHOLD]);
-
-  // Multi-select drag - mouseup
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleMouseUp = (e: MouseEvent) => {
-      const wasDragging = isDragging;
-      const dragStart = dragStartRef.current;
-
-      if (isDragging && dragStart) {
-        justFinishedDragRef.current = true;
-
-        // Do final element detection for accurate count
-        const left = Math.min(dragStart.x, e.clientX);
-        const top = Math.min(dragStart.y, e.clientY);
-        const right = Math.max(dragStart.x, e.clientX);
-        const bottom = Math.max(dragStart.y, e.clientY);
-
-        // Query all meaningful elements and check bounding box intersection
-        const allMatching: { element: HTMLElement; rect: DOMRect }[] = [];
-        const selector =
-          "button, a, input, img, p, h1, h2, h3, h4, h5, h6, li, label, td, th";
-
-        document.querySelectorAll(selector).forEach((el) => {
-          if (!(el instanceof HTMLElement)) return;
-          if (
-            closestCrossingShadow(el, "[data-feedback-toolbar]") ||
-            closestCrossingShadow(el, "[data-annotation-marker]")
-          )
-            return;
-
-          const rect = el.getBoundingClientRect();
-          if (
-            rect.width > window.innerWidth * 0.8 &&
-            rect.height > window.innerHeight * 0.5
-          )
-            return;
-          if (rect.width < 10 || rect.height < 10) return;
-
-          // Check if element intersects with selection
-          if (
-            rect.left < right &&
-            rect.right > left &&
-            rect.top < bottom &&
-            rect.bottom > top
-          ) {
-            allMatching.push({ element: el, rect });
-          }
-        });
-
-        // Filter out parent elements that contain other matched elements
-        const finalElements = allMatching.filter(
-          ({ element: el }) =>
-            !allMatching.some(
-              ({ element: other }) => other !== el && el.contains(other),
-            ),
-        );
-
-        const x = (e.clientX / window.innerWidth) * 100;
-        const y = e.clientY + window.scrollY;
-
-        if (finalElements.length > 0) {
-          const bounds = finalElements.reduce(
-            (acc, { rect }) => ({
-              left: Math.min(acc.left, rect.left),
-              top: Math.min(acc.top, rect.top),
-              right: Math.max(acc.right, rect.right),
-              bottom: Math.max(acc.bottom, rect.bottom),
-            }),
-            {
-              left: Infinity,
-              top: Infinity,
-              right: -Infinity,
-              bottom: -Infinity,
-            },
-          );
-
-          const elementNames = finalElements
-            .slice(0, 5)
-            .map(({ element }) => identifyElement(element).name)
-            .join(", ");
-          const suffix =
-            finalElements.length > 5
-              ? ` +${finalElements.length - 5} more`
-              : "";
-
-          // Capture computed styles from first element - filtered for popup, full for forensic output
-          const firstElement = finalElements[0].element;
-          const firstElementComputedStyles =
-            getDetailedComputedStyles(firstElement);
-          const firstElementComputedStylesStr =
-            getForensicComputedStyles(firstElement);
-
-          setPendingAnnotation({
-            x,
-            y,
-            clientY: e.clientY,
-            element: `${finalElements.length} elements: ${elementNames}${suffix}`,
-            elementPath: "multi-select",
-            boundingBox: {
-              x: bounds.left,
-              y: bounds.top + window.scrollY,
-              width: bounds.right - bounds.left,
-              height: bounds.bottom - bounds.top,
-            },
-            isMultiSelect: true,
-            // Forensic data from first element
-            fullPath: getFullElementPath(firstElement),
-            accessibility: getAccessibilityInfo(firstElement),
-            computedStyles: firstElementComputedStylesStr,
-            computedStylesObj: firstElementComputedStyles,
-            nearbyElements: getNearbyElements(firstElement),
-            cssClasses: getElementClasses(firstElement),
-            nearbyText: getNearbyText(firstElement),
-            sourceFile: detectSourceFile(firstElement),
-          });
-        } else {
-          // No elements selected, but allow annotation on empty area
-          const width = Math.abs(right - left);
-          const height = Math.abs(bottom - top);
-
-          // Only create if drag area is meaningful size (not just a click)
-          if (width > 20 && height > 20) {
-            setPendingAnnotation({
-              x,
-              y,
-              clientY: e.clientY,
-              element: "Area selection",
-              elementPath: `region at (${Math.round(left)}, ${Math.round(top)})`,
-              boundingBox: {
-                x: left,
-                y: top + window.scrollY,
-                width,
-                height,
-              },
-              isMultiSelect: true,
-            });
-          }
-        }
-        setHoverInfo(null);
-      } else if (wasDragging) {
-        justFinishedDragRef.current = true;
-      }
-
-      mouseDownPosRef.current = null;
-      dragStartRef.current = null;
-      setIsDragging(false);
-      // Clear highlights container
-      if (highlightsContainerRef.current) {
-        highlightsContainerRef.current.innerHTML = "";
-      }
-    };
-
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, [isActive, isDragging]);
 
   // Fire webhook for annotation events - returns true on success, false on failure
   const fireWebhook = useCallback(
@@ -2035,6 +1540,26 @@ export function PageFeedbackToolbarCSS({
     toggleMarkers: () => setShowMarkers((prev) => !prev),
     toggleReviewQueue: () => setShowReviewQueue((prev) => !prev),
     clearPendingMultiSelect: () => setPendingMultiSelectElements([]),
+  });
+
+  useToolbarRenderTransitions({
+    isActive,
+    showMarkers,
+    annotations,
+    markersVisible,
+    showSettings,
+    showReviewQueue,
+    settingsPage,
+    setMarkersVisible,
+    setMarkersExiting,
+    setAnimatedMarkers,
+    setShowSettingsVisible,
+    setShowReviewQueueVisible,
+    setShowReviewQueue,
+    setShowSettings,
+    setTooltipsHidden,
+    setSettingsPage,
+    setIsTransitioning,
   });
 
   useInteractionLifecycle({
