@@ -11,6 +11,7 @@ import {
   resetPageToolbarTestEnvironment,
   seedAnnotations,
 } from "./pageToolbarTestUtils";
+import { setupPageToolbarServerMock } from "./pageToolbarServerTestUtils";
 
 const eventSourceHarness = createEventSourceHarness();
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
@@ -19,69 +20,15 @@ const mockWriteText = vi.fn().mockResolvedValue(undefined);
 // Mock fetch for server connection
 // ---------------------------------------------------------------------------
 
-let fetchCalls: Array<{ url: string; method: string; body: any }>;
+let fetchCalls: ReturnType<typeof setupPageToolbarServerMock>["fetchCalls"];
 
 function setupServerMock(sessionAnnotations: Annotation[] = []) {
-  fetchCalls = [];
-  const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
-    const method = init?.method || "GET";
-    const body = init?.body ? JSON.parse(init.body as string) : undefined;
-    fetchCalls.push({ url, method, body });
-
-    if (url.includes("/health")) {
-      return { ok: true, json: async () => ({}) };
-    }
-    if (url.includes("/sessions/") && method === "GET") {
-      return {
-        ok: true,
-        json: async () => ({
-          id: "session-1",
-          annotations: sessionAnnotations,
-        }),
-      };
-    }
-    if (url.endsWith("/sessions") && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({
-          id: "session-1",
-          annotations: sessionAnnotations,
-        }),
-      };
-    }
-    // Thread reply
-    if (url.includes("/thread") && method === "POST") {
-      const annotationId = url.match(/annotations\/([^/]+)\/thread/)?.[1];
-      const matchingAnn = sessionAnnotations.find((a) => a.id === annotationId);
-      const newThread = [
-        ...(matchingAnn?.thread || []),
-        { id: `t-${Date.now()}`, role: body?.role, content: body?.content, timestamp: Date.now() },
-      ];
-      return {
-        ok: true,
-        json: async () => ({
-          ...matchingAnn,
-          id: annotationId,
-          thread: newThread,
-        }),
-      };
-    }
-    if (url.includes("/annotations") && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({ ...(body || {}), id: body?.id || "server-id" }),
-      };
-    }
-    if (method === "PATCH") {
-      return { ok: true, json: async () => ({ ...body }) };
-    }
-    if (method === "DELETE") {
-      return { ok: true, json: async () => ({}) };
-    }
-    return { ok: true, json: async () => ({}) };
+  const setup = setupPageToolbarServerMock({
+    annotations: sessionAnnotations,
+    includeThreadReplies: true,
   });
-  vi.stubGlobal("fetch", mockFetch);
-  return mockFetch;
+  fetchCalls = setup.fetchCalls;
+  return setup.mockFetch;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,11 +241,13 @@ describe("thread reply from edit popup", () => {
     // Verify POST to /annotations/reply-1/thread
     await waitFor(() => {
       const threadCall = fetchCalls.find(
-        (c) => c.url.includes("/thread") && c.method === "POST",
+        (call) => call.url.includes("/thread") && call.method === "POST",
       );
       expect(threadCall).toBeTruthy();
-      expect(threadCall!.body.content).toBe("Thanks for fixing!");
-      expect(threadCall!.body.role).toBe("human");
+      expect(threadCall?.body).toMatchObject({
+        content: "Thanks for fixing!",
+        role: "human",
+      });
     });
   });
 

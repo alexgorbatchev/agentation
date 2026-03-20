@@ -11,6 +11,13 @@ import {
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
+import {
+  mockCreateSessionResponse,
+  mockGetSessionResponse,
+  mockHealthResponse,
+  mockSyncAnnotationResponse,
+  setupPageToolbarServerMock,
+} from "./pageToolbarServerTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,64 +92,11 @@ function createMockTarget(
 // Mock fetch to simulate a connected server
 // ---------------------------------------------------------------------------
 
-let fetchCalls: Array<{ url: string; method: string; body: any }> = [];
+let fetchCalls: ReturnType<typeof setupPageToolbarServerMock>["fetchCalls"] = [];
 
 function setupServerMock(sessionAnnotations: Annotation[] = []) {
-  fetchCalls = [];
-  let syncIdCounter = 0;
-  const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
-    const method = init?.method || "GET";
-    const body = init?.body ? JSON.parse(init.body as string) : undefined;
-    fetchCalls.push({ url, method, body });
-
-    // Health check
-    if (url.includes("/health")) {
-      return { ok: true, json: async () => ({}) };
-    }
-    // Get session
-    if (url.includes("/sessions/") && method === "GET") {
-      return {
-        ok: true,
-        json: async () => ({
-          id: "session-1",
-          annotations: sessionAnnotations,
-        }),
-      };
-    }
-    // Create session
-    if (url.endsWith("/sessions") && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({
-          id: "session-1",
-          annotations: sessionAnnotations,
-        }),
-      };
-    }
-    // Sync annotation
-    if (url.includes("/annotations") && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({
-          ...(body || {}),
-          // Preserve original id if present, otherwise generate one
-          id: body?.id || `server-sync-${++syncIdCounter}`,
-        }),
-      };
-    }
-    // Update annotation
-    if (method === "PATCH") {
-      return { ok: true, json: async () => ({ ...body }) };
-    }
-    // Delete annotation
-    if (method === "DELETE") {
-      return { ok: true, json: async () => ({}) };
-    }
-    // Default
-    return { ok: true, json: async () => ({}) };
-  });
-  vi.stubGlobal("fetch", mockFetch);
-  // Mock EventSource
+  const setup = setupPageToolbarServerMock({ annotations: sessionAnnotations });
+  fetchCalls = setup.fetchCalls;
   vi.stubGlobal(
     "EventSource",
     class {
@@ -151,7 +105,7 @@ function setupServerMock(sessionAnnotations: Annotation[] = []) {
       close() {}
     },
   );
-  return mockFetch;
+  return setup.mockFetch;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,12 +210,10 @@ describe("Annotation operations with active server connection", () => {
     // Verify syncAnnotation was called (POST to /sessions/session-1/annotations)
     await waitFor(() => {
       const syncCall = fetchCalls.find(
-        (c) =>
-          c.url.includes("/annotations") &&
-          c.method === "POST" &&
-          c.body?.comment === "Server test",
+        (call) => call.url.includes("/annotations") && call.method === "POST",
       );
       expect(syncCall).toBeTruthy();
+      expect(syncCall?.body).toMatchObject({ comment: "Server test" });
     });
 
     mockEl.remove();
@@ -413,9 +365,9 @@ describe("Annotation operations with active server connection", () => {
 
     // Verify PATCH was called
     await waitFor(() => {
-      const patchCall = fetchCalls.find((c) => c.method === "PATCH");
+      const patchCall = fetchCalls.find((call) => call.method === "PATCH");
       expect(patchCall).toBeTruthy();
-      expect(patchCall!.body.comment).toBe("Updated comment");
+      expect(patchCall?.body).toMatchObject({ comment: "Updated comment" });
     });
   });
 
@@ -711,36 +663,32 @@ describe("Reconnection sync", () => {
       // Health check — first fails, then succeeds
       if (url.includes("/health")) {
         if (
-          mockFetch.mock.calls.filter((c) => c[0].includes("/health"))
-            .length <= 1
+          mockFetch.mock.calls.filter((call) => call[0].includes("/health")).length <= 1
         ) {
-          return { ok: false };
+          return mockHealthResponse(false);
         }
-        return { ok: true };
+        return mockHealthResponse(true);
       }
-      // Get session
+
       if (url.includes("/sessions/") && method === "GET") {
-        return {
-          ok: true,
-          json: async () => ({ id: "session-r", annotations: [] }),
-        };
+        return mockGetSessionResponse("session-r");
       }
-      // Create session
+
       if (url.endsWith("/sessions") && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({ id: "session-r", annotations: [] }),
-        };
+        return mockCreateSessionResponse("session-r");
       }
-      // Sync annotation
+
       if (url.includes("/annotations") && method === "POST") {
-        const body = init?.body ? JSON.parse(init.body as string) : {};
-        return {
-          ok: true,
-          json: async () => ({ ...body, id: body.id }),
-        };
+        const requestBody = init?.body;
+        const parsedBody = typeof requestBody === "string" ? JSON.parse(requestBody) : {};
+        return mockSyncAnnotationResponse({
+          ...ann,
+          ...(typeof parsedBody === "object" && parsedBody !== null ? parsedBody : {}),
+          id: ann.id,
+        });
       }
-      return { ok: true, json: async () => ({}) };
+
+      return mockCreateSessionResponse("session-r");
     });
 
     vi.stubGlobal("fetch", mockFetch);

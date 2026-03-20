@@ -13,6 +13,16 @@ import {
   resetPageToolbarTestEnvironment,
   seedAnnotations,
 } from "./pageToolbarTestUtils";
+import {
+  mockCreateSessionResponse,
+  mockFailedResponse,
+  mockGetSessionResponse,
+  mockHealthResponse,
+  mockNetworkError,
+  mockSyncAnnotationResponse,
+  setupPageToolbarServerMock,
+  type PageToolbarServerFetchMock,
+} from "./pageToolbarServerTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,7 +48,7 @@ function getLastEventSource() {
 // Mock fetch
 // ---------------------------------------------------------------------------
 
-const mockFetch = vi.fn<(url: string, options?: RequestInit) => Promise<unknown>>();
+let mockFetch: PageToolbarServerFetchMock;
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
 // ---------------------------------------------------------------------------
@@ -54,8 +64,8 @@ beforeEach(() => {
     fetchMode: "none",
   });
 
+  mockFetch = vi.fn<(url: string, options?: RequestInit) => Promise<unknown>>();
   vi.stubGlobal("fetch", mockFetch);
-  mockFetch.mockReset();
 
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -68,64 +78,6 @@ afterEach(() => {
 // Helpers for mock responses
 // ---------------------------------------------------------------------------
 
-function mockCreateSessionResponse(
-  sessionId: string,
-  annotations: Annotation[] = []
-) {
-  return {
-    ok: true,
-    json: async () => ({
-      id: sessionId,
-      url: "http://localhost:3000/",
-      status: "active",
-      createdAt: new Date().toISOString(),
-      annotations,
-    }),
-  };
-}
-
-function mockGetSessionResponse(
-  sessionId: string,
-  annotations: Annotation[] = []
-) {
-  return {
-    ok: true,
-    json: async () => ({
-      id: sessionId,
-      url: "http://localhost:3000/",
-      status: "active",
-      createdAt: new Date().toISOString(),
-      annotations,
-    }),
-  };
-}
-
-function mockHealthResponse(ok = true) {
-  return { ok };
-}
-
-function mockSyncAnnotationResponse(annotation: Annotation) {
-  return {
-    ok: true,
-    json: async () => ({
-      ...annotation,
-      _syncedTo: "session-123",
-    }),
-  };
-}
-
-function mockFailedResponse(status = 500) {
-  return {
-    ok: false,
-    status,
-    json: async () => ({ error: "Server error" }),
-  };
-}
-
-function mockNetworkError() {
-  return Promise.reject(new Error("Network error"));
-}
-
 /**
  * Set up fetch mock to handle session creation + health check.
  * The component issues both on mount when endpoint is provided.
@@ -135,36 +87,14 @@ function setupBasicServerMocks(
   sessionId = "session-123",
   annotations: Annotation[] = []
 ) {
-  mockFetch.mockImplementation(async (url: string, options?: RequestInit) => {
-    const method = options?.method || "GET";
-
-    if (url.endsWith("/health")) {
-      return mockHealthResponse(true);
-    }
-
-    // POST /sessions → create session
-    if (url.endsWith("/sessions") && method === "POST") {
-      return mockCreateSessionResponse(sessionId, annotations);
-    }
-
-    // GET /sessions/:id → get session
-    if (url.match(/\/sessions\/[\w-]+$/) && method === "GET") {
-      return mockGetSessionResponse(sessionId, annotations);
-    }
-
-    // POST /sessions/:id/annotations → sync annotation
-    if (url.match(/\/sessions\/[\w-]+\/annotations$/) && method === "POST") {
-      const body = JSON.parse(options?.body as string);
-      return mockSyncAnnotationResponse(body);
-    }
-
-    // Webhook POST
-    if (method === "POST" && !url.includes("/sessions")) {
-      return { ok: true };
-    }
-
-    return mockFailedResponse(404);
+  const setup = setupPageToolbarServerMock({
+    sessionId,
+    annotations,
+    allowWebhookPosts: true,
+    syncedToSessionId: "session-123",
   });
+  mockFetch = setup.mockFetch;
+  return mockFetch;
 }
 
 // =============================================================================

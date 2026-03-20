@@ -12,57 +12,18 @@ import {
   seedAnnotations,
   stubLocalOnlyFetch,
 } from "./pageToolbarTestUtils";
+import { setupPageToolbarServerMock } from "./pageToolbarServerTestUtils";
 
 // ---------------------------------------------------------------------------
 // Mock fetch for server connection
 // ---------------------------------------------------------------------------
 
-let fetchCalls: Array<{ url: string; method: string; body: any }>;
+let fetchCalls: ReturnType<typeof setupPageToolbarServerMock>["fetchCalls"];
 const reviewQueueEventSourceHarness = createEventSourceHarness();
 
 function setupServerMock(sessionAnnotations: Annotation[] = []) {
-  fetchCalls = [];
-  const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
-    const method = init?.method || "GET";
-    const body = init?.body ? JSON.parse(init.body as string) : undefined;
-    fetchCalls.push({ url, method, body });
-
-    if (url.includes("/health")) {
-      return { ok: true, json: async () => ({}) };
-    }
-    if (url.includes("/sessions/") && method === "GET") {
-      return {
-        ok: true,
-        json: async () => ({
-          id: "session-1",
-          annotations: sessionAnnotations,
-        }),
-      };
-    }
-    if (url.endsWith("/sessions") && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({
-          id: "session-1",
-          annotations: sessionAnnotations,
-        }),
-      };
-    }
-    if (url.includes("/annotations") && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({ ...(body || {}), id: body?.id || "server-id" }),
-      };
-    }
-    if (method === "PATCH") {
-      return { ok: true, json: async () => ({ ...body }) };
-    }
-    if (method === "DELETE") {
-      return { ok: true, json: async () => ({}) };
-    }
-    return { ok: true, json: async () => ({}) };
-  });
-  vi.stubGlobal("fetch", mockFetch);
+  const setup = setupPageToolbarServerMock({ annotations: sessionAnnotations });
+  fetchCalls = setup.fetchCalls;
   vi.stubGlobal(
     "EventSource",
     class {
@@ -71,7 +32,7 @@ function setupServerMock(sessionAnnotations: Annotation[] = []) {
       close() {}
     },
   );
-  return mockFetch;
+  return setup.mockFetch;
 }
 
 // ---------------------------------------------------------------------------
@@ -719,41 +680,12 @@ describe("Clear Selected deletes from server", () => {
 
 describe("SSE annotation.resolved keeps annotation visible", () => {
   function setupServerMockWithSSE(sessionAnnotations: Annotation[] = []) {
-    fetchCalls = [];
-    const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
-      const method = init?.method || "GET";
-      const body = init?.body ? JSON.parse(init.body as string) : undefined;
-      fetchCalls.push({ url, method, body });
-
-      if (url.includes("/health")) {
-        return { ok: true, json: async () => ({}) };
-      }
-      if (url.includes("/sessions/") && method === "GET") {
-        return {
-          ok: true,
-          json: async () => ({ id: "session-1", annotations: sessionAnnotations }),
-        };
-      }
-      if (url.endsWith("/sessions") && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({ id: "session-1", annotations: sessionAnnotations }),
-        };
-      }
-      if (url.includes("/annotations") && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({ ...(body || {}), id: body?.id || "server-id" }),
-        };
-      }
-      if (method === "DELETE") {
-        return { ok: true, json: async () => ({}) };
-      }
-      return { ok: true, json: async () => ({}) };
+    const setup = setupPageToolbarServerMock({
+      annotations: sessionAnnotations,
+      eventSourceClass: reviewQueueEventSourceHarness.EventSourceClass,
     });
-    vi.stubGlobal("fetch", mockFetch);
-    vi.stubGlobal("EventSource", reviewQueueEventSourceHarness.EventSourceClass);
-    return mockFetch;
+    fetchCalls = setup.fetchCalls;
+    return setup.mockFetch;
   }
 
   beforeEach(() => {
