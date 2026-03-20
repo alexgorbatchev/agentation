@@ -2,8 +2,8 @@
 
 Monorepo containing:
 
-1. **npm package** (`package/`) - See `package/CLAUDE.md`
-2. **Website/docs** (`package/example/`) - See `package/example/CLAUDE.md`
+1. **npm package** (`packages/agentation/`) - See `packages/agentation/CLAUDE.md`
+2. **Website/docs** (`packages/agentation/example/`) - See `packages/agentation/example/CLAUDE.md`
 3. **Pi integration package** (`packages/pi-agentation/`)
 
 ## What is Agentation?
@@ -21,8 +21,8 @@ pnpm test       # Run all tests
 
 ## Important
 
-The npm package is public. Changes to `package/src/` affect all users.
-Website changes (`package/example/`) only affect agentation.dev.
+The npm package is public. Changes to `packages/agentation/src/` affect all users.
+Website changes (`packages/agentation/example/`) only affect agentation.dev.
 
 ## PR/Issue Approach
 

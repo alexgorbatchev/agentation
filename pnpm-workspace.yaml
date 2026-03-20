@@ -1,4 +1,4 @@
 packages:
-  - 'package'
-  - 'package/example'
+  - 'packages/agentation'
+  - 'packages/agentation/example'
   - 'packages/pi-agentation'

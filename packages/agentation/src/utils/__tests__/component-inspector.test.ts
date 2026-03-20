@@ -120,7 +120,7 @@ describe("createComponentSourceUrl", () => {
   it("formats clipboard/source paths without leading dots or slashes", () => {
     expect(
       formatComponentSourcePath({
-        fileName: "/Users/alex/development/github/agentation/agentation/package/src/Button.tsx",
+        fileName: "/Users/alex/development/github/agentation/agentation/packages/agentation/src/Button.tsx",
         lineNumber: 10,
         columnNumber: 2,
       }),

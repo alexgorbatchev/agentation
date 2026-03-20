@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  package:
+  packages/agentation:
     devDependencies:
       '@alexgorbatchev/storybook-addon-localstorage':
         specifier: 10.0.4
@@ -83,7 +83,7 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@20.19.32)(@vitest/browser-playwright@4.0.18)(jsdom@25.0.1)(sass-embedded@1.97.3)(sass@1.97.3)
 
-  package/example:
+  packages/agentation/example:
     dependencies:
       agentation:
         specifier: workspace:*

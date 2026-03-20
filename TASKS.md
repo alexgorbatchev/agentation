@@ -11,7 +11,7 @@ Derived from `REVIEW.md` findings and lifecycle state.
 ## Priority 1 (moderate)
 
 - [x] **[REV-010] Decompose `page-toolbar-css/index.tsx` into cohesive modules**
-  - **Location:** `package/src/components/page-toolbar-css/index.tsx` (~1300+ LOC)
+  - **Location:** `packages/agentation/src/components/page-toolbar-css/index.tsx` (~1300+ LOC)
   - **Goal:** Reduce orchestration complexity and integration churn by splitting responsibilities.
   - **Progress:** Completed for planned split scope — extracted `state/toolbar-settings.ts` (pure parse/serialize + tests), `hooks/useInteractionLifecycle.ts` (keyboard/pointer lifecycle), and `hooks/useAnnotationPopupState.ts` (popup/edit-thread orchestration).
   - **Planned splits:**

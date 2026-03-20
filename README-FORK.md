@@ -18,13 +18,13 @@ This fork exists because I wanted a set of workflow features for my own day-to-d
 
 ## Repository structure (high level)
 
-- `package/` — npm package and example app
+- `packages/agentation/` — npm package and example app
 - `packages/pi-agentation/` — [pi](https://pi.dev) plugin integration package
 - `cli/` — Go-based local service/router tooling
 - `nvim/` — Neovim integration
 
 ## Notes for contributors
 
-- Changes under `package/src/` affect all npm consumers
+- Changes under `packages/agentation/src/` affect all npm consumers
 - Keep package size and runtime overhead low
 - Treat UI behavior changes as user-facing API changes

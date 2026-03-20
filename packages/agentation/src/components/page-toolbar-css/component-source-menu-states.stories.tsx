@@ -238,7 +238,7 @@ export const LongFilePaths: Story = {
           name: "ExtremelyDetailedTelemetryAndDiagnosticsPanel",
           source: {
             fileName:
-              "/Users/alex/development/github/agentation/agentation/package/src/components/page-toolbar-css/states/ExtremelyDetailedTelemetryAndDiagnosticsPanel.tsx",
+              "/Users/alex/development/github/agentation/agentation/packages/agentation/src/components/page-toolbar-css/states/ExtremelyDetailedTelemetryAndDiagnosticsPanel.tsx",
             lineNumber: 138,
             columnNumber: 17,
           },
@@ -251,7 +251,7 @@ export const LongFilePaths: Story = {
           name: "AutomationSettingsContainer",
           source: {
             fileName:
-              "/Users/alex/development/github/agentation/agentation/package/src/components/page-toolbar-css/states/AutomationSettingsContainer.tsx",
+              "/Users/alex/development/github/agentation/agentation/packages/agentation/src/components/page-toolbar-css/states/AutomationSettingsContainer.tsx",
             lineNumber: 42,
             columnNumber: 11,
           },

@@ -66,7 +66,7 @@ reviewed_at: 2026-03-20T01:37:40Z
 
 ## File Size and Modularity
 ### [REV-010] [moderate] `page-toolbar-css/index.tsx` remains a very large orchestrator despite extraction of hooks/render modules
-- Location: `package/src/components/page-toolbar-css/index.tsx` (~1300+ LOC)
+- Location: `packages/agentation/src/components/page-toolbar-css/index.tsx` (~1300+ LOC)
 - Current behavior: The file is substantially reduced but still combines orchestration, event wiring, persistence, and UI state transitions.
 - Expected behavior: Continue decomposition into cohesive submodules (e.g., keyboard/selection handlers, popup orchestration, settings persistence).
 - Why it matters: The file remains a high-churn integration hotspot and still imposes significant review/maintenance overhead.
