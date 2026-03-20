@@ -445,11 +445,19 @@ function App() {
                 </td>
               </tr>
               <tr>
-                <td style={{ padding: "0.5rem 0", width: "35%" }}>
+                <td style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", width: "35%" }}>
                   <code>className</code>
                 </td>
-                <td style={{ padding: "0.5rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>
+                <td style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>
                   Custom class for positioning or z-index adjustments
+                </td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.5rem 0", width: "35%" }}>
+                  <code>navigateToUrl</code>
+                </td>
+                <td style={{ padding: "0.5rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>
+                  Override component-source navigation side effects (advanced)
                 </td>
               </tr>
             </tbody>

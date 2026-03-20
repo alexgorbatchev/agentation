@@ -107,6 +107,15 @@ export default function APIPage() {
               </div>
               <p className="prop-desc">Webhook URL to receive annotation events</p>
             </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">navigateToUrl</code>
+                <span className="prop-type">(url: string) =&gt; void</span>
+              </div>
+              <p className="prop-desc">
+                Override navigation side effects when opening component source links
+              </p>
+            </div>
           </div>
         </section>
 

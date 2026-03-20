@@ -58,6 +58,7 @@ The toolbar appears in the bottom-right corner. Click to activate, then click an
 | `sessionId` | `string` | - | Pre-existing session ID to join |
 | `onSessionCreated` | `(sessionId: string) => void` | - | Called when a new session is created |
 | `webhookUrl` | `string` | - | Webhook URL to receive annotation events |
+| `navigateToUrl` | `(url: string) => void` | `window.location.assign` | Override navigation side effects when opening component source links |
 
 ### Programmatic Integration
 
