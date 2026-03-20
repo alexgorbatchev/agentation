@@ -2,6 +2,17 @@ import type { Annotation } from "../../../types";
 import type { OutputDetailLevel } from "../state/toolbar-settings";
 import type { ReactComponentMode } from "../types";
 
+function formatAnnotationLocation(annotation: Annotation): string {
+  const x = annotation.x;
+  const y = annotation.y;
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return "unknown";
+  }
+
+  return `${x.toFixed(1)}% from left, ${Math.round(y)}px from top`;
+}
+
 export function generateOutput(
   annotations: Annotation[],
   pathname: string,
@@ -62,7 +73,7 @@ export function generateOutput(
           `**Position:** x:${Math.round(annotation.boundingBox.x)}, y:${Math.round(annotation.boundingBox.y)} ` +
           `(${Math.round(annotation.boundingBox.width)}×${Math.round(annotation.boundingBox.height)}px)\n`;
       }
-      output += `**Annotation at:** ${annotation.x.toFixed(1)}% from left, ${Math.round(annotation.y)}px from top\n`;
+      output += `**Annotation at:** ${formatAnnotationLocation(annotation)}\n`;
       if (annotation.selectedText) {
         output += `**Selected text:** "${annotation.selectedText}"\n`;
       }
