@@ -60,7 +60,7 @@ When instructed to publish a new npm version:
 3. Commit the version bump
 4. Run `npm publish --access public` (will prompt for OTP)
 5. Push to main
-6. Update changelog in `example/src/app/changelog/page.tsx` (add new entry to `releases` array)
+6. Update changelog in `packages/example/src/app/changelog/page.tsx` (add new entry to `releases` array)
 7. Commit and push the changelog update
 
 Always analyze what changed since the last version to write accurate changelog entries.

@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm build && cd packages/agentation/example && pnpm build",
-  "outputDirectory": "packages/agentation/example/out",
+  "buildCommand": "pnpm build && cd packages/example && pnpm build",
+  "outputDirectory": "packages/example/out",
   "framework": null,
   "installCommand": "pnpm install"
 }

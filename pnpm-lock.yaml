@@ -83,11 +83,11 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@20.19.32)(@vitest/browser-playwright@4.0.18)(jsdom@25.0.1)(sass-embedded@1.97.3)(sass@1.97.3)
 
-  packages/agentation/example:
+  packages/example:
     dependencies:
       agentation:
         specifier: workspace:*
-        version: link:..
+        version: link:../agentation
       beautiful-mermaid:
         specifier: ^0.1.2
         version: 0.1.3
