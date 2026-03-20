@@ -15,6 +15,8 @@ type MockTargetOptions = {
 };
 
 type EventSourceConstructor = new (url: string) => unknown;
+type EventSourceListener = (event: MessageEvent) => void;
+type EventSourceListenerMap = Record<string, EventSourceListener[]>;
 
 type InstallPageToolbarTestGlobalsOptions = {
   writeText: (text: string) => Promise<void>;
@@ -23,12 +25,80 @@ type InstallPageToolbarTestGlobalsOptions = {
   fetchMode?: "local-only" | "none";
 };
 
+type CapturedEventSourceInstance = {
+  url: string;
+  listeners: EventSourceListenerMap;
+  addEventListener: (type: string, listener: EventSourceListener) => void;
+  removeEventListener: (type: string, listener: EventSourceListener) => void;
+  close: () => void;
+};
+
+type EventSourceHarness = {
+  EventSourceClass: new (url: string) => CapturedEventSourceInstance;
+  reset: () => void;
+  getLastInstance: () => CapturedEventSourceInstance | null;
+  getListeners: (type: string) => EventSourceListener[];
+  dispatch: (type: string, data: string) => void;
+  emit: (type: string, payload: unknown) => void;
+};
+
 export class MockEventSource {
   addEventListener: (type?: string, listener?: EventListenerOrEventListenerObject | null) => void = vi.fn();
   removeEventListener: (type?: string, listener?: EventListenerOrEventListenerObject | null) => void = vi.fn();
   close: () => void = vi.fn();
 
   constructor(_url: string) {}
+}
+
+export function createEventSourceHarness(): EventSourceHarness {
+  let lastInstance: CapturedEventSourceInstance | null = null;
+
+  class CapturingEventSource {
+    url: string;
+    listeners: EventSourceListenerMap = {};
+    close: () => void = vi.fn();
+
+    constructor(url: string) {
+      this.url = url;
+      lastInstance = this;
+    }
+
+    addEventListener(type: string, listener: EventSourceListener): void {
+      const listeners = this.listeners[type] ?? [];
+      this.listeners[type] = [...listeners, listener];
+    }
+
+    removeEventListener(type: string, listener: EventSourceListener): void {
+      const listeners = this.listeners[type] ?? [];
+      this.listeners[type] = listeners.filter((candidate) => candidate !== listener);
+    }
+  }
+
+  function getListeners(type: string): EventSourceListener[] {
+    return lastInstance?.listeners[type] ?? [];
+  }
+
+  function dispatch(type: string, data: string): void {
+    const event = new MessageEvent("message", { data });
+    for (const listener of getListeners(type)) {
+      listener(event);
+    }
+  }
+
+  function emit(type: string, payload: unknown): void {
+    dispatch(type, JSON.stringify({ payload }));
+  }
+
+  return {
+    EventSourceClass: CapturingEventSource,
+    reset: () => {
+      lastInstance = null;
+    },
+    getLastInstance: () => lastInstance,
+    getListeners,
+    dispatch,
+    emit,
+  };
 }
 
 function resolveFetchUrl(input: string | URL | Request): string {

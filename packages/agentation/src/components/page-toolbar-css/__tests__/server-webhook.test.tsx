@@ -6,6 +6,7 @@ import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import {
   activateToolbar,
+  createEventSourceHarness,
   findButtonByTooltip,
   installPageToolbarTestGlobals,
   makeAnnotation,
@@ -27,35 +28,10 @@ function seedSessionId(sessionId: string) {
 // Mock EventSource
 // ---------------------------------------------------------------------------
 
-let lastEventSource: MockEventSource | null = null;
+const eventSourceHarness = createEventSourceHarness();
 
-class MockEventSource {
-  listeners: Record<string, Function[]> = {};
-  url: string;
-  close = vi.fn();
-
-  constructor(url: string) {
-    this.url = url;
-    lastEventSource = this;
-  }
-
-  addEventListener(type: string, handler: Function) {
-    if (!this.listeners[type]) this.listeners[type] = [];
-    this.listeners[type].push(handler);
-  }
-
-  removeEventListener(type: string, handler: Function) {
-    if (this.listeners[type]) {
-      this.listeners[type] = this.listeners[type].filter((h) => h !== handler);
-    }
-  }
-
-  /** Test helper to dispatch events */
-  emit(type: string, data: any) {
-    (this.listeners[type] || []).forEach((h) =>
-      h({ data: JSON.stringify(data) })
-    );
-  }
+function getLastEventSource() {
+  return eventSourceHarness.getLastInstance();
 }
 
 // ---------------------------------------------------------------------------
@@ -70,11 +46,11 @@ const mockWriteText = vi.fn().mockResolvedValue(undefined);
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  lastEventSource = null;
+  eventSourceHarness.reset();
   mockWriteText.mockClear();
   installPageToolbarTestGlobals({
     writeText: mockWriteText,
-    eventSourceClass: MockEventSource,
+    eventSourceClass: eventSourceHarness.EventSourceClass,
     fetchMode: "none",
   });
 
@@ -470,8 +446,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       );
 
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
-        expect(lastEventSource!.url).toBe(
+        const eventSource = getLastEventSource();
+        expect(eventSource).not.toBeNull();
+        expect(eventSource?.url).toBe(
           "http://localhost:4747/sessions/session-sse-1/events"
         );
       });
@@ -488,11 +465,8 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       );
 
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
-        expect(lastEventSource!.listeners["annotation.updated"]).toBeDefined();
-        expect(
-          lastEventSource!.listeners["annotation.updated"].length
-        ).toBeGreaterThan(0);
+        expect(getLastEventSource()).not.toBeNull();
+        expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
       });
     });
 
@@ -516,14 +490,15 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
       // Wait for EventSource to be created
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
-        expect(lastEventSource!.listeners["annotation.updated"]).toBeDefined();
+        expect(getLastEventSource()).not.toBeNull();
+        expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
       });
 
       // Emit resolved event
       act(() => {
-        lastEventSource!.emit("annotation.updated", {
-          payload: { id: "sse-resolve-1", status: "resolved" },
+        eventSourceHarness.emit("annotation.updated", {
+          id: "sse-resolve-1",
+          status: "resolved",
         });
       });
 
@@ -562,13 +537,14 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       );
 
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
-        expect(lastEventSource!.listeners["annotation.updated"]).toBeDefined();
+        expect(getLastEventSource()).not.toBeNull();
+        expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
       });
 
       act(() => {
-        lastEventSource!.emit("annotation.updated", {
-          payload: { id: "sse-dismiss-1", status: "dismissed" },
+        eventSourceHarness.emit("annotation.updated", {
+          id: "sse-dismiss-1",
+          status: "dismissed",
         });
       });
 
@@ -595,13 +571,14 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       );
 
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
+        expect(getLastEventSource()).not.toBeNull();
       });
 
-      const es = lastEventSource!;
+      const eventSource = getLastEventSource();
+      assert(eventSource);
       unmount();
 
-      expect(es.close).toHaveBeenCalled();
+      expect(eventSource.close).toHaveBeenCalled();
     });
 
     it("does not create EventSource when endpoint is missing", async () => {
@@ -612,7 +589,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         expect(toolbar).toBeTruthy();
       });
 
-      expect(lastEventSource).toBeNull();
+      expect(getLastEventSource()).toBeNull();
     });
 
     it("ignores SSE events with non-removal statuses", async () => {
@@ -632,14 +609,15 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       await activateToolbar();
 
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
-        expect(lastEventSource!.listeners["annotation.updated"]).toBeDefined();
+        expect(getLastEventSource()).not.toBeNull();
+        expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
       });
 
       // Emit an "acknowledged" event - should NOT remove the annotation
       act(() => {
-        lastEventSource!.emit("annotation.updated", {
-          payload: { id: "sse-ack-1", status: "acknowledged" },
+        eventSourceHarness.emit("annotation.updated", {
+          id: "sse-ack-1",
+          status: "acknowledged",
         });
       });
 
@@ -664,14 +642,13 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       );
 
       await waitFor(() => {
-        expect(lastEventSource).not.toBeNull();
-        expect(lastEventSource!.listeners["annotation.updated"]).toBeDefined();
+        expect(getLastEventSource()).not.toBeNull();
+        expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
       });
 
       // Emit an event with invalid JSON - should not throw
-      const handler = lastEventSource!.listeners["annotation.updated"][0];
       expect(() => {
-        handler({ data: "not-valid-json" });
+        eventSourceHarness.dispatch("annotation.updated", "not-valid-json");
       }).not.toThrow();
     });
   });

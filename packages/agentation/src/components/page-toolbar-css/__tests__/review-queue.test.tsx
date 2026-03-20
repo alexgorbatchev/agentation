@@ -5,6 +5,7 @@ import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import {
   activateToolbar,
+  createEventSourceHarness,
   findButtonByTooltip,
   makeAnnotation,
   resetPageToolbarTestEnvironment,
@@ -17,6 +18,7 @@ import {
 // ---------------------------------------------------------------------------
 
 let fetchCalls: Array<{ url: string; method: string; body: any }>;
+const reviewQueueEventSourceHarness = createEventSourceHarness();
 
 function setupServerMock(sessionAnnotations: Annotation[] = []) {
   fetchCalls = [];
@@ -716,33 +718,6 @@ describe("Clear Selected deletes from server", () => {
 // =============================================================================
 
 describe("SSE annotation.resolved keeps annotation visible", () => {
-  // Mock EventSource that captures listeners
-  type SSEListener = (e: MessageEvent) => void;
-  let sseListeners: Record<string, SSEListener[]>;
-
-  class MockEventSource {
-    addEventListener(event: string, handler: SSEListener) {
-      if (!sseListeners[event]) sseListeners[event] = [];
-      sseListeners[event].push(handler);
-    }
-    removeEventListener(event: string, handler: SSEListener) {
-      if (sseListeners[event]) {
-        sseListeners[event] = sseListeners[event].filter((h) => h !== handler);
-      }
-    }
-    close() {}
-  }
-
-  function emitSSE(event: string, payload: unknown) {
-    for (const listener of sseListeners[event] || []) {
-      listener(
-        new MessageEvent("message", {
-          data: JSON.stringify({ payload }),
-        }),
-      );
-    }
-  }
-
   function setupServerMockWithSSE(sessionAnnotations: Annotation[] = []) {
     fetchCalls = [];
     const mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -777,12 +752,12 @@ describe("SSE annotation.resolved keeps annotation visible", () => {
       return { ok: true, json: async () => ({}) };
     });
     vi.stubGlobal("fetch", mockFetch);
-    vi.stubGlobal("EventSource", MockEventSource);
+    vi.stubGlobal("EventSource", reviewQueueEventSourceHarness.EventSourceClass);
     return mockFetch;
   }
 
   beforeEach(() => {
-    sseListeners = {};
+    reviewQueueEventSourceHarness.reset();
   });
 
   it("annotation stays visible after server resolves it via SSE", async () => {
@@ -808,7 +783,7 @@ describe("SSE annotation.resolved keeps annotation visible", () => {
 
     // Simulate server resolving the annotation via SSE
     await act(async () => {
-      emitSSE("annotation.updated", {
+      reviewQueueEventSourceHarness.emit("annotation.updated", {
         id: "sse-resolve-1",
         status: "resolved",
         thread: [

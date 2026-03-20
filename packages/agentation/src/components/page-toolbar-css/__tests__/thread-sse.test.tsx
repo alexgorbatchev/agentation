@@ -1,80 +1,19 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
+import {
+  activateToolbar,
+  createEventSourceHarness,
+  installPageToolbarTestGlobals,
+  makeAnnotation,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+} from "./pageToolbarTestUtils";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-let idCounter = 0;
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${++idCounter}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    expect(document.querySelector("[data-feedback-toolbar]")).toBeTruthy();
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Mock EventSource that captures listeners
-// ---------------------------------------------------------------------------
-
-type SSEListener = (e: MessageEvent) => void;
-
-let sseListeners: Record<string, SSEListener[]>;
-
-class MockEventSource {
-  addEventListener(event: string, handler: SSEListener) {
-    if (!sseListeners[event]) sseListeners[event] = [];
-    sseListeners[event].push(handler);
-  }
-  removeEventListener(event: string, handler: SSEListener) {
-    if (sseListeners[event]) {
-      sseListeners[event] = sseListeners[event].filter((h) => h !== handler);
-    }
-  }
-  close() {}
-}
-
-function emitSSE(event: string, payload: unknown) {
-  const listeners = sseListeners[event] || [];
-  const messageEvent = new MessageEvent("message", {
-    data: JSON.stringify({ payload }),
-  });
-  for (const listener of listeners) {
-    listener(messageEvent);
-  }
-}
+const eventSourceHarness = createEventSourceHarness();
+const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
 // ---------------------------------------------------------------------------
 // Mock fetch for server connection
@@ -142,7 +81,6 @@ function setupServerMock(sessionAnnotations: Annotation[] = []) {
     return { ok: true, json: async () => ({}) };
   });
   vi.stubGlobal("fetch", mockFetch);
-  vi.stubGlobal("EventSource", MockEventSource);
   return mockFetch;
 }
 
@@ -151,34 +89,19 @@ function setupServerMock(sessionAnnotations: Annotation[] = []) {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  idCounter = 0;
-  sseListeners = {};
+  eventSourceHarness.reset();
+  mockWriteText.mockClear();
+  installPageToolbarTestGlobals({
+    writeText: mockWriteText,
+    includeElementsFromPoint: true,
+    eventSourceClass: eventSourceHarness.EventSourceClass,
+    fetchMode: "none",
+  });
   vi.spyOn(console, "warn").mockImplementation(() => {});
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-  if (!document.elementsFromPoint) {
-    (document as unknown as Record<string, unknown>).elementsFromPoint = vi
-      .fn()
-      .mockReturnValue([]);
-  }
 });
 
 afterEach(() => {
-  unfreezeAll();
-  cleanup();
-  document
-    .querySelectorAll("[data-feedback-toolbar]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-marker]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-popup]")
-    .forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
@@ -197,8 +120,7 @@ describe("SSE thread.message listener", () => {
     );
 
     await waitFor(() => {
-      expect(sseListeners["thread.message"]).toBeDefined();
-      expect(sseListeners["thread.message"].length).toBeGreaterThan(0);
+      expect(eventSourceHarness.getListeners("thread.message").length).toBeGreaterThan(0);
     });
   });
 
@@ -215,7 +137,7 @@ describe("SSE thread.message listener", () => {
     );
 
     await waitFor(() => {
-      expect(sseListeners["thread.message"]).toBeDefined();
+      expect(eventSourceHarness.getListeners("thread.message").length).toBeGreaterThan(0);
     });
 
     await activateToolbar();
@@ -229,7 +151,7 @@ describe("SSE thread.message listener", () => {
 
     // Emit a thread.message SSE event with the full annotation
     await act(async () => {
-      emitSSE("thread.message", {
+      eventSourceHarness.emit("thread.message", {
         id: "sse-1",
         thread: [
           { id: "t1", role: "agent", content: "On it!", timestamp: 123 },
