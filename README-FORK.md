@@ -13,13 +13,17 @@ This fork exists because I wanted a set of workflow features for my own day-to-d
 - **MCP replaced by the local CLI** workflow ([`cli/README.md`](cli/README.md))
 - **Local CLI/server support** for surfacing human thread replies in local environments ([`cli/README.md`](cli/README.md))
 - **Endpoint auto-probe on load**: if `endpoint` is omitted, the toolbar attempts one health probe against `http://127.0.0.1:4747` and uses local sync only when reachable
+- **Configurable source navigation side effects** via `navigateToUrl` for component source links
+- **Unsafe source-probing hardening** with an explicit allowlist requirement
+- **Toolbar reliability + modularization** (split toolbar internals into hooks/render modules, extracted settings/interaction/drag lifecycles, and guarded localStorage persistence)
 - **Storybook + expanded automated test coverage**
 - **Neovim integration** with local multi-project routing support ([`nvim/README.md`](nvim/README.md))
-- **[pi](https://pi.dev) plugin integration** ([`packages/pi-agentation/README.md`](packages/pi-agentation/README.md))
+- **[pi](https://pi.dev) plugin integration** with bundled fix-loop skill and symlink-safe launcher resolution ([`packages/pi-agentation/README.md`](packages/pi-agentation/README.md))
 
 ## Repository structure (high level)
 
-- `packages/agentation/` — npm package and example app
+- `packages/agentation/` — publishable npm package
+- `packages/example/` — website/docs app
 - `packages/pi-agentation/` — [pi](https://pi.dev) plugin integration package
 - `cli/` — Go-based local service/router tooling
 - `nvim/` — Neovim integration
