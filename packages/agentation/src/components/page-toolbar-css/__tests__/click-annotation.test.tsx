@@ -1,100 +1,19 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${Math.random().toString(36).slice(2)}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
-  });
-}
-
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const toolbarEls = document.querySelectorAll("[data-feedback-toolbar]");
-  for (const toolbar of toolbarEls) {
-    const spans = toolbar.querySelectorAll("span");
-    for (const span of spans) {
-      if (span.textContent?.trim().startsWith(tooltipText)) {
-        const wrapper = span.parentElement;
-        if (wrapper) {
-          const button = wrapper.querySelector("button");
-          if (button) return button;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Create a mock element and append it to the body. The element is given
- * a data attribute so we can clean it up easily.
- */
-function createMockTarget(
-  tag: string = "button",
-  text: string = "Click me",
-): HTMLElement {
-  const el = document.createElement(tag);
-  el.textContent = text;
-  el.setAttribute("data-mock-target", "true");
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Simulate a click at given viewport coordinates. The click handler attaches
- * to document in capture phase. We dispatch from a real element in the body
- * so that composedPath()[0] is an Element with `.matches()` available.
- */
-function clickAtPoint(
-  x: number,
-  y: number,
-  options: Partial<MouseEventInit> = {},
-) {
-  const event = new MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
-    clientX: x,
-    clientY: y,
-    ...options,
-  });
-  document.body.dispatchEvent(event);
-}
+import {
+  activateToolbar,
+  clickAtPoint,
+  createMockTarget,
+  findButtonByTooltip,
+  makeAnnotation,
+  PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+  stubLocalOnlyFetch,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Global Mocks
@@ -113,6 +32,8 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 
+  stubLocalOnlyFetch();
+
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: mockWriteText },
     writable: true,
@@ -127,24 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if already unfrozen
-  }
-
-  cleanup();
-  // Clean up portal remnants that survive React unmount
-  document.querySelectorAll("[data-feedback-toolbar]").forEach((el) => el.remove());
-  document.querySelectorAll("[data-annotation-marker]").forEach((el) => el.remove());
-  document.querySelectorAll("[data-annotation-popup]").forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  // Remove mock target elements we appended
-  document.querySelectorAll("[data-mock-target]").forEach((el) => el.remove());
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
@@ -1132,8 +1036,8 @@ describe("Click-to-annotate flow", () => {
         }),
       );
 
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", mockFetch);
+      stubLocalOnlyFetch();
+      const mockFetch = vi.mocked(fetch);
 
       render(<PageFeedbackToolbarCSS />);
       await activateToolbar();
@@ -1270,7 +1174,7 @@ describe("Click-to-annotate flow", () => {
       );
 
       await waitFor(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY);
         expect(stored).toBeTruthy();
         const parsed = JSON.parse(stored!);
         expect(parsed.length).toBeGreaterThanOrEqual(1);
@@ -1500,8 +1404,8 @@ describe("Click-to-annotate flow", () => {
 
   describe("Webhook and callback integration", () => {
     it("fires webhook on annotation add when webhooks are enabled", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", mockFetch);
+      stubLocalOnlyFetch();
+      const mockFetch = vi.mocked(fetch);
 
       localStorage.setItem(
         "feedback-toolbar-settings",

@@ -1,62 +1,16 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-let idCounter = 0;
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${++idCounter}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    expect(document.querySelector("[data-feedback-toolbar]")).toBeTruthy();
-  });
-}
-
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const allSpans = document.querySelectorAll("[data-feedback-toolbar] span");
-  for (const span of allSpans) {
-    if (span.textContent?.trim().startsWith(tooltipText)) {
-      const btn =
-        span.closest("button") ||
-        span.parentElement?.querySelector("button");
-      if (btn) return btn as HTMLButtonElement;
-    }
-  }
-  return null;
-}
+import {
+  activateToolbar,
+  findButtonByTooltip,
+  makeAnnotation,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+  stubLocalOnlyFetch,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Mock fetch for server connection
@@ -123,7 +77,7 @@ function setupServerMock(sessionAnnotations: Annotation[] = []) {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  idCounter = 0;
+  stubLocalOnlyFetch();
   vi.spyOn(console, "warn").mockImplementation(() => {});
   document.elementFromPoint = vi.fn().mockReturnValue(null);
   if (!document.elementsFromPoint) {
@@ -134,22 +88,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  unfreezeAll();
-  cleanup();
-  document
-    .querySelectorAll("[data-feedback-toolbar]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-marker]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-popup]")
-    .forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================

@@ -1,16 +1,12 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
+import {
+  resetPageToolbarTestEnvironment,
+  stubLocalOnlyFetch,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,10 +44,8 @@ async function flushAsyncEffects(): Promise<void> {
 async function activateToolbar() {
   const activateButton = screen.getByTitle("Start feedback mode");
   fireEvent.click(activateButton);
-  // Wait for the active state to render control buttons
   await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
+    expect(screen.queryByTitle("Start feedback mode")).toBeNull();
   });
 }
 
@@ -95,17 +89,7 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        id: "test-session",
-        annotations: [],
-        status: "active",
-      }),
-    })),
-  );
+  stubLocalOnlyFetch();
 
   // Mock clipboard
   Object.defineProperty(navigator, "clipboard", {
@@ -123,28 +107,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if already unfrozen
-  }
-
-  // Let React Testing Library cleanup first (unmounts components properly)
-  cleanup();
-
-  // Then clean up any leftover portal elements from document.body
-  // without nuking the whole body (which breaks React portal cleanup)
-  const portalElements = document.querySelectorAll("[data-feedback-toolbar]");
-  portalElements.forEach((el) => el.remove());
-
-  // Clean up cursor styles injected into head
-  const cursorStyle = document.getElementById("feedback-cursor-styles");
-  if (cursorStyle) cursorStyle.remove();
-
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-  localStorage.clear();
-  sessionStorage.clear();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
@@ -688,7 +651,7 @@ describe("PageFeedbackToolbarCSS", () => {
       });
     });
 
-    it("shows MCP indicator when endpoint is provided and connected", async () => {
+    it("shows server indicator when endpoint is provided and connected", async () => {
       // Mock fetch to succeed for both health check and session creation
       vi.stubGlobal(
         "fetch",
@@ -711,10 +674,10 @@ describe("PageFeedbackToolbarCSS", () => {
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
-      // The MCP indicator should be present near the settings button
+      // The server indicator should be present near the settings button
       await waitFor(() => {
         const indicators = document.querySelectorAll(
-          "[data-feedback-toolbar] [title*='MCP']"
+          "[data-feedback-toolbar] [title*='Server']"
         );
         expect(indicators.length).toBeGreaterThanOrEqual(1);
       });
@@ -1361,10 +1324,7 @@ describe("PageFeedbackToolbarCSS", () => {
         })
       );
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({ ok: true })
-      );
+      stubLocalOnlyFetch();
 
       render(<PageFeedbackToolbarCSS onSubmit={onSubmit} />);
       await activateToolbar();

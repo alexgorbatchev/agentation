@@ -1,26 +1,13 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { cleanup, render, waitFor } from "@testing-library/react";
-import { PageFeedbackToolbarCSS } from "./index";
-import { unfreeze as unfreezeAll } from "../../utils/freeze-animations";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, waitFor } from "@testing-library/react";
+
+import { PageFeedbackToolbarCSS } from "../index";
+import { resetPageToolbarTestEnvironment } from "./pageToolbarTestUtils";
 
 afterEach(() => {
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if not frozen
-  }
-
-  cleanup();
-  document.querySelectorAll("[data-feedback-toolbar]").forEach((element) => {
-    element.remove();
-  });
-  document.getElementById("feedback-cursor-styles")?.remove();
-  document.getElementById("feedback-freeze-styles")?.remove();
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 describe("PageFeedbackToolbarCSS localStorage guards", () => {

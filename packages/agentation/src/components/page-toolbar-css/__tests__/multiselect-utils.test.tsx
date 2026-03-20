@@ -1,133 +1,18 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
-import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${Math.random().toString(36).slice(2)}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
-
-function seedSettings(overrides: Record<string, unknown> = {}) {
-  const defaults = {
-    outputDetail: "standard",
-    autoClearAfterCopy: false,
-    annotationColor: "#3c82f7",
-    blockInteractions: true,
-    reactEnabled: true,
-    markerClickBehavior: "edit",
-    webhookUrl: "",
-    webhooksEnabled: true,
-  };
-  localStorage.setItem(
-    "feedback-toolbar-settings",
-    JSON.stringify({ ...defaults, ...overrides }),
-  );
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
-  });
-}
-
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const toolbarEls = document.querySelectorAll("[data-feedback-toolbar]");
-  for (const toolbar of toolbarEls) {
-    const spans = toolbar.querySelectorAll("span");
-    for (const span of spans) {
-      if (span.textContent?.trim().startsWith(tooltipText)) {
-        const wrapper = span.parentElement;
-        if (wrapper) {
-          const button = wrapper.querySelector("button");
-          if (button) return button;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Create a mock element with a deterministic bounding rect and append to body.
- */
-function createMockTarget(
-  tag: string = "button",
-  text: string = "Click me",
-  rect?: Partial<DOMRect>,
-): HTMLElement {
-  const el = document.createElement(tag);
-  el.textContent = text;
-  el.setAttribute("data-mock-target", "true");
-  document.body.appendChild(el);
-
-  // Override getBoundingClientRect for predictable geometry
-  if (rect) {
-    const fullRect = {
-      x: rect.x ?? rect.left ?? 0,
-      y: rect.y ?? rect.top ?? 0,
-      width: rect.width ?? 100,
-      height: rect.height ?? 30,
-      left: rect.left ?? rect.x ?? 0,
-      top: rect.top ?? rect.y ?? 0,
-      right: (rect.left ?? rect.x ?? 0) + (rect.width ?? 100),
-      bottom: (rect.top ?? rect.y ?? 0) + (rect.height ?? 30),
-      toJSON: () => {},
-    };
-    vi.spyOn(el, "getBoundingClientRect").mockReturnValue(fullRect as DOMRect);
-  }
-
-  return el;
-}
-
-/**
- * Dispatch a click event from document.body at given coordinates.
- * The click handler attaches to document in capture phase.
- */
-function clickAtPoint(
-  x: number,
-  y: number,
-  options: Partial<MouseEventInit> = {},
-) {
-  const event = new MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
-    clientX: x,
-    clientY: y,
-    ...options,
-  });
-  document.body.dispatchEvent(event);
-}
+import {
+  activateToolbar,
+  clickAtPoint,
+  createMockTarget,
+  findButtonByTooltip,
+  makeAnnotation,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+  seedSettings,
+  stubLocalOnlyFetch,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Global Mocks
@@ -146,10 +31,7 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockResolvedValue(new Response("ok", { status: 200 })),
-  );
+  stubLocalOnlyFetch();
   vi.spyOn(console, "warn").mockImplementation(() => {});
 
   Object.defineProperty(navigator, "clipboard", {
@@ -169,31 +51,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if already unfrozen
-  }
-
-  cleanup();
-  document
-    .querySelectorAll("[data-feedback-toolbar]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-marker]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-popup]")
-    .forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  document.getElementById("feedback-freeze-styles")?.remove();
-  document
-    .querySelectorAll("[data-mock-target]")
-    .forEach((el) => el.remove());
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
@@ -696,8 +554,14 @@ describe("PageFeedbackToolbarCSS - Multi-select & Utilities", () => {
           fireEvent.keyDown(document, { key: "s" });
         });
 
-        // Should not have called fetch because URL is invalid
-        expect(fetchSpy).not.toHaveBeenCalled();
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        });
+
+        const invalidWebhookCalls = fetchSpy.mock.calls.filter(
+          ([callUrl]) => callUrl === "not-a-url",
+        );
+        expect(invalidWebhookCalls.length).toBe(0);
       });
 
       it("sends when webhook URL is a valid https URL", async () => {
@@ -716,11 +580,12 @@ describe("PageFeedbackToolbarCSS - Multi-select & Utilities", () => {
         });
 
         await waitFor(() => {
-          expect(fetchSpy).toHaveBeenCalled();
+          const webhookCalls = fetchSpy.mock.calls.filter(
+            ([callUrl, options]) =>
+              callUrl === "https://example.com/hook" && options?.method === "POST",
+          );
+          expect(webhookCalls.length).toBeGreaterThan(0);
         });
-
-        const callUrl = fetchSpy.mock.calls[0][0];
-        expect(callUrl).toBe("https://example.com/hook");
       });
 
       it("does not send when webhook URL is empty", async () => {
@@ -738,7 +603,17 @@ describe("PageFeedbackToolbarCSS - Multi-select & Utilities", () => {
           fireEvent.keyDown(document, { key: "s" });
         });
 
-        expect(fetchSpy).not.toHaveBeenCalled();
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        });
+
+        const emptyWebhookCalls = fetchSpy.mock.calls.filter(
+          ([callUrl, options]) =>
+            typeof callUrl === "string" &&
+            !callUrl.startsWith("http://127.0.0.1:4747/") &&
+            options?.method === "POST",
+        );
+        expect(emptyWebhookCalls.length).toBe(0);
       });
 
       it("sends with prop webhookUrl when settings webhookUrl is empty", async () => {
@@ -759,7 +634,12 @@ describe("PageFeedbackToolbarCSS - Multi-select & Utilities", () => {
         });
 
         await waitFor(() => {
-          expect(fetchSpy).toHaveBeenCalled();
+          const webhookCalls = fetchSpy.mock.calls.filter(
+            ([callUrl, options]) =>
+              callUrl === "https://prop-hook.example.com/api" &&
+              options?.method === "POST",
+          );
+          expect(webhookCalls.length).toBeGreaterThan(0);
         });
       });
     });
@@ -1050,7 +930,15 @@ describe("PageFeedbackToolbarCSS - Multi-select & Utilities", () => {
         fireEvent.keyDown(document, { key: "s" });
       });
 
-      expect(fetchSpy).not.toHaveBeenCalled();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      const webhookCalls = fetchSpy.mock.calls.filter(
+        ([callUrl, options]) =>
+          callUrl === "https://example.com/hook" && options?.method === "POST",
+      );
+      expect(webhookCalls.length).toBe(0);
     });
 
     it("S key does not trigger send when toolbar is not active", async () => {
@@ -1068,8 +956,15 @@ describe("PageFeedbackToolbarCSS - Multi-select & Utilities", () => {
         fireEvent.keyDown(document, { key: "s" });
       });
 
-      // S key shortcuts only work when toolbar is active
-      expect(fetchSpy).not.toHaveBeenCalled();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      const webhookCalls = fetchSpy.mock.calls.filter(
+        ([callUrl, options]) =>
+          callUrl === "https://example.com/hook" && options?.method === "POST",
+      );
+      expect(webhookCalls.length).toBe(0);
     });
 
     it("Escape clears pending multi-select elements", async () => {

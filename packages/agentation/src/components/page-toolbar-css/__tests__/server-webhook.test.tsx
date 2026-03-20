@@ -1,76 +1,25 @@
 /** @vitest-environment jsdom */
 import assert from "node:assert";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
+import {
+  activateToolbar,
+  findButtonByTooltip,
+  makeAnnotation,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${Math.random().toString(36).slice(2)}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
 const SESSION_STORAGE_KEY = "agentation-session-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
 
 function seedSessionId(sessionId: string) {
   localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-}
-
-/**
- * Activate the toolbar by clicking the collapsed container.
- */
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
-  });
-}
-
-/**
- * Find a control button by the text content of its sibling tooltip span.
- */
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const toolbarEls = document.querySelectorAll("[data-feedback-toolbar]");
-  for (const toolbar of toolbarEls) {
-    const spans = toolbar.querySelectorAll("span");
-    for (const span of spans) {
-      if (span.textContent?.trim().startsWith(tooltipText)) {
-        const wrapper = span.parentElement;
-        if (wrapper) {
-          const button = wrapper.querySelector("button");
-          if (button) return button;
-        }
-      }
-    }
-  }
-  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,28 +94,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if already unfrozen
-  }
-
-  cleanup();
-  document
-    .querySelectorAll("[data-feedback-toolbar]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-marker]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-popup]")
-    .forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+  resetPageToolbarTestEnvironment();
 });
 
 // ---------------------------------------------------------------------------
@@ -494,9 +422,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
-      // When connected, should show MCP indicator with "MCP Connected" title
+      // When connected, should show server indicator with "Server Connected" title
       await waitFor(() => {
-        const indicator = document.querySelector('[title="MCP Connected"]');
+        const indicator = document.querySelector('[title="Server Connected"]');
         expect(indicator).toBeTruthy();
       });
     });
@@ -513,9 +441,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
-      // The MCP "Connected" indicator should not appear
+      // The connected server indicator should not appear
       await waitFor(() => {
-        const connected = document.querySelector('[title="MCP Connected"]');
+        const connected = document.querySelector('[title="Server Connected"]');
         expect(connected).toBeNull();
       });
     });
@@ -529,7 +457,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       await activateToolbar();
 
       await waitFor(() => {
-        const connected = document.querySelector('[title="MCP Connected"]');
+        const connected = document.querySelector('[title="Server Connected"]');
         expect(connected).toBeNull();
       });
     });
@@ -1067,19 +995,19 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
   // ===========================================================================
 
   describe("Connection status UI", () => {
-    it("shows MCP indicator when connected and active", async () => {
+    it("shows server indicator when connected and active", async () => {
       setupBasicServerMocks("session-ui-1");
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
       await waitFor(() => {
-        const indicator = document.querySelector('[title="MCP Connected"]');
+        const indicator = document.querySelector('[title="Server Connected"]');
         expect(indicator).toBeTruthy();
       });
     });
 
-    it("shows MCP Connecting indicator during connection", async () => {
+    it("shows Server Connecting indicator during connection", async () => {
       // Delay session creation to keep "connecting" status visible
       mockFetch.mockImplementation(async (url: string) => {
         if (url.endsWith("/health")) {
@@ -1093,26 +1021,26 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
-      // During connecting state, should show "MCP Connecting..." title
+      // During connecting state, should show "Server Connecting..." title
       await waitFor(() => {
         const connecting = document.querySelector(
-          '[title="MCP Connecting..."]'
+          '[title="Server Connecting..."]'
         );
         expect(connecting).toBeTruthy();
       });
     });
 
-    it("does not show MCP indicator when endpoint is not provided", async () => {
+    it("does not show server indicator when endpoint is not provided", async () => {
       render(<PageFeedbackToolbarCSS />);
       await activateToolbar();
 
-      const indicator = document.querySelector('[title="MCP Connected"]');
-      const connecting = document.querySelector('[title="MCP Connecting..."]');
+      const indicator = document.querySelector('[title="Server Connected"]');
+      const connecting = document.querySelector('[title="Server Connecting..."]');
       expect(indicator).toBeNull();
       expect(connecting).toBeNull();
     });
 
-    it("shows MCP disconnected indicator when disconnected", async () => {
+    it("shows Server Disconnected indicator when disconnected", async () => {
       // Both health and session fail
       mockFetch.mockImplementation(async () => {
         throw new Error("Network error");
@@ -1126,9 +1054,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         expect(console.warn).toHaveBeenCalled();
       });
 
-      const disconnected = document.querySelector('[title="MCP Disconnected"]');
-      const connected = document.querySelector('[title="MCP Connected"]');
-      const connecting = document.querySelector('[title="MCP Connecting..."]');
+      const disconnected = document.querySelector('[title="Server Disconnected"]');
+      const connected = document.querySelector('[title="Server Connected"]');
+      const connecting = document.querySelector('[title="Server Connecting..."]');
 
       expect(disconnected).toBeTruthy();
       expect(connected).toBeNull();

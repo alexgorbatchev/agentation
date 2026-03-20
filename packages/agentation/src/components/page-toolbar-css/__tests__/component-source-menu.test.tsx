@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const hooks = vi.hoisted(() => ({
@@ -31,17 +31,20 @@ vi.mock("../../../utils/component-inspector", async () => {
 });
 
 import { PageFeedbackToolbarCSS } from "../index";
+import {
+  activateToolbar,
+  createMockTarget,
+  resetPageToolbarTestEnvironment,
+  stubLocalOnlyFetch,
+} from "./pageToolbarTestUtils";
 
 const navigateToUrlMock = vi.fn<(url: string) => void>();
 
-async function activateToolbar(): Promise<void> {
-  fireEvent.click(screen.getByTitle("Start feedback mode"));
-  await waitFor(() => {
-    expect(screen.queryByTitle("Start feedback mode")).toBeNull();
-  });
-}
-
 describe("component source menu", () => {
+  afterEach(() => {
+    resetPageToolbarTestEnvironment();
+  });
+
   beforeEach(() => {
     hooks.createUrl.mockClear();
     hooks.inspect.mockClear();
@@ -53,12 +56,7 @@ describe("component source menu", () => {
       },
       configurable: true,
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-      }),
-    );
+    stubLocalOnlyFetch();
   });
 
   it("opens a component menu on alt+right-click and navigates on selection", async () => {
@@ -70,9 +68,7 @@ describe("component source menu", () => {
     );
     await activateToolbar();
 
-    const target = document.createElement("button");
-    target.textContent = "Target";
-    document.body.appendChild(target);
+    const target = createMockTarget({ text: "Target" });
     vi.mocked(document.elementFromPoint).mockReturnValue(target);
 
     fireEvent.contextMenu(target, {
@@ -109,8 +105,7 @@ describe("component source menu", () => {
     );
     await activateToolbar();
 
-    const target = document.createElement("button");
-    document.body.appendChild(target);
+    const target = createMockTarget();
     vi.mocked(document.elementFromPoint).mockReturnValue(target);
 
     fireEvent.contextMenu(target, {
@@ -141,8 +136,7 @@ describe("component source menu", () => {
     );
     await activateToolbar();
 
-    const target = document.createElement("button");
-    document.body.appendChild(target);
+    const target = createMockTarget();
     vi.mocked(document.elementFromPoint).mockReturnValue(target);
 
     fireEvent.contextMenu(target, {
@@ -180,8 +174,7 @@ describe("component source menu", () => {
     );
     await activateToolbar();
 
-    const target = document.createElement("button");
-    document.body.appendChild(target);
+    const target = createMockTarget();
     vi.mocked(document.elementFromPoint).mockReturnValue(target);
 
     fireEvent.contextMenu(target, {
