@@ -18,7 +18,49 @@ type MockJsonResponse<T> = {
 
 type EventSourceConstructor = new (url: string) => unknown;
 
-type SetupPageToolbarServerMockOptions = {
+type PageToolbarServerMockResult = Promise<unknown> | unknown;
+
+type PageToolbarServerMockRequest = {
+  url: string;
+  method: string;
+  body: unknown;
+  fetchCalls: PageToolbarServerFetchCall[];
+};
+
+type PageToolbarServerHealthRequest = PageToolbarServerMockRequest & {
+  healthCallIndex: number;
+};
+
+type PageToolbarServerSessionRequest = PageToolbarServerMockRequest & {
+  requestedSessionId: string;
+};
+
+type PageToolbarServerSyncRequest = PageToolbarServerMockRequest & {
+  annotation: Annotation;
+};
+
+type PageToolbarServerMockRouteOverrides = {
+  onHealthRequest?: (
+    request: PageToolbarServerHealthRequest,
+  ) => PageToolbarServerMockResult | undefined;
+  onGetSessionRequest?: (
+    request: PageToolbarServerSessionRequest,
+  ) => PageToolbarServerMockResult | undefined;
+  onCreateSessionRequest?: (
+    request: PageToolbarServerMockRequest,
+  ) => PageToolbarServerMockResult | undefined;
+  onSyncAnnotationRequest?: (
+    request: PageToolbarServerSyncRequest,
+  ) => PageToolbarServerMockResult | undefined;
+  onWebhookRequest?: (
+    request: PageToolbarServerMockRequest,
+  ) => PageToolbarServerMockResult | undefined;
+  onUnhandledRequest?: (
+    request: PageToolbarServerMockRequest,
+  ) => PageToolbarServerMockResult | undefined;
+};
+
+type SetupPageToolbarServerMockOptions = PageToolbarServerMockRouteOverrides & {
   annotations?: Annotation[];
   sessionId?: string;
   eventSourceClass?: EventSourceConstructor;
@@ -122,8 +164,12 @@ export function mockFailedResponse(
   };
 }
 
-export function mockNetworkError(): Promise<never> {
-  return Promise.reject(new Error("Network error"));
+export function mockNetworkError(message = "Network error"): Promise<never> {
+  return Promise.reject(new Error(message));
+}
+
+export function mockPendingResponse(): Promise<never> {
+  return new Promise(() => {});
 }
 
 export function setupPageToolbarServerMock({
@@ -136,6 +182,12 @@ export function setupPageToolbarServerMock({
   allowWebhookPosts = false,
   syncIdPrefix = "server-sync-",
   syncedToSessionId,
+  onHealthRequest,
+  onGetSessionRequest,
+  onCreateSessionRequest,
+  onSyncAnnotationRequest,
+  onWebhookRequest,
+  onUnhandledRequest,
 }: SetupPageToolbarServerMockOptions = {}): SetupPageToolbarServerMockResult {
   const fetchCalls: PageToolbarServerFetchCall[] = [];
   let syncIdCounter = 0;
@@ -144,19 +196,42 @@ export function setupPageToolbarServerMock({
   const mockFetch: PageToolbarServerFetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const body = parseRequestBody(init?.body);
+    const request: PageToolbarServerMockRequest = { url, method, body, fetchCalls };
     fetchCalls.push({ url, method, body });
 
     if (url.includes("/health")) {
-      const healthStatus = healthResponses?.[healthResponseIndex] ?? healthOk;
+      const overrideResponse = await onHealthRequest?.({
+        ...request,
+        healthCallIndex: healthResponseIndex,
+      });
       healthResponseIndex += 1;
+      if (overrideResponse !== undefined) {
+        return overrideResponse;
+      }
+
+      const healthStatus = healthResponses?.[healthResponseIndex - 1] ?? healthOk;
       return mockHealthResponse(healthStatus);
     }
 
-    if (url.match(/\/sessions\/[\w-]+$/) && method === "GET") {
-      return mockGetSessionResponse(sessionId, annotations);
+    if (url.match(/\/sessions\/([\w-]+)$/) && method === "GET") {
+      const requestedSessionId = url.match(/\/sessions\/([\w-]+)$/)?.[1] ?? sessionId;
+      const overrideResponse = await onGetSessionRequest?.({
+        ...request,
+        requestedSessionId,
+      });
+      if (overrideResponse !== undefined) {
+        return overrideResponse;
+      }
+
+      return mockGetSessionResponse(requestedSessionId, annotations);
     }
 
     if (url.endsWith("/sessions") && method === "POST") {
+      const overrideResponse = await onCreateSessionRequest?.(request);
+      if (overrideResponse !== undefined) {
+        return overrideResponse;
+      }
+
       return mockCreateSessionResponse(sessionId, annotations);
     }
 
@@ -193,6 +268,14 @@ export function setupPageToolbarServerMock({
             ? parsedAnnotation.id
             : `${syncIdPrefix}${++syncIdCounter}`,
       } as Annotation;
+      const overrideResponse = await onSyncAnnotationRequest?.({
+        ...request,
+        annotation,
+      });
+      if (overrideResponse !== undefined) {
+        return overrideResponse;
+      }
+
       return mockSyncAnnotationResponse(annotation, syncedToSessionId);
     }
 
@@ -211,7 +294,17 @@ export function setupPageToolbarServerMock({
     }
 
     if (allowWebhookPosts && method === "POST" && !url.includes("/sessions")) {
+      const overrideResponse = await onWebhookRequest?.(request);
+      if (overrideResponse !== undefined) {
+        return overrideResponse;
+      }
+
       return { ok: true };
+    }
+
+    const overrideResponse = await onUnhandledRequest?.(request);
+    if (overrideResponse !== undefined) {
+      return overrideResponse;
     }
 
     return mockFailedResponse(404);

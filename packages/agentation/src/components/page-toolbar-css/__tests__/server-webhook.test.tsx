@@ -14,12 +14,8 @@ import {
   seedAnnotations,
 } from "./pageToolbarTestUtils";
 import {
-  mockCreateSessionResponse,
-  mockFailedResponse,
-  mockGetSessionResponse,
-  mockHealthResponse,
   mockNetworkError,
-  mockSyncAnnotationResponse,
+  mockPendingResponse,
   setupPageToolbarServerMock,
   type PageToolbarServerFetchMock,
 } from "./pageToolbarServerTestUtils";
@@ -47,6 +43,8 @@ function getLastEventSource() {
 // ---------------------------------------------------------------------------
 // Mock fetch
 // ---------------------------------------------------------------------------
+
+type ServerMockOptions = NonNullable<Parameters<typeof setupPageToolbarServerMock>[0]>;
 
 let mockFetch: PageToolbarServerFetchMock;
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
@@ -85,16 +83,18 @@ afterEach(() => {
  */
 function setupBasicServerMocks(
   sessionId = "session-123",
-  annotations: Annotation[] = []
+  annotations: Annotation[] = [],
+  options: Partial<ServerMockOptions> = {},
 ) {
   const setup = setupPageToolbarServerMock({
     sessionId,
     annotations,
     allowWebhookPosts: true,
-    syncedToSessionId: "session-123",
+    syncedToSessionId: sessionId,
+    ...options,
   });
   mockFetch = setup.mockFetch;
-  return mockFetch;
+  return setup;
 }
 
 // =============================================================================
@@ -180,31 +180,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     it("creates new session if stored session fails to rejoin", async () => {
       seedSessionId("session-expired");
 
-      // First call: getSession fails, then createSession succeeds
-      mockFetch.mockImplementation(
-        async (url: string, options?: RequestInit) => {
-          const method = options?.method || "GET";
-
-          if (url.endsWith("/health")) {
-            return mockHealthResponse(true);
-          }
-
-          // GET /sessions/session-expired → fail (expired)
-          if (
-            url === "http://localhost:4747/sessions/session-expired" &&
-            method === "GET"
-          ) {
-            throw new Error("Session not found");
-          }
-
-          // POST /sessions → create new session
-          if (url.endsWith("/sessions") && method === "POST") {
-            return mockCreateSessionResponse("session-new-after-fail");
-          }
-
-          return mockFailedResponse(404);
-        }
-      );
+      setupBasicServerMocks("session-new-after-fail", [], {
+        onGetSessionRequest: () => mockNetworkError("Session not found"),
+      });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
 
@@ -238,8 +216,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("falls back to local storage mode on network error", async () => {
-      mockFetch.mockImplementation(async () => {
-        throw new Error("Network error");
+      setupBasicServerMocks("session-network-error", [], {
+        onHealthRequest: () => mockNetworkError(),
+        onCreateSessionRequest: () => mockNetworkError(),
       });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
@@ -271,11 +250,8 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
     it("probes the default endpoint once on page load when endpoint prop is not provided", async () => {
       vi.stubEnv("NODE_ENV", "production");
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url === "http://127.0.0.1:4747/health") {
-          return { ok: false, status: 503 } as Response;
-        }
-        return { ok: false, status: 404 } as Response;
+      setupBasicServerMocks("session-default-probe", [], {
+        healthOk: false,
       });
 
       render(<PageFeedbackToolbarCSS />);
@@ -327,12 +303,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("sets connection status to disconnected on health check failure", async () => {
-      // Health fails, session creation also fails
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url.endsWith("/health")) {
-          return mockHealthResponse(false);
-        }
-        throw new Error("Network error");
+      setupBasicServerMocks("session-health-fail", [], {
+        healthOk: false,
+        onCreateSessionRequest: () => mockNetworkError(),
       });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
@@ -346,8 +319,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("sets connection status to disconnected when health check throws", async () => {
-      mockFetch.mockImplementation(async () => {
-        throw new Error("Network error");
+      setupBasicServerMocks("session-health-throws", [], {
+        onHealthRequest: () => mockNetworkError(),
+        onCreateSessionRequest: () => mockNetworkError(),
       });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
@@ -686,15 +660,8 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       const annotation = makeAnnotation({ id: "wh-fail-1", comment: "Fail" });
       seedAnnotations([annotation]);
 
-      // First resolve OK for any non-webhook calls, then throw for webhook
-      mockFetch.mockImplementation(async (url: string, opts?: RequestInit) => {
-        if (
-          url === "https://example.com/fail-hook" &&
-          opts?.method === "POST"
-        ) {
-          throw new Error("Webhook network error");
-        }
-        return { ok: true };
+      setupBasicServerMocks("session-webhook-fail", [], {
+        onWebhookRequest: () => mockNetworkError("Webhook network error"),
       });
 
       render(
@@ -841,39 +808,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("creates new session on reconnect if existing session is expired", async () => {
-      // First, set up a session that will work, then one that fails on reconnect
-      let callCount = 0;
-      mockFetch.mockImplementation(
-        async (url: string, options?: RequestInit) => {
-          const method = options?.method || "GET";
-
-          if (url.endsWith("/health")) {
-            callCount++;
-            // First health check succeeds, second fails, third succeeds (reconnect)
-            if (callCount <= 1) return mockHealthResponse(true);
-            if (callCount === 2) return mockHealthResponse(false);
-            return mockHealthResponse(true);
-          }
-
-          if (url.endsWith("/sessions") && method === "POST") {
-            return mockCreateSessionResponse("session-reconnect-new");
-          }
-
-          if (url.match(/\/sessions\/[\w-]+$/) && method === "GET") {
-            return mockGetSessionResponse("session-reconnect-new");
-          }
-
-          if (
-            url.match(/\/sessions\/[\w-]+\/annotations$/) &&
-            method === "POST"
-          ) {
-            const body = JSON.parse(options?.body as string);
-            return mockSyncAnnotationResponse(body);
-          }
-
-          return mockFailedResponse(404);
-        }
-      );
+      setupBasicServerMocks("session-reconnect-new", [], {
+        healthResponses: [true, false, true],
+      });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
 
@@ -906,14 +843,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("shows Server Connecting indicator during connection", async () => {
-      // Delay session creation to keep "connecting" status visible
-      mockFetch.mockImplementation(async (url: string) => {
-        if (url.endsWith("/health")) {
-          // Don't resolve health immediately
-          return new Promise(() => {}); // never resolves
-        }
-        // Session creation also never resolves
-        return new Promise(() => {});
+      setupBasicServerMocks("session-connecting", [], {
+        onHealthRequest: () => mockPendingResponse(),
+        onCreateSessionRequest: () => mockPendingResponse(),
       });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
@@ -939,9 +871,9 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("shows Server Disconnected indicator when disconnected", async () => {
-      // Both health and session fail
-      mockFetch.mockImplementation(async () => {
-        throw new Error("Network error");
+      setupBasicServerMocks("session-disconnected", [], {
+        onHealthRequest: () => mockNetworkError(),
+        onCreateSessionRequest: () => mockNetworkError(),
       });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
