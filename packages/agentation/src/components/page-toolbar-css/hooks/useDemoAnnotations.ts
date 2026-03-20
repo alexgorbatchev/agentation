@@ -4,12 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { Annotation } from "../../../types";
 import { getElementClasses, getNearbyText, identifyElement } from "../../../utils/element-identification";
 import { originalSetTimeout } from "../../../utils/freeze-animations";
-
-type DemoAnnotation = {
-  selector: string;
-  comment: string;
-  selectedText?: string;
-};
+import type { DemoAnnotation } from "../types";
 
 type UseDemoAnnotationsParams = {
   enableDemoMode: boolean;

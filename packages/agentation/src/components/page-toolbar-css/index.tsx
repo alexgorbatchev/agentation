@@ -1,225 +1,65 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import type { CSSProperties } from "react";
+import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { AnnotationPopupCSSHandle } from "../annotation-popup-css";
-import { identifyElement } from "../../utils/element-identification";
-import { loadToolbarHidden, saveToolbarHidden } from "../../utils/storage";
-import { getReactComponentName } from "../../utils/react-detection";
-import {
-  getSourceLocation,
-  findNearestComponentSource,
-  formatSourceLocation,
-} from "../../utils/source-location";
-import {
-  createComponentSourceUrl,
-  formatComponentSourcePath,
-  type ComponentEditor,
-  type ComponentInspection,
-  type ComponentSourceUrlParams,
-} from "../../utils/component-inspector";
+import { saveToolbarHidden } from "../../utils/storage";
 import {
   freeze as freezeAll,
-  unfreeze as unfreezeAll,
   originalSetTimeout,
+  unfreeze as unfreezeAll,
 } from "../../utils/freeze-animations";
 
-import type { Annotation } from "../../types";
-import { useAnnotationActions } from "./hooks/useAnnotationActions";
-import { useAnnotationPersistence } from "./hooks/useAnnotationPersistence";
-import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
-import { useAnnotationState } from "./hooks/useAnnotationState";
-import { useDemoAnnotations } from "./hooks/useDemoAnnotations";
-import { useDragSelectionLifecycle } from "./hooks/useDragSelectionLifecycle";
-import { useEndpointDiscovery } from "./hooks/useEndpointDiscovery";
-import {
-  useInteractionLifecycle,
-  type ComponentMenuState,
-  type HoverInfo,
-  type PendingAnnotationState,
-  type PendingMultiSelectElement,
-} from "./hooks/useInteractionLifecycle";
-import { usePendingMultiSelectAnnotation } from "./hooks/usePendingMultiSelectAnnotation";
-import { usePortalEventBoundary } from "./hooks/usePortalEventBoundary";
-import { useServerSync } from "./hooks/useServerSync";
-import { useToolbarActiveLifecycle } from "./hooks/useToolbarActiveLifecycle";
-import { useToolbarDragging } from "./hooks/useToolbarDragging";
-import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
-import { useToolbarPreferences } from "./hooks/useToolbarPreferences";
-import { useScrollState } from "./hooks/useScrollState";
-import { useToolbarRenderTransitions } from "./hooks/useToolbarRenderTransitions";
+import { COLOR_OPTIONS, OUTPUT_DETAIL_OPTIONS, OUTPUT_TO_REACT_MODE } from "./constants";
 import { InteractionOverlay } from "./components/InteractionOverlay";
 import { MarkersLayer } from "./components/MarkersLayer";
 import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ToolbarControls } from "./components/ToolbarControls";
 import { ToolbarShell } from "./components/ToolbarShell";
-import { type OutputDetailLevel } from "./state/toolbar-settings";
-import { isValidUrl } from "./utils/isValidUrl";
+import { useAnnotationActions } from "./hooks/useAnnotationActions";
+import { useAnnotationPersistence } from "./hooks/useAnnotationPersistence";
+import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
+import { useAnnotationState } from "./hooks/useAnnotationState";
+import { useAnnotationViewModel } from "./hooks/useAnnotationViewModel";
+import { useComponentSourceNavigation } from "./hooks/useComponentSourceNavigation";
+import { useDemoAnnotations } from "./hooks/useDemoAnnotations";
+import { useDragSelectionLifecycle } from "./hooks/useDragSelectionLifecycle";
+import { useEndpointDiscovery } from "./hooks/useEndpointDiscovery";
+import { useInteractionLifecycle } from "./hooks/useInteractionLifecycle";
+import { useInteractionOverlayModel } from "./hooks/useInteractionOverlayModel";
+import { useInteractionSelectionState } from "./hooks/useInteractionSelectionState";
+import { useMarkerAnimationState } from "./hooks/useMarkerAnimationState";
+import { usePendingMultiSelectAnnotation } from "./hooks/usePendingMultiSelectAnnotation";
+import { usePortalEventBoundary } from "./hooks/usePortalEventBoundary";
+import { useScrollState } from "./hooks/useScrollState";
+import { useServerSync } from "./hooks/useServerSync";
+import { useToolbarActiveLifecycle } from "./hooks/useToolbarActiveLifecycle";
+import { useToolbarDragging } from "./hooks/useToolbarDragging";
+import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
+import { useToolbarPreferences } from "./hooks/useToolbarPreferences";
+import { useToolbarRenderTransitions } from "./hooks/useToolbarRenderTransitions";
+import { useToolbarUiState } from "./hooks/useToolbarUiState";
+import type { PageFeedbackToolbarCSSProps, ReactComponentMode } from "./types";
 import {
   deepElementFromPoint,
   isElementFixed,
   pierceElementFromPoint,
 } from "./utils/pierceElementFromPoint";
+import { detectSourceFile } from "./utils/detectSourceFile";
+import { getTooltipPosition } from "./utils/getTooltipPosition";
+import { identifyElementWithReact } from "./utils/identifyElementWithReact";
+import { isValidUrl } from "./utils/isValidUrl";
+import { normalizeNeovimBridgeUrl } from "./utils/normalizeNeovimBridgeUrl";
+import { removeLocalStorageItem } from "./utils/removeLocalStorageItem";
 import styles from "./styles.module.scss";
 
-/**
- * Composes element identification with React component detection.
- * This is the boundary where we combine framework-agnostic element ID
- * with React-specific component name detection.
- */
-function identifyElementWithReact(
-  element: HTMLElement,
-  reactMode: ReactComponentMode = "filtered",
-): {
-  /** Combined name for display (React path + element) */
-  name: string;
-  /** Raw element name without React path */
-  elementName: string;
-  /** DOM path */
-  path: string;
-  /** React component path (e.g., '<SideNav> <LinkComponent>') */
-  reactComponents: string | null;
-} {
-  const { name: elementName, path } = identifyElement(element);
-
-  // If React detection is off, just return element info
-  if (reactMode === "off") {
-    return { name: elementName, elementName, path, reactComponents: null };
-  }
-
-  const reactInfo = getReactComponentName(element, { mode: reactMode });
-
-  return {
-    name: reactInfo.path ? `${reactInfo.path} ${elementName}` : elementName,
-    elementName,
-    path,
-    reactComponents: reactInfo.path,
-  };
-}
-
-// =============================================================================
-// Types
-// =============================================================================
-
-// ReactComponentMode is now derived from outputDetail when reactEnabled is true
-type ReactComponentMode = "smart" | "filtered" | "all" | "off";
-
-function normalizeNeovimBridgeUrl(url: string): string {
-  return url.replace(/\/+$/, "");
-}
-
-function removeLocalStorageItem(key: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    // localStorage may be unavailable or blocked
-  }
-}
-
-// Maps output detail level to React detection mode
-const OUTPUT_TO_REACT_MODE: Record<OutputDetailLevel, ReactComponentMode> = {
-  compact: "off",
-  standard: "filtered",
-  detailed: "smart",
-  forensic: "all",
-};
-
-const OUTPUT_DETAIL_OPTIONS: { value: OutputDetailLevel; label: string }[] = [
-  { value: "compact", label: "Compact" },
-  { value: "standard", label: "Standard" },
-  { value: "detailed", label: "Detailed" },
-  { value: "forensic", label: "Forensic" },
-];
-
-const COLOR_OPTIONS = [
-  { value: "#AF52DE", label: "Purple" },
-  { value: "#3c82f7", label: "Blue" },
-  { value: "#5AC8FA", label: "Cyan" },
-  { value: "#34C759", label: "Green" },
-  { value: "#FFD60A", label: "Yellow" },
-  { value: "#FF9500", label: "Orange" },
-  { value: "#FF3B30", label: "Red" },
-];
-
-// =============================================================================
-// Utils
-// =============================================================================
-
-function detectSourceFile(element: Element): string | undefined {
-  const result = getSourceLocation(element as HTMLElement);
-  const loc = result.found ? result : findNearestComponentSource(element as HTMLElement);
-  if (loc.found && loc.source) {
-    return formatSourceLocation(loc.source, "path");
-  }
-  return undefined;
-}
-
-// =============================================================================
-// Types for Props
-// =============================================================================
-
-export type DemoAnnotation = {
-  selector: string;
-  comment: string;
-  selectedText?: string;
-};
-
-export type PageFeedbackToolbarCSSProps = {
-  demoAnnotations?: DemoAnnotation[];
-  demoDelay?: number;
-  enableDemoMode?: boolean;
-  /** Callback fired when an annotation is added. */
-  onAnnotationAdd?: (annotation: Annotation) => void;
-  /** Callback fired when an annotation is deleted. */
-  onAnnotationDelete?: (annotation: Annotation) => void;
-  /** Callback fired when an annotation comment is edited. */
-  onAnnotationUpdate?: (annotation: Annotation) => void;
-  /** Callback fired when all annotations are cleared. Receives the annotations that were cleared. */
-  onAnnotationsClear?: (annotations: Annotation[]) => void;
-  /** Callback fired when the copy button is clicked. Receives the markdown output. */
-  onCopy?: (markdown: string) => void;
-  /** Callback fired when "Send to Agent" is clicked. Receives the markdown output and annotations. */
-  onSubmit?: (output: string, annotations: Annotation[]) => void;
-  /** Whether to copy to clipboard when the copy button is clicked. Defaults to true. */
-  copyToClipboard?: boolean;
-  /** Server URL for sync (e.g., "http://127.0.0.1:4747"). Optional; if omitted, Agentation probes the local endpoint once on page load. */
-  endpoint?: string;
-  /** Project identifier used to scope server sessions for multi-project agent loops. */
-  projectId?: string;
-  /** Pre-existing session ID to join. If not provided, creates or rejoins a project-scoped session. */
-  sessionId?: string;
-  /** Called when a new session is created. */
-  onSessionCreated?: (sessionId: string) => void;
-  /** Webhook URL to receive annotation events. */
-  webhookUrl?: string;
-  /** Custom class name applied to the toolbar container. Use to adjust positioning or z-index. */
-  className?: string;
-  /** Editor protocol used for alt+right-click component navigation. */
-  componentEditor?: ComponentEditor;
-  /** Override editor URL generation for alt+right-click component navigation. */
-  getComponentEditorUrl?: (params: ComponentSourceUrlParams) => string;
-  /** Override navigation side effects for opening component sources. */
-  navigateToUrl?: (url: string) => void;
-  /** Base URL for the Neovim bridge/router when using componentEditor="neovim". */
-  neovimBridgeUrl?: string;
-  /** Optional project ID used by the Neovim router to resolve the target session. */
-  neovimProjectId?: string;
-  /** Copy the component source path to the clipboard when opening it. */
-  copyComponentSourcePath?: boolean;
-};
-
-/** Public Agentation props require project scoping. */
-export type AgentationProps = Omit<PageFeedbackToolbarCSSProps, "projectId"> & {
-  projectId: string;
-};
-
-// =============================================================================
-// Component
-// =============================================================================
+export type {
+  AgentationProps,
+  DemoAnnotation,
+  PageFeedbackToolbarCSSProps,
+} from "./types";
 
 export function PageFeedbackToolbarCSS({
   demoAnnotations,
@@ -247,64 +87,91 @@ export function PageFeedbackToolbarCSS({
   neovimProjectId,
   copyComponentSourcePath = true,
 }: PageFeedbackToolbarCSSProps = {}) {
-  const [isActive, setIsActive] = useState(false);
-  const [showMarkers, setShowMarkers] = useState(true);
-  const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
-  const [isToolbarHiding, setIsToolbarHiding] = useState(false);
+  const {
+    isActive,
+    setIsActive,
+    showMarkers,
+    setShowMarkers,
+    isToolbarHidden,
+    setIsToolbarHidden,
+    isToolbarHiding,
+    setIsToolbarHiding,
+    markersVisible,
+    setMarkersVisible,
+    markersExiting,
+    setMarkersExiting,
+    showSettings,
+    setShowSettings,
+    showSettingsVisible,
+    setShowSettingsVisible,
+    showReviewQueue,
+    setShowReviewQueue,
+    showReviewQueueVisible,
+    setShowReviewQueueVisible,
+    settingsPage,
+    setSettingsPage,
+    isTransitioning,
+    setIsTransitioning,
+  } = useToolbarUiState();
+
+  const {
+    hoverInfo,
+    setHoverInfo,
+    hoverPosition,
+    setHoverPosition,
+    pendingAnnotation,
+    setPendingAnnotation,
+    hoveredMarkerId,
+    setHoveredMarkerId,
+    hoveredTargetElement,
+    setHoveredTargetElement,
+    hoveredTargetElements,
+    setHoveredTargetElements,
+    editingAnnotation,
+    setEditingAnnotation,
+    editingTargetElement,
+    setEditingTargetElement,
+    editingTargetElements,
+    setEditingTargetElements,
+    componentMenu,
+    setComponentMenu,
+    hoveredComponentMenuIndex,
+    setHoveredComponentMenuIndex,
+    pendingMultiSelectElements,
+    setPendingMultiSelectElements,
+    isReplySending,
+    setIsReplySending,
+    scrollY,
+    setScrollY,
+    isScrolling,
+    setIsScrolling,
+  } = useInteractionSelectionState();
+
+  const {
+    animatedMarkers,
+    setAnimatedMarkers,
+    exitingMarkers,
+    setExitingMarkers,
+    pendingExiting,
+    setPendingExiting,
+    editExiting,
+    setEditExiting,
+    deletingMarkerId,
+    setDeletingMarkerId,
+    renumberFrom,
+    setRenumberFrom,
+    isClearing,
+    setIsClearing,
+    recentlyAddedIdRef,
+  } = useMarkerAnimationState();
+
+  const [isFrozen, setIsFrozen] = useState(false);
 
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
 
   const resolvedEndpoint = useEndpointDiscovery(endpoint);
   const portalWrapperRef = usePortalEventBoundary();
-
-  // Unified marker visibility state - controls both toolbar and eye toggle
-  const [markersVisible, setMarkersVisible] = useState(false);
-  const [markersExiting, setMarkersExiting] = useState(false);
-  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
-  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
-  const [pendingAnnotation, setPendingAnnotation] =
-    useState<PendingAnnotationState | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
-  const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
-  const [hoveredTargetElement, setHoveredTargetElement] =
-    useState<HTMLElement | null>(null);
-  const [hoveredTargetElements, setHoveredTargetElements] = useState<
-    HTMLElement[]
-  >([]);
-  const [deletingMarkerId, setDeletingMarkerId] = useState<string | null>(null);
-  const [renumberFrom, setRenumberFrom] = useState<number | null>(null);
-  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(
-    null,
-  );
-  const [isReplySending, setIsReplySending] = useState(false);
-  const [editingTargetElement, setEditingTargetElement] =
-    useState<HTMLElement | null>(null);
-  const [editingTargetElements, setEditingTargetElements] = useState<
-    HTMLElement[]
-  >([]);
-  const [scrollY, setScrollY] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
-  const [isFrozen, setIsFrozen] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showSettingsVisible, setShowSettingsVisible] = useState(false);
-  const [showReviewQueue, setShowReviewQueue] = useState(false);
-  const [showReviewQueueVisible, setShowReviewQueueVisible] = useState(false);
-  const [componentMenu, setComponentMenu] = useState<ComponentMenuState | null>(
-    null,
-  );
-  const [hoveredComponentMenuIndex, setHoveredComponentMenuIndex] = useState<
-    number | null
-  >(null);
-  const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
-    "main",
-  );
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  // Cmd+shift+click multi-select state
-  const [pendingMultiSelectElements, setPendingMultiSelectElements] = useState<
-    PendingMultiSelectElement[]
-  >([]);
 
   const {
     settings,
@@ -368,16 +235,6 @@ export function PageFeedbackToolbarCSS({
     settingsPanelClassName: styles.settingsPanel,
     mounted,
   });
-
-  // For animations - track which markers have animated in and which are exiting
-  const [animatedMarkers, setAnimatedMarkers] = useState<Set<string>>(
-    new Set(),
-  );
-  const [exitingMarkers, setExitingMarkers] = useState<Set<string>>(new Set());
-  const [pendingExiting, setPendingExiting] = useState(false);
-  const [editExiting, setEditExiting] = useState(false);
-
-  const recentlyAddedIdRef = useRef<string | null>(null);
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
@@ -619,111 +476,71 @@ export function PageFeedbackToolbarCSS({
     pierceElementFromPoint,
   });
 
+  const { openComponentSource } = useComponentSourceNavigation({
+    copyComponentSourcePath,
+    componentEditor,
+    getComponentEditorUrl,
+    normalizedNeovimBridgeUrl,
+    neovimProjectId,
+    navigateToUrl,
+    closeComponentMenu: () => {
+      setComponentMenu(null);
+      setHoveredComponentMenuIndex(null);
+    },
+  });
+
+  const {
+    activeAnnotations,
+    resolvedAnnotations,
+    unreviewedCount,
+    hasAnnotations,
+    visibleAnnotations,
+    exitingAnnotationsList,
+  } = useAnnotationViewModel({
+    annotations,
+    exitingMarkers,
+  });
+
+  const interactionOverlayModel = useInteractionOverlayModel({
+    isActive,
+    pendingAnnotation,
+    editingAnnotation,
+    hoverInfo,
+    isScrolling,
+    isDragging,
+    annotationColor: settings.annotationColor,
+    pendingMultiSelectElements,
+    hoveredMarkerId,
+    annotations,
+    hoveredTargetElement,
+    hoveredTargetElements,
+    scrollY,
+    hoverPosition,
+    componentMenu,
+    isDarkMode,
+    hoveredComponentMenuIndex,
+    pendingExiting,
+    editingTargetElement,
+    editingTargetElements,
+    editExiting,
+    resolvedEndpoint,
+    isReplySending,
+    setHoveredComponentMenuIndex,
+    openComponentSource,
+    addAnnotation,
+    cancelAnnotation,
+    updateAnnotation,
+    cancelEditAnnotation,
+    deleteAnnotation,
+    handleThreadReply,
+    popupRef,
+    editPopupRef,
+    dragRectRef,
+    highlightsContainerRef,
+  });
+
   if (!mounted) return null;
   if (isToolbarHidden) return null;
-
-  const isResolvedAnnotation = (a: Annotation) =>
-    a.status === "resolved" || a.status === "dismissed";
-
-  const activeAnnotations = annotations.filter(
-    (a) => !exitingMarkers.has(a.id) && !isResolvedAnnotation(a),
-  );
-  const resolvedAnnotations = annotations.filter(isResolvedAnnotation);
-  const unreviewedCount = resolvedAnnotations.filter((a) => !a._reviewedAt).length;
-  const hasAnnotations = activeAnnotations.length > 0 || resolvedAnnotations.length > 0;
-
-  // visibleAnnotations = active only (for numbered markers + existing logic)
-  const visibleAnnotations = activeAnnotations;
-  const exitingAnnotationsList = annotations.filter((a) =>
-    exitingMarkers.has(a.id),
-  );
-
-  // Helper function to calculate viewport-aware tooltip positioning
-  // Helper function to calculate viewport-aware tooltip positioning
-  const getTooltipPosition = (annotation: Annotation): CSSProperties => {
-    // Tooltip dimensions (from CSS)
-    const tooltipMaxWidth = 200;
-    const tooltipEstimatedHeight = 80; // Estimated max height
-    const markerSize = 22;
-    const gap = 10;
-
-    // Convert percentage-based x to pixels
-    const markerX = (annotation.x / 100) * window.innerWidth;
-    const markerY =
-      typeof annotation.y === "string"
-        ? parseFloat(annotation.y)
-        : annotation.y;
-
-    const styles: CSSProperties = {};
-
-    // Vertical positioning: flip if near bottom
-    const spaceBelow = window.innerHeight - markerY - markerSize - gap;
-    if (spaceBelow < tooltipEstimatedHeight) {
-      // Show above marker
-      styles.top = "auto";
-      styles.bottom = `calc(100% + ${gap}px)`;
-    }
-    // If enough space below, use default CSS (top: calc(100% + 10px))
-
-    // Horizontal positioning: adjust if near edges
-    const centerX = markerX - tooltipMaxWidth / 2;
-    const edgePadding = 10;
-
-    if (centerX < edgePadding) {
-      // Too close to left edge
-      const offset = edgePadding - centerX;
-      styles.left = `calc(50% + ${offset}px)`;
-    } else if (centerX + tooltipMaxWidth > window.innerWidth - edgePadding) {
-      // Too close to right edge
-      const overflow =
-        centerX + tooltipMaxWidth - (window.innerWidth - edgePadding);
-      styles.left = `calc(50% - ${overflow}px)`;
-    }
-    // If centered position is fine, use default CSS (left: 50%)
-
-    return styles;
-  };
-
-  async function openComponentSource(item: ComponentInspection): Promise<void> {
-    const sourcePath = formatComponentSourcePath(item.source);
-
-    if (copyComponentSourcePath) {
-      try {
-        await navigator.clipboard.writeText(sourcePath);
-      } catch {
-        // Ignore clipboard failures and still attempt editor navigation.
-      }
-    }
-
-    const url = createComponentSourceUrl(
-      item.source,
-      componentEditor,
-      getComponentEditorUrl,
-      normalizedNeovimBridgeUrl,
-      neovimProjectId,
-    );
-
-    if (
-      componentEditor === "neovim" &&
-      /^https?:\/\//.test(url) &&
-      typeof fetch === "function"
-    ) {
-      try {
-        await fetch(url, {
-          method: "GET",
-          mode: "cors",
-          keepalive: true,
-        });
-      } catch {
-        // Ignore local bridge failures and keep the menu behavior predictable.
-      }
-    } else {
-      navigateToUrl(url);
-    }
-
-    setComponentMenu(null);
-    setHoveredComponentMenuIndex(null);
-  }
 
   const toolbarContainerClassName = `${styles.toolbarContainer} ${
     !isDarkMode ? styles.light : ""
@@ -859,49 +676,7 @@ export function PageFeedbackToolbarCSS({
         startEditAnnotation={startEditAnnotation}
       />
 
-      <InteractionOverlay
-        state={{
-          isActive,
-          pendingAnnotation,
-          editingAnnotation,
-          hoverInfo,
-          isScrolling,
-          isDragging,
-          annotationColor: settings.annotationColor,
-          pendingMultiSelectElements,
-          hoveredMarkerId,
-          annotations,
-          hoveredTargetElement,
-          hoveredTargetElements,
-          scrollY,
-          hoverPosition,
-          componentMenu,
-          isDarkMode,
-          hoveredComponentMenuIndex,
-          pendingExiting,
-          editingTargetElement,
-          editingTargetElements,
-          editExiting,
-          resolvedEndpoint,
-          isReplySending,
-        }}
-        actions={{
-          setHoveredComponentMenuIndex,
-          openComponentSource,
-          addAnnotation,
-          cancelAnnotation,
-          updateAnnotation,
-          cancelEditAnnotation,
-          deleteAnnotation,
-          handleThreadReply,
-        }}
-        refs={{
-          popupRef,
-          editPopupRef,
-          dragRectRef,
-          highlightsContainerRef,
-        }}
-      />
+      <InteractionOverlay {...interactionOverlayModel} />
     </div>,
     document.body,
   );

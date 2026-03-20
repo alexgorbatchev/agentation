@@ -21,6 +21,7 @@ import {
   inspectComponentElement,
   type ComponentInspection,
 } from "../../../utils/component-inspector";
+import type { ReactComponentMode } from "../types";
 
 export type HoverInfo = {
   element: string;
@@ -73,8 +74,6 @@ export type ComponentMenuState = {
   x: number;
   y: number;
 };
-
-type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 
 type IdentifyElementWithReactResult = {
   name: string;
