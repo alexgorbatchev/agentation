@@ -14,6 +14,7 @@ import {
   seedAnnotations,
 } from "./pageToolbarTestUtils";
 import {
+  mockCreateSessionResponse,
   mockNetworkError,
   mockPendingResponse,
   setupPageToolbarServerMock,
@@ -808,20 +809,77 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("creates new session on reconnect if existing session is expired", async () => {
-      setupBasicServerMocks("session-reconnect-new", [], {
-        healthResponses: [true, false, true],
-      });
+      vi.useFakeTimers();
 
-      render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
+      try {
+        const annotation = makeAnnotation({
+          id: "reconnect-expired-1",
+          comment: "Reconnect me",
+        });
+        seedAnnotations([annotation]);
 
-      await waitFor(() => {
-        const createCalls = mockFetch.mock.calls.filter(
-          ([url, opts]: [string, RequestInit?]) =>
-            url === "http://localhost:4747/sessions" &&
-            opts?.method === "POST"
+        const createdSessionIds = ["session-reconnect-old", "session-reconnect-new"];
+        let createSessionIndex = 0;
+        const setup = setupBasicServerMocks("session-reconnect-old", [], {
+          healthResponses: [true, false, true],
+          onCreateSessionRequest: () => {
+            const nextSessionId =
+              createdSessionIds[createSessionIndex] ?? createdSessionIds[createdSessionIds.length - 1];
+            createSessionIndex += 1;
+            return mockCreateSessionResponse(nextSessionId);
+          },
+          onGetSessionRequest: () => mockNetworkError("Session not found"),
+        });
+
+        render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
+
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10000);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10000);
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        const sessionCreateCalls = setup.fetchCalls.filter(
+          (call) =>
+            call.url === "http://localhost:4747/sessions" &&
+            call.method === "POST",
         );
-        expect(createCalls.length).toBeGreaterThanOrEqual(1);
-      });
+        expect(sessionCreateCalls).toHaveLength(2);
+
+        const reconnectGetSessionCall = setup.fetchCalls.find(
+          (call) =>
+            call.url === "http://localhost:4747/sessions/session-reconnect-old" &&
+            call.method === "GET",
+        );
+        expect(reconnectGetSessionCall).toBeTruthy();
+
+        const reconnectSyncCall = setup.fetchCalls.find(
+          (call) =>
+            call.url === "http://localhost:4747/sessions/session-reconnect-new/annotations" &&
+            call.method === "POST",
+        );
+        expect(reconnectSyncCall?.body).toMatchObject({
+          id: "reconnect-expired-1",
+          sessionId: "session-reconnect-new",
+        });
+
+        expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBe("session-reconnect-new");
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
