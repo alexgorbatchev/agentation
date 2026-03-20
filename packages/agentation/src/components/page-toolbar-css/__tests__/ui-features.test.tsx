@@ -13,6 +13,7 @@ import type { Annotation } from "../../../types";
 import {
   unfreeze as unfreezeAll,
 } from "../../../utils/freeze-animations";
+import { stubLocalOnlyFetch } from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -96,6 +97,7 @@ class MockEventSource {
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+  stubLocalOnlyFetch();
 
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: mockWriteText },
@@ -733,13 +735,6 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
     });
 
     it("shows Neovim bridge status when using the neovim editor mode", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: true,
-        }),
-      );
-
       render(<PageFeedbackToolbarCSS componentEditor="neovim" />);
       await activateToolbar();
 
