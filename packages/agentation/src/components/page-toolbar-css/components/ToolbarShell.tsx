@@ -12,7 +12,7 @@ export function ToolbarShell({
   className,
   toolbarPosition,
   children,
-}: ToolbarShellProps) {
+}: ToolbarShellProps): JSX.Element {
   return (
     <div
       className={`${styles.toolbar}${className ? ` ${className}` : ""}`}

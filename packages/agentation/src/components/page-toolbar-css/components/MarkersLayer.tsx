@@ -50,7 +50,7 @@ export function MarkersLayer({
   handleMarkerHover,
   deleteAnnotation,
   startEditAnnotation,
-}: MarkersLayerProps) {
+}: MarkersLayerProps): JSX.Element {
   return (
     <>
       <div className={styles.markersLayer} data-feedback-toolbar>

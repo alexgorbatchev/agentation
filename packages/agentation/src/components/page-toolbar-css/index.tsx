@@ -7,24 +7,7 @@ import {
   AnnotationPopupCSS,
   AnnotationPopupCSSHandle,
 } from "../annotation-popup-css";
-import {
-  IconListSparkle,
-  IconPlus,
-  IconGear,
-  IconCheckSmall,
-  IconCheckSmallAnimated,
-  IconHelp,
-  IconCopyAnimated,
-  IconSendArrow,
-  IconTrashAlt,
-  IconCheckmarkCircle,
-  IconEyeAnimated,
-  IconPausePlayAnimated,
-  IconSun,
-  IconMoon,
-  IconXmarkLarge,
-  IconChevronLeft,
-} from "../icons";
+import { IconPlus } from "../icons";
 import {
   identifyElement,
   getNearbyText,
@@ -78,8 +61,11 @@ import {
 import { useServerSync } from "./hooks/useServerSync";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
 import { useToolbarRenderTransitions } from "./hooks/useToolbarRenderTransitions";
-import { ToolbarShell } from "./render/ToolbarShell";
-import { MarkersLayer } from "./render/MarkersLayer";
+import { MarkersLayer } from "./components/MarkersLayer";
+import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { ToolbarControls } from "./components/ToolbarControls";
+import { ToolbarShell } from "./components/ToolbarShell";
 import {
   DEFAULT_TOOLBAR_SETTINGS,
   parseToolbarPosition,
@@ -684,107 +670,6 @@ export function PageFeedbackToolbarCSS({
     pathname,
     resolvedEndpoint,
   });
-
-  // Tooltip component that renders via portal to escape overflow clipping
-  const Tooltip = ({
-    content,
-    children,
-  }: {
-    content: string;
-    children: React.ReactNode;
-  }) => {
-    const [isHovering, setIsHovering] = useState(false);
-    const [visible, setVisible] = useState(false);
-    const [shouldRender, setShouldRender] = useState(false);
-    const [position, setPosition] = useState({ top: 0, right: 0 });
-    const triggerRef = useRef<HTMLSpanElement>(null);
-    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const updatePosition = () => {
-      if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect();
-        setPosition({
-          top: rect.top + rect.height / 2,
-          right: window.innerWidth - rect.left + 8,
-        });
-      }
-    };
-
-    const handleMouseEnter = () => {
-      setIsHovering(true);
-      setShouldRender(true);
-      if (exitTimeoutRef.current) {
-        clearTimeout(exitTimeoutRef.current);
-        exitTimeoutRef.current = null;
-      }
-      updatePosition();
-      timeoutRef.current = originalSetTimeout(() => {
-        setVisible(true);
-      }, 500); // 0.5s delay before showing
-    };
-
-    const handleMouseLeave = () => {
-      setIsHovering(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      setVisible(false);
-      // Keep rendered during exit animation
-      exitTimeoutRef.current = originalSetTimeout(() => {
-        setShouldRender(false);
-      }, 150);
-    };
-
-    useEffect(() => {
-      return () => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
-      };
-    }, []);
-
-    return (
-      <>
-        <span
-          ref={triggerRef}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {children}
-        </span>
-        {shouldRender &&
-          createPortal(
-            <div
-              data-feedback-toolbar
-              style={{
-                position: "fixed",
-                top: position.top,
-                right: position.right,
-                transform: "translateY(-50%)",
-                padding: "6px 10px",
-                background: "#383838",
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "11px",
-                fontWeight: 400,
-                lineHeight: "14px",
-                borderRadius: "10px",
-                width: "180px",
-                textAlign: "left" as const,
-                zIndex: 100020,
-                pointerEvents: "none" as const,
-                boxShadow: "0px 1px 8px rgba(0, 0, 0, 0.28)",
-                opacity: visible && !isTransitioning ? 1 : 0,
-                transition: "opacity 0.15s ease",
-              }}
-            >
-              {content}
-            </div>,
-            document.body,
-          )}
-      </>
-    );
-  };
 
   const [settings, setSettings] = useState<ToolbarSettings>(
     DEFAULT_TOOLBAR_SETTINGS,
@@ -1750,782 +1635,73 @@ export function PageFeedbackToolbarCSS({
             }),
           }}
         >
-          {/* Toggle content - visible when collapsed */}
-          <div
-            className={`${styles.toggleContent} ${!isActive ? styles.visible : styles.hidden}`}
-          >
-            <IconListSparkle size={24} />
-            {activeAnnotations.length > 0 && (
-              <span
-                className={`${styles.badge} ${isActive ? styles.fadeOut : ""} ${showEntranceAnimation ? styles.entrance : ""}`}
-                style={{ backgroundColor: settings.annotationColor }}
-              >
-                {activeAnnotations.length}
-              </span>
-            )}
-          </div>
+          <ToolbarControls
+            isActive={isActive}
+            isDarkMode={isDarkMode}
+            activeAnnotations={activeAnnotations}
+            showEntranceAnimation={showEntranceAnimation}
+            annotationColor={settings.annotationColor}
+            toolbarPosition={toolbarPosition}
+            tooltipsHidden={tooltipsHidden}
+            showSettings={showSettings}
+            showReviewQueue={showReviewQueue}
+            tooltipSessionActive={tooltipSessionActive}
+            handleControlsMouseEnter={handleControlsMouseEnter}
+            handleControlsMouseLeave={handleControlsMouseLeave}
+            isFrozen={isFrozen}
+            hideTooltipsUntilMouseLeave={hideTooltipsUntilMouseLeave}
+            toggleFreeze={toggleFreeze}
+            hasAnnotations={hasAnnotations}
+            showMarkers={showMarkers}
+            onToggleMarkers={() => setShowMarkers((previous) => !previous)}
+            copied={copied}
+            copyOutput={copyOutput}
+            webhooksEnabled={settings.webhooksEnabled}
+            settingsWebhookUrl={settings.webhookUrl}
+            webhookUrl={webhookUrl}
+            sendState={sendState}
+            sendToWebhook={sendToWebhook}
+            clearAll={clearAll}
+            resolvedAnnotationsCount={resolvedAnnotations.length}
+            unreviewedCount={unreviewedCount}
+            onToggleReviewQueue={() => setShowReviewQueue((previous) => !previous)}
+            resolvedEndpoint={resolvedEndpoint}
+            connectionStatus={connectionStatus}
+            onToggleSettings={() => setShowSettings((previous) => !previous)}
+            onDeactivate={() => setIsActive(false)}
+            isValidUrl={isValidUrl}
+          />
 
-          {/* Controls content - visible when expanded */}
-          <div
-            className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
-              toolbarPosition && toolbarPosition.y < 100
-                ? styles.tooltipBelow
-                : ""
-            } ${tooltipsHidden || showSettings || showReviewQueue ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
-            onMouseEnter={handleControlsMouseEnter}
-            onMouseLeave={handleControlsMouseLeave}
-          >
-            <div
-              className={`${styles.buttonWrapper} ${
-                toolbarPosition && toolbarPosition.x < 120
-                  ? styles.buttonWrapperAlignLeft
-                  : ""
-              }`}
-            >
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  toggleFreeze();
-                }}
-                data-active={isFrozen}
-              >
-                <IconPausePlayAnimated size={24} isPaused={isFrozen} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {isFrozen ? "Resume animations" : "Pause animations"}
-                <span className={styles.shortcut}>P</span>
-              </span>
-            </div>
+          <SettingsPanel
+            isDarkMode={isDarkMode}
+            showSettingsVisible={showSettingsVisible}
+            isTransitioning={isTransitioning}
+            toolbarPosition={toolbarPosition}
+            settingsPage={settingsPage}
+            setSettingsPage={setSettingsPage}
+            settings={settings}
+            setSettings={setSettings}
+            setIsDarkMode={setIsDarkMode}
+            isDevMode={isDevMode}
+            projectId={projectId}
+            resolvedEndpoint={resolvedEndpoint}
+            connectionStatus={connectionStatus}
+            neovimConnectionStatus={neovimConnectionStatus}
+            componentEditor={componentEditor}
+            hideToolbarTemporarily={hideToolbarTemporarily}
+            outputDetailOptions={OUTPUT_DETAIL_OPTIONS}
+            colorOptions={COLOR_OPTIONS}
+          />
 
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  setShowMarkers(!showMarkers);
-                }}
-                disabled={!hasAnnotations}
-              >
-                <IconEyeAnimated size={24} isOpen={showMarkers} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                {showMarkers ? "Hide markers" : "Show markers"}
-                <span className={styles.shortcut}>H</span>
-              </span>
-            </div>
-
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${copied ? styles.statusShowing : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  copyOutput();
-                }}
-                disabled={!hasAnnotations}
-                data-active={copied}
-              >
-                <IconCopyAnimated size={24} copied={copied} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                Copy feedback
-                <span className={styles.shortcut}>C</span>
-              </span>
-            </div>
-
-            {/* Send button - only visible when webhook URL is available AND auto-send is off */}
-            <div
-              className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${isActive && !settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
-            >
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  sendToWebhook();
-                }}
-                disabled={
-                  !hasAnnotations ||
-                  (!isValidUrl(settings.webhookUrl) &&
-                    !isValidUrl(webhookUrl || "")) ||
-                  sendState === "sending"
-                }
-                data-no-hover={sendState === "sent" || sendState === "failed"}
-                tabIndex={
-                  isValidUrl(settings.webhookUrl) ||
-                  isValidUrl(webhookUrl || "")
-                    ? 0
-                    : -1
-                }
-              >
-                <IconSendArrow size={24} state={sendState} />
-                {activeAnnotations.length > 0 && sendState === "idle" && (
-                  <span
-                    className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}
-                    style={{ backgroundColor: settings.annotationColor }}
-                  >
-                    {activeAnnotations.length}
-                  </span>
-                )}
-              </button>
-              <span className={styles.buttonTooltip}>
-                Send Annotations
-                <span className={styles.shortcut}>S</span>
-              </span>
-            </div>
-
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  clearAll();
-                }}
-                disabled={!hasAnnotations}
-                data-danger
-              >
-                <IconTrashAlt size={24} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                Clear all
-                <span className={styles.shortcut}>X</span>
-              </span>
-            </div>
-
-            <div
-              className={`${styles.buttonWrapper} ${styles.reviewQueueButtonWrapper}`}
-            >
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                disabled={resolvedAnnotations.length === 0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  setShowReviewQueue(!showReviewQueue);
-                }}
-                data-active={showReviewQueue}
-              >
-                <IconCheckmarkCircle size={24} />
-                {unreviewedCount > 0 && (
-                  <span
-                    className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}
-                    style={{ backgroundColor: "#34C759" }}
-                  >
-                    {unreviewedCount}
-                  </span>
-                )}
-              </button>
-              <span className={styles.buttonTooltip}>
-                Review queue
-                <span className={styles.shortcut}>Q</span>
-              </span>
-            </div>
-
-            <div className={styles.buttonWrapper}>
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  setShowSettings(!showSettings);
-                }}
-              >
-                <IconGear size={24} />
-              </button>
-              {resolvedEndpoint && (
-                <span
-                  className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
-                  title={
-                    connectionStatus === "connected"
-                      ? "MCP Connected"
-                      : connectionStatus === "connecting"
-                        ? "MCP Connecting..."
-                        : "MCP Disconnected"
-                  }
-                />
-              )}
-              <span className={styles.buttonTooltip}>Settings</span>
-            </div>
-
-            <div
-              className={`${styles.divider} ${!isDarkMode ? styles.light : ""}`}
-            />
-
-            <div
-              className={`${styles.buttonWrapper} ${
-                toolbarPosition &&
-                typeof window !== "undefined" &&
-                toolbarPosition.x > window.innerWidth - 120
-                  ? styles.buttonWrapperAlignRight
-                  : ""
-              }`}
-            >
-              <button
-                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  hideTooltipsUntilMouseLeave();
-                  setIsActive(false);
-                }}
-              >
-                <IconXmarkLarge size={24} />
-              </button>
-              <span className={styles.buttonTooltip}>
-                Exit
-                <span className={styles.shortcut}>Esc</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Settings Panel */}
-          <div
-            className={`${styles.settingsPanel} ${isDarkMode ? styles.dark : styles.light} ${showSettingsVisible ? styles.enter : styles.exit}`}
-            onClick={(e) => e.stopPropagation()}
-            style={
-              toolbarPosition && toolbarPosition.y < 230
-                ? {
-                    bottom: "auto",
-                    top: "calc(100% + 0.5rem)",
-                  }
-                : undefined
-            }
-          >
-            <div
-              className={`${styles.settingsPanelContainer} ${isTransitioning ? styles.transitioning : ""}`}
-            >
-              <div
-                className={`${styles.settingsPage} ${settingsPage === "automations" ? styles.slideLeft : ""}`}
-              >
-                <div className={styles.settingsHeader}>
-                  <span className={styles.settingsBrand}>
-                    <span
-                      className={styles.settingsBrandSlash}
-                      style={{
-                        color: settings.annotationColor,
-                        transition: "color 0.2s ease",
-                      }}
-                    >
-                      /
-                    </span>
-                    agentation
-                  </span>
-                  <span className={styles.settingsVersion}>v{__VERSION__}</span>
-                  <button
-                    className={styles.themeToggle}
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    title={
-                      isDarkMode
-                        ? "Switch to light mode"
-                        : "Switch to dark mode"
-                    }
-                  >
-                    <span className={styles.themeIconWrapper}>
-                      <span
-                        key={isDarkMode ? "sun" : "moon"}
-                        className={styles.themeIcon}
-                      >
-                        {isDarkMode ? (
-                          <IconSun size={20} />
-                        ) : (
-                          <IconMoon size={20} />
-                        )}
-                      </span>
-                    </span>
-                  </button>
-                </div>
-
-                <div className={styles.settingsSection}>
-                  <div className={styles.settingsRow}>
-                    <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Project ID
-                    </div>
-                    <span
-                      className={`${styles.settingsValue} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      {typeof projectId === "string" && projectId.trim() !== ""
-                        ? projectId.trim()
-                        : "Not set"}
-                    </span>
-                  </div>
-
-                  <div
-                    className={`${styles.settingsRow} ${styles.settingsRowMarginTop}`}
-                  >
-                    <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Output Detail
-                      <Tooltip content="Controls how much detail is included in the copied output">
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </div>
-                    <button
-                      className={`${styles.cycleButton} ${!isDarkMode ? styles.light : ""}`}
-                      onClick={() => {
-                        const currentIndex = OUTPUT_DETAIL_OPTIONS.findIndex(
-                          (opt) => opt.value === settings.outputDetail,
-                        );
-                        const nextIndex =
-                          (currentIndex + 1) % OUTPUT_DETAIL_OPTIONS.length;
-                        setSettings((s) => ({
-                          ...s,
-                          outputDetail: OUTPUT_DETAIL_OPTIONS[nextIndex].value,
-                        }));
-                      }}
-                    >
-                      <span
-                        key={settings.outputDetail}
-                        className={styles.cycleButtonText}
-                      >
-                        {
-                          OUTPUT_DETAIL_OPTIONS.find(
-                            (opt) => opt.value === settings.outputDetail,
-                          )?.label
-                        }
-                      </span>
-                      <span className={styles.cycleDots}>
-                        {OUTPUT_DETAIL_OPTIONS.map((option, i) => (
-                          <span
-                            key={option.value}
-                            className={`${styles.cycleDot} ${!isDarkMode ? styles.light : ""} ${settings.outputDetail === option.value ? styles.active : ""}`}
-                          />
-                        ))}
-                      </span>
-                    </button>
-                  </div>
-
-                  <div
-                    className={`${styles.settingsRow} ${styles.settingsRowMarginTop} ${!isDevMode ? styles.settingsRowDisabled : ""}`}
-                  >
-                    <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      React Components
-                      <Tooltip
-                        content={
-                          !isDevMode
-                            ? "Disabled — production builds minify component names, making detection unreliable. Use in development mode."
-                            : "Include React component names in annotations"
-                        }
-                      >
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </div>
-                    <label
-                      className={`${styles.toggleSwitch} ${!isDevMode ? styles.disabled : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isDevMode && settings.reactEnabled}
-                        disabled={!isDevMode}
-                        onChange={() =>
-                          setSettings((s) => ({
-                            ...s,
-                            reactEnabled: !s.reactEnabled,
-                          }))
-                        }
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-
-                  <div className={`${styles.settingsRow} ${styles.settingsRowMarginTop}`}>
-                    <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Hide Until Restart
-                      <Tooltip content="Hides the toolbar until you open a new tab">
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </div>
-                    <label className={styles.toggleSwitch}>
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            hideToolbarTemporarily();
-                          }
-                        }}
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
-                </div>
-
-                <div className={styles.settingsSection}>
-                  <div
-                    className={`${styles.settingsLabel} ${styles.settingsLabelMarker} ${!isDarkMode ? styles.light : ""}`}
-                  >
-                    Marker Colour
-                  </div>
-                  <div className={styles.colorOptions}>
-                    {COLOR_OPTIONS.map((color) => (
-                      <div
-                        key={color.value}
-                        role="button"
-                        onClick={() =>
-                          setSettings((s) => ({
-                            ...s,
-                            annotationColor: color.value,
-                          }))
-                        }
-                        style={{
-                          borderColor:
-                            settings.annotationColor === color.value
-                              ? color.value
-                              : "transparent",
-                        }}
-                        className={`${styles.colorOptionRing} ${settings.annotationColor === color.value ? styles.selected : ""}`}
-                      >
-                        <div
-                          className={`${styles.colorOption} ${settings.annotationColor === color.value ? styles.selected : ""}`}
-                          style={{ backgroundColor: color.value }}
-                          title={color.label}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.settingsSection}>
-                  <label className={styles.settingsToggle}>
-                    <input
-                      type="checkbox"
-                      id="autoClearAfterCopy"
-                      checked={settings.autoClearAfterCopy}
-                      onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          autoClearAfterCopy: e.target.checked,
-                        }))
-                      }
-                    />
-                    <label
-                      className={`${styles.customCheckbox} ${settings.autoClearAfterCopy ? styles.checked : ""}`}
-                      htmlFor="autoClearAfterCopy"
-                    >
-                      {settings.autoClearAfterCopy && (
-                        <IconCheckSmallAnimated size={14} />
-                      )}
-                    </label>
-                    <span
-                      className={`${styles.toggleLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Clear on copy/send
-                      <Tooltip content="Automatically clear annotations after copying">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNudge2}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </span>
-                  </label>
-                  <label
-                    className={`${styles.settingsToggle} ${styles.settingsToggleMarginBottom}`}
-                  >
-                    <input
-                      type="checkbox"
-                      id="blockInteractions"
-                      checked={settings.blockInteractions}
-                      onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          blockInteractions: e.target.checked,
-                        }))
-                      }
-                    />
-                    <label
-                      className={`${styles.customCheckbox} ${settings.blockInteractions ? styles.checked : ""}`}
-                      htmlFor="blockInteractions"
-                    >
-                      {settings.blockInteractions && (
-                        <IconCheckSmallAnimated size={14} />
-                      )}
-                    </label>
-                    <span
-                      className={`${styles.toggleLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Block page interactions
-                    </span>
-                  </label>
-                </div>
-
-                <div
-                  className={`${styles.settingsSection} ${styles.settingsSectionExtraPadding}`}
-                >
-                  <button
-                    className={`${styles.settingsNavLink} ${!isDarkMode ? styles.light : ""}`}
-                    onClick={() => setSettingsPage("automations")}
-                  >
-                    <span>Manage Connections</span>
-                    <span className={styles.settingsNavLinkRight}>
-                      {resolvedEndpoint && (
-                        <span
-                          className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
-                        />
-                      )}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7.5 12.5L12 8L7.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Automations Page */}
-              <div
-                className={`${styles.settingsPage} ${styles.automationsPage} ${settingsPage === "automations" ? styles.slideIn : ""}`}
-              >
-                <button
-                  className={`${styles.settingsBackButton} ${!isDarkMode ? styles.light : ""}`}
-                  onClick={() => setSettingsPage("main")}
-                >
-                  <IconChevronLeft size={16} />
-                  <span>Manage Connections</span>
-                </button>
-
-                {/* Server Connection section */}
-                <div className={styles.settingsSection}>
-                  <div className={styles.settingsRow}>
-                    <span
-                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Server Connection
-                      <Tooltip content="Connect to an Agentation server to let AI agents like Claude Code receive annotations in real-time.">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNudgeDown}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </span>
-                    {resolvedEndpoint && (
-                      <div
-                        className={`${styles.mcpStatusDot} ${styles[connectionStatus]}`}
-                        title={
-                          connectionStatus === "connected"
-                            ? "Connected"
-                            : connectionStatus === "connecting"
-                              ? "Connecting..."
-                              : "Disconnected"
-                        }
-                      />
-                    )}
-                  </div>
-                  <p
-                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
-                    style={{ paddingBottom: 6 }}
-                  >
-                    Server connection allows agents to receive and act on
-                    annotations.{" "}
-                    <a
-                      href="https://agentation.dev/mcp"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${styles.learnMoreLink} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Learn more
-                    </a>
-                  </p>
-
-                  {componentEditor === "neovim" && (
-                    <>
-                      <div className={styles.settingsRow}>
-                        <span
-                          className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
-                        >
-                          Neovim Bridge
-                        </span>
-                        <div
-                          className={`${styles.mcpStatusDot} ${styles[neovimConnectionStatus]}`}
-                          title={
-                            neovimConnectionStatus === "connected"
-                              ? "Connected"
-                              : neovimConnectionStatus === "connecting"
-                                ? "Connecting..."
-                                : "Disconnected"
-                          }
-                        />
-                      </div>
-                      <p
-                        className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
-                        style={{ paddingBottom: 6 }}
-                      >
-                        {neovimConnectionStatus === "connected"
-                          ? "Web page connected to Neovim."
-                          : neovimConnectionStatus === "connecting"
-                            ? "Connecting to Neovim bridge..."
-                            : "Neovim bridge not detected."}
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                {/* Webhooks section */}
-                <div
-                  className={`${styles.settingsSection} ${styles.settingsSectionGrow}`}
-                >
-                  <div className={styles.settingsRow}>
-                    <span
-                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Webhooks
-                      <Tooltip content="Send annotation data to any URL endpoint when annotations change. Useful for custom integrations.">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNoNudge}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </span>
-                    <div className={styles.autoSendRow}>
-                      <span
-                        className={`${styles.autoSendLabel} ${!isDarkMode ? styles.light : ""} ${settings.webhooksEnabled ? styles.active : ""}`}
-                      >
-                        Auto-Send
-                      </span>
-                      <label
-                        className={`${styles.toggleSwitch} ${!settings.webhookUrl ? styles.disabled : ""}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={settings.webhooksEnabled}
-                          disabled={!settings.webhookUrl}
-                          onChange={() =>
-                            setSettings((s) => ({
-                              ...s,
-                              webhooksEnabled: !s.webhooksEnabled,
-                            }))
-                          }
-                        />
-                        <span className={styles.toggleSlider} />
-                      </label>
-                    </div>
-                  </div>
-                  <p
-                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
-                  >
-                    The webhook URL will receive live annotation changes and
-                    annotation data.
-                  </p>
-                  <textarea
-                    className={`${styles.webhookUrlInput} ${!isDarkMode ? styles.light : ""}`}
-                    placeholder="Webhook URL"
-                    value={settings.webhookUrl}
-                    style={
-                      {
-                        "--marker-color": settings.annotationColor,
-                      } as React.CSSProperties
-                    }
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        webhookUrl: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Review Queue Panel */}
-          <div
-            className={`${styles.reviewQueuePanel} ${isDarkMode ? styles.dark : styles.light} ${showReviewQueueVisible ? styles.enter : styles.exit}`}
-            onClick={(e) => e.stopPropagation()}
-            style={
-              toolbarPosition && toolbarPosition.y < 230
-                ? {
-                    bottom: "auto",
-                    top: "calc(100% + 0.5rem)",
-                  }
-                : undefined
-            }
-          >
-            <div className={styles.reviewQueueHeader}>
-              <span className={styles.reviewQueueTitle}>Review Queue</span>
-              <span className={styles.reviewQueueCount}>
-                {resolvedAnnotations.filter((a) => a._reviewedAt).length}/{resolvedAnnotations.length}
-              </span>
-            </div>
-            <div className={styles.reviewQueueList}>
-              {resolvedAnnotations.map((annotation) => {
-                const agentReply = annotation.thread?.find((m) => m.role === "agent");
-                return (
-                  <label
-                    key={annotation.id}
-                    className={`${styles.reviewQueueItem} ${annotation._reviewedAt ? styles.checked : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!annotation._reviewedAt}
-                      onChange={() => toggleReviewed(annotation.id)}
-                    />
-                    <span
-                      className={`${styles.customCheckbox} ${annotation._reviewedAt ? styles.checked : ""}`}
-                    >
-                      {annotation._reviewedAt && <IconCheckSmall size={14} />}
-                    </span>
-                    <div className={styles.reviewQueueItemContent}>
-                      <span className={styles.reviewQueueItemElement}>
-                        {annotation.element}
-                      </span>
-                      <span className={styles.reviewQueueItemComment}>
-                        {annotation.comment}
-                      </span>
-                      {agentReply && (
-                        <span className={styles.reviewQueueItemReply}>
-                          {agentReply.content}
-                        </span>
-                      )}
-                      <span className={`${styles.reviewQueueItemStatus} ${styles[annotation.status || "resolved"]}`}>
-                        {annotation.status}
-                      </span>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-            <div className={styles.reviewQueueFooter}>
-              <button
-                className={`${styles.reviewQueueFooterButton} ${!isDarkMode ? styles.light : ""}`}
-                disabled={resolvedAnnotations.length === 0 || resolvedAnnotations.every((a) => a._reviewedAt)}
-                onClick={() => {
-                  setAnnotations((prev) =>
-                    prev.map((a) =>
-                      (a.status === "resolved" || a.status === "dismissed") && !a._reviewedAt
-                        ? { ...a, _reviewedAt: Date.now() }
-                        : a
-                    )
-                  );
-                }}
-              >
-                Select All
-              </button>
-              <button
-                className={`${styles.reviewQueueFooterButton} ${!isDarkMode ? styles.light : ""}`}
-                disabled={!resolvedAnnotations.some((a) => a._reviewedAt)}
-                onClick={handleClearReviewedAnnotations}
-              >
-                Clear Selected
-              </button>
-            </div>
-          </div>
+          <ReviewQueuePanel
+            isDarkMode={isDarkMode}
+            showReviewQueueVisible={showReviewQueueVisible}
+            toolbarPosition={toolbarPosition}
+            resolvedAnnotations={resolvedAnnotations}
+            toggleReviewed={toggleReviewed}
+            setAnnotations={setAnnotations}
+            handleClearReviewedAnnotations={handleClearReviewedAnnotations}
+          />
         </div>
       </ToolbarShell>
 
