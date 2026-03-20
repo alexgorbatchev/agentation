@@ -3,18 +3,13 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-import {
-  AnnotationPopupCSS,
-  AnnotationPopupCSSHandle,
-} from "../annotation-popup-css";
-import { IconPlus } from "../icons";
+import type { AnnotationPopupCSSHandle } from "../annotation-popup-css";
 import {
   identifyElement,
   getNearbyText,
   getElementClasses,
   getDetailedComputedStyles,
   getForensicComputedStyles,
-  parseComputedStylesString,
   getFullElementPath,
   getAccessibilityInfo,
   getNearbyElements,
@@ -27,7 +22,6 @@ import {
   loadToolbarHidden,
   saveToolbarHidden,
 } from "../../utils/storage";
-import { deleteAnnotation as deleteAnnotationFromServer } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
 import {
   getSourceLocation,
@@ -48,9 +42,11 @@ import {
 } from "../../utils/freeze-animations";
 
 import type { Annotation } from "../../types";
-import { useAnnotationState } from "./hooks/useAnnotationState";
+import { useAnnotationActions } from "./hooks/useAnnotationActions";
 import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
+import { useAnnotationState } from "./hooks/useAnnotationState";
 import { useDragSelectionLifecycle } from "./hooks/useDragSelectionLifecycle";
+import { useEndpointDiscovery } from "./hooks/useEndpointDiscovery";
 import {
   useInteractionLifecycle,
   type ComponentMenuState,
@@ -59,28 +55,22 @@ import {
   type PendingMultiSelectElement,
 } from "./hooks/useInteractionLifecycle";
 import { useServerSync } from "./hooks/useServerSync";
+import { useToolbarDragging } from "./hooks/useToolbarDragging";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
+import { useToolbarPreferences } from "./hooks/useToolbarPreferences";
 import { useToolbarRenderTransitions } from "./hooks/useToolbarRenderTransitions";
+import { InteractionOverlay } from "./components/InteractionOverlay";
 import { MarkersLayer } from "./components/MarkersLayer";
 import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ToolbarControls } from "./components/ToolbarControls";
 import { ToolbarShell } from "./components/ToolbarShell";
+import { type OutputDetailLevel } from "./state/toolbar-settings";
 import {
-  DEFAULT_TOOLBAR_SETTINGS,
-  parseToolbarPosition,
-  parseToolbarSettings,
-  parseToolbarTheme,
-  serializeToolbarPosition,
-  serializeToolbarSettings,
-  serializeToolbarTheme,
-  TOOLBAR_POSITION_STORAGE_KEY,
-  TOOLBAR_SETTINGS_STORAGE_KEY,
-  TOOLBAR_THEME_STORAGE_KEY,
-  type MarkerClickBehavior,
-  type OutputDetailLevel,
-  type ToolbarSettings,
-} from "./state/toolbar-settings";
+  deepElementFromPoint,
+  isElementFixed,
+  pierceElementFromPoint,
+} from "./utils/pierceElementFromPoint";
 import styles from "./styles.module.scss";
 
 /**
@@ -118,37 +108,15 @@ function identifyElementWithReact(
   };
 }
 
-// Module-level flag to prevent re-animating on SPA page navigation
-let hasPlayedEntranceAnimation = false;
-
 // =============================================================================
 // Types
 // =============================================================================
 
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
-const DEFAULT_AGENTATION_ENDPOINT = "http://127.0.0.1:4747";
 
 function normalizeNeovimBridgeUrl(url: string): string {
   return url.replace(/\/+$/, "");
-}
-
-function getLocalStorageItem(key: string): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function setLocalStorageItem(key: string, value: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    // localStorage may be unavailable or blocked
-  }
 }
 
 function removeLocalStorageItem(key: string): void {
@@ -200,136 +168,6 @@ const COLOR_OPTIONS = [
 // Utils
 // =============================================================================
 
-/**
- * Pierce through shadow DOMs to find the actual element.
- */
-function pierceShadowDOM(
-  element: HTMLElement,
-  x: number,
-  y: number,
-): HTMLElement {
-  let el = element;
-  while (el?.shadowRoot) {
-    const deeper = el.shadowRoot.elementFromPoint(x, y) as HTMLElement | null;
-    if (!deeper || deeper === el) break;
-    el = deeper;
-  }
-  return el;
-}
-
-/**
- * Finds the deepest element at a point, piercing shadow DOMs.
- */
-function deepElementFromPoint(x: number, y: number): HTMLElement | null {
-  const element = document.elementFromPoint(x, y) as HTMLElement | null;
-  if (!element) return null;
-  return pierceShadowDOM(element, x, y);
-}
-
-// =============================================================================
-// Pierce mode (Cmd+hover) — scans through container wrappers and invisible
-// elements to find the actual content underneath. Useful for annotation in
-// animation-heavy frameworks (Remotion, Framer Motion, etc.) where empty
-// overlay divs intercept pointer events.
-// =============================================================================
-
-const GENERIC_CONTAINER_TAGS = new Set([
-  "DIV", "SPAN", "SECTION", "ARTICLE", "MAIN", "ASIDE", "HEADER", "FOOTER", "NAV",
-]);
-
-function isEffectivelyInvisible(el: HTMLElement): boolean {
-  if (typeof el.checkVisibility === "function") {
-    return !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
-  }
-  let current: HTMLElement | null = el;
-  while (current && current !== document.body) {
-    if (window.getComputedStyle(current).opacity === "0") return true;
-    current = current.parentElement;
-  }
-  return false;
-}
-
-function hasDirectContent(el: HTMLElement): boolean {
-  if (!GENERIC_CONTAINER_TAGS.has(el.tagName)) return true;
-  for (const child of el.childNodes) {
-    if (child.nodeType === Node.TEXT_NODE && child.textContent?.trim()) return true;
-  }
-  return false;
-}
-
-/**
- * Pierce mode: scans all elements at a point to find the deepest one with
- * visible, meaningful content. Two-pass approach:
- *   1. Find elements with direct text content (skips empty wrappers)
- *   2. If no text found, return the smallest visible element (catches
- *      visual-only elements like timeline bars, chart segments, swatches)
- * Activated by holding Cmd (Mac) / Ctrl (Windows) while hovering.
- */
-function pierceElementFromPoint(x: number, y: number): HTMLElement | null {
-  const topElement = document.elementFromPoint(x, y) as HTMLElement | null;
-  if (!topElement) return null;
-
-  const pierced = pierceShadowDOM(topElement, x, y);
-  if (hasDirectContent(pierced) && !isEffectivelyInvisible(pierced))
-    return pierced;
-
-  const allElements = document.elementsFromPoint(x, y) as HTMLElement[];
-
-  // Pass 1: find first element with direct text content
-  for (const candidate of allElements) {
-    if (candidate === topElement) continue;
-    if (candidate === document.documentElement || candidate === document.body)
-      continue;
-    const deep = pierceShadowDOM(candidate, x, y);
-    if (hasDirectContent(deep) && !isEffectivelyInvisible(deep))
-      return deep;
-  }
-
-  // Pass 2: no text content found — return the smallest visible element.
-  // Catches visual-only elements (timeline bars, color swatches, progress
-  // indicators, chart segments) that communicate through color/size, not text.
-  const topRect = pierced.getBoundingClientRect();
-  const topArea = topRect.width * topRect.height;
-  let smallest: HTMLElement | null = null;
-  let smallestArea = topArea;
-
-  for (const candidate of allElements) {
-    if (candidate === topElement) continue;
-    if (candidate === document.documentElement || candidate === document.body)
-      continue;
-    if (isEffectivelyInvisible(candidate)) continue;
-    const deep = pierceShadowDOM(candidate, x, y);
-    const rect = deep.getBoundingClientRect();
-    const area = rect.width * rect.height;
-    if (area > 0 && area < smallestArea) {
-      smallest = deep;
-      smallestArea = area;
-    }
-  }
-
-  return smallest || pierced;
-}
-
-function isElementFixed(element: HTMLElement): boolean {
-  let current: HTMLElement | null = element;
-  while (current && current !== document.body) {
-    const style = window.getComputedStyle(current);
-    const position = style.position;
-    if (position === "fixed" || position === "sticky") {
-      return true;
-    }
-    current = current.parentElement;
-  }
-  return false;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 function isRenderableAnnotation(_annotation: Annotation): boolean {
   return true; // All annotations are renderable — resolved ones show as faded checkmarks
 }
@@ -341,121 +179,6 @@ function detectSourceFile(element: Element): string | undefined {
     return formatSourceLocation(loc.source, "path");
   }
   return undefined;
-}
-
-function generateOutput(
-  annotations: Annotation[],
-  pathname: string,
-  detailLevel: OutputDetailLevel = "standard",
-  reactMode: ReactComponentMode = "filtered",
-): string {
-  if (annotations.length === 0) return "";
-
-  const viewport =
-    typeof window !== "undefined"
-      ? `${window.innerWidth}×${window.innerHeight}`
-      : "unknown";
-
-  let output = `## Page Feedback: ${pathname}\n`;
-
-  if (detailLevel === "forensic") {
-    // Full environment info for forensic mode
-    output += `\n**Environment:**\n`;
-    output += `- Viewport: ${viewport}\n`;
-    if (typeof window !== "undefined") {
-      output += `- URL: ${window.location.href}\n`;
-      output += `- User Agent: ${navigator.userAgent}\n`;
-      output += `- Timestamp: ${new Date().toISOString()}\n`;
-      output += `- Device Pixel Ratio: ${window.devicePixelRatio}\n`;
-    }
-    output += `\n---\n`;
-  } else if (detailLevel !== "compact") {
-    output += `**Viewport:** ${viewport}\n`;
-  }
-  output += "\n";
-
-  annotations.forEach((a, i) => {
-    if (detailLevel === "compact") {
-      output += `${i + 1}. **${a.element}**${a.sourceFile ? ` (${a.sourceFile})` : ""}: ${a.comment}`;
-      if (a.selectedText) {
-        output += ` (re: "${a.selectedText.slice(0, 30)}${a.selectedText.length > 30 ? "..." : ""}")`;
-      }
-      output += "\n";
-    } else if (detailLevel === "forensic") {
-      // Forensic mode - order matches output page example
-      output += `### ${i + 1}. ${a.element}\n`;
-      if (a.isMultiSelect && a.fullPath) {
-        output += `*Forensic data shown for first element of selection*\n`;
-      }
-      if (a.fullPath) {
-        output += `**Full DOM Path:** ${a.fullPath}\n`;
-      }
-      if (a.cssClasses) {
-        output += `**CSS Classes:** ${a.cssClasses}\n`;
-      }
-      if (a.boundingBox) {
-        output += `**Position:** x:${Math.round(a.boundingBox.x)}, y:${Math.round(a.boundingBox.y)} (${Math.round(a.boundingBox.width)}×${Math.round(a.boundingBox.height)}px)\n`;
-      }
-      output += `**Annotation at:** ${a.x.toFixed(1)}% from left, ${Math.round(a.y)}px from top\n`;
-      if (a.selectedText) {
-        output += `**Selected text:** "${a.selectedText}"\n`;
-      }
-      if (a.nearbyText && !a.selectedText) {
-        output += `**Context:** ${a.nearbyText.slice(0, 100)}\n`;
-      }
-      if (a.computedStyles) {
-        output += `**Computed Styles:** ${a.computedStyles}\n`;
-      }
-      if (a.accessibility) {
-        output += `**Accessibility:** ${a.accessibility}\n`;
-      }
-      if (a.nearbyElements) {
-        output += `**Nearby Elements:** ${a.nearbyElements}\n`;
-      }
-      if (a.sourceFile) {
-        output += `**Source:** ${a.sourceFile}\n`;
-      }
-      if (a.reactComponents) {
-        output += `**React:** ${a.reactComponents}\n`;
-      }
-      output += `**Feedback:** ${a.comment}\n\n`;
-    } else {
-      // Standard and detailed modes
-      output += `### ${i + 1}. ${a.element}\n`;
-      output += `**Location:** ${a.elementPath}\n`;
-
-      if (a.sourceFile) {
-        output += `**Source:** ${a.sourceFile}\n`;
-      }
-
-      // React components in both standard and detailed
-      if (a.reactComponents) {
-        output += `**React:** ${a.reactComponents}\n`;
-      }
-
-      if (detailLevel === "detailed") {
-        if (a.cssClasses) {
-          output += `**Classes:** ${a.cssClasses}\n`;
-        }
-
-        if (a.boundingBox) {
-          output += `**Position:** ${Math.round(a.boundingBox.x)}px, ${Math.round(a.boundingBox.y)}px (${Math.round(a.boundingBox.width)}×${Math.round(a.boundingBox.height)}px)\n`;
-        }
-      }
-
-      if (a.selectedText) {
-        output += `**Selected text:** "${a.selectedText}"\n`;
-      }
-
-      if (detailLevel === "detailed" && a.nearbyText && !a.selectedText) {
-        output += `**Context:** ${a.nearbyText.slice(0, 100)}\n`;
-      }
-
-      output += `**Feedback:** ${a.comment}\n\n`;
-    }
-  });
-
-  return output.trim();
 }
 
 // =============================================================================
@@ -555,40 +278,7 @@ export function PageFeedbackToolbarCSS({
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
 
-  const [autoDiscoveredEndpoint, setAutoDiscoveredEndpoint] = useState("");
-  const hasExplicitEndpoint =
-    typeof endpoint === "string" && endpoint.trim() !== "";
-  const shouldAutoConnectOnce =
-    !hasExplicitEndpoint &&
-    typeof process !== "undefined" &&
-    process.env.NODE_ENV !== "test";
-  const resolvedEndpoint = hasExplicitEndpoint
-    ? endpoint.trim()
-    : autoDiscoveredEndpoint;
-
-  useEffect(() => {
-    if (!shouldAutoConnectOnce || autoDiscoveredEndpoint) {
-      return;
-    }
-
-    let cancelled = false;
-    const probeDefaultEndpoint = async (): Promise<void> => {
-      try {
-        const response = await fetch(`${DEFAULT_AGENTATION_ENDPOINT}/health`);
-        if (!cancelled && response.ok) {
-          setAutoDiscoveredEndpoint(DEFAULT_AGENTATION_ENDPOINT);
-        }
-      } catch {
-        // Ignore probe failures and keep local-only mode.
-      }
-    };
-
-    void probeDefaultEndpoint();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [autoDiscoveredEndpoint, shouldAutoConnectOnce]);
+  const resolvedEndpoint = useEndpointDiscovery(endpoint);
 
   // Stop native events from bubbling past document.body when they originate
   // inside the toolbar portal. Without this, clicks on the toolbar propagate to
@@ -618,18 +308,13 @@ export function PageFeedbackToolbarCSS({
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
   const [pendingAnnotation, setPendingAnnotation] =
     useState<PendingAnnotationState | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [sendState, setSendState] = useState<
-    "idle" | "sending" | "sent" | "failed"
-  >("idle");
-  const [cleared, setCleared] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
   const [hoveredTargetElement, setHoveredTargetElement] =
     useState<HTMLElement | null>(null);
   const [hoveredTargetElements, setHoveredTargetElements] = useState<
     HTMLElement[]
-  >([]); // For cmd+shift+click multi-select hover
+  >([]);
   const [deletingMarkerId, setDeletingMarkerId] = useState<string | null>(null);
   const [renumberFrom, setRenumberFrom] = useState<number | null>(null);
   const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(
@@ -640,17 +325,20 @@ export function PageFeedbackToolbarCSS({
     useState<HTMLElement | null>(null);
   const [editingTargetElements, setEditingTargetElements] = useState<
     HTMLElement[]
-  >([]); // For cmd+shift+click multi-select
+  >([]);
   const [scrollY, setScrollY] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSettingsVisible, setShowSettingsVisible] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
   const [showReviewQueueVisible, setShowReviewQueueVisible] = useState(false);
-  const [componentMenu, setComponentMenu] = useState<ComponentMenuState | null>(null);
-  const [hoveredComponentMenuIndex, setHoveredComponentMenuIndex] = useState<number | null>(null);
+  const [componentMenu, setComponentMenu] = useState<ComponentMenuState | null>(
+    null,
+  );
+  const [hoveredComponentMenuIndex, setHoveredComponentMenuIndex] = useState<
+    number | null
+  >(null);
   const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
     "main",
   );
@@ -662,6 +350,17 @@ export function PageFeedbackToolbarCSS({
   >([]);
 
   const {
+    settings,
+    setSettings,
+    isDarkMode,
+    setIsDarkMode,
+    toolbarPosition,
+    setToolbarPosition,
+    mounted,
+    showEntranceAnimation,
+  } = useToolbarPreferences({ pathname });
+
+  const {
     annotations,
     setAnnotations,
     toggleReviewed,
@@ -670,12 +369,6 @@ export function PageFeedbackToolbarCSS({
     pathname,
     resolvedEndpoint,
   });
-
-  const [settings, setSettings] = useState<ToolbarSettings>(
-    DEFAULT_TOOLBAR_SETTINGS,
-  );
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [showEntranceAnimation, setShowEntranceAnimation] = useState(false);
 
   // Check if running in development mode - React detection only works in development mode
   const isDevMode = process.env.NODE_ENV === "development";
@@ -706,20 +399,19 @@ export function PageFeedbackToolbarCSS({
     neovimProjectId,
   });
 
-  // Draggable toolbar state
-  const [toolbarPosition, setToolbarPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
-  const [dragStartPos, setDragStartPos] = useState<{
-    x: number;
-    y: number;
-    toolbarX: number;
-    toolbarY: number;
-  } | null>(null);
-  const [dragRotation, setDragRotation] = useState(0);
-  const justFinishedToolbarDragRef = useRef(false);
+  const {
+    isDraggingToolbar,
+    dragRotation,
+    handleToolbarMouseDown,
+    consumeJustFinishedToolbarDrag,
+  } = useToolbarDragging({
+    toolbarPosition,
+    setToolbarPosition,
+    isActive,
+    connectionStatus,
+    settingsPanelClassName: styles.settingsPanel,
+    mounted,
+  });
 
   // For animations - track which markers have animated in and which are exiting
   const [animatedMarkers, setAnimatedMarkers] = useState<Set<string>>(
@@ -749,62 +441,9 @@ export function PageFeedbackToolbarCSS({
     selectedElementHighlightClassName: styles.selectedElementHighlight,
   });
 
-  // Mount and load
   useEffect(() => {
-    setMounted(true);
     setScrollY(window.scrollY);
-    // Trigger entrance animation only on first load (not on SPA navigation)
-    if (!hasPlayedEntranceAnimation) {
-      setShowEntranceAnimation(true);
-      hasPlayedEntranceAnimation = true;
-      // Remove animation class after it completes (toolbar: 500ms, badge: 400ms delay + 300ms)
-      originalSetTimeout(() => setShowEntranceAnimation(false), 750);
-    }
-
-    const storedSettings = getLocalStorageItem(TOOLBAR_SETTINGS_STORAGE_KEY);
-    setSettings(parseToolbarSettings(storedSettings));
-
-    const savedTheme = getLocalStorageItem(TOOLBAR_THEME_STORAGE_KEY);
-    setIsDarkMode(parseToolbarTheme(savedTheme));
-
-    const savedPosition = getLocalStorageItem(TOOLBAR_POSITION_STORAGE_KEY);
-    setToolbarPosition(parseToolbarPosition(savedPosition));
-  }, [pathname]);
-
-  // Save settings
-  useEffect(() => {
-    if (mounted) {
-      setLocalStorageItem(
-        TOOLBAR_SETTINGS_STORAGE_KEY,
-        serializeToolbarSettings(settings),
-      );
-    }
-  }, [settings, mounted]);
-
-  // Save theme preference
-  useEffect(() => {
-    if (mounted) {
-      setLocalStorageItem(
-        TOOLBAR_THEME_STORAGE_KEY,
-        serializeToolbarTheme(isDarkMode),
-      );
-    }
-  }, [isDarkMode, mounted]);
-
-  // Save toolbar position when drag ends
-  const prevDraggingRef = useRef(false);
-  useEffect(() => {
-    const wasDragging = prevDraggingRef.current;
-    prevDraggingRef.current = isDraggingToolbar;
-
-    // Save position when dragging ends (transition from true to false)
-    if (wasDragging && !isDraggingToolbar && toolbarPosition && mounted) {
-      setLocalStorageItem(
-        TOOLBAR_POSITION_STORAGE_KEY,
-        serializeToolbarPosition(toolbarPosition),
-      );
-    }
-  }, [isDraggingToolbar, toolbarPosition, mounted]);
+  }, []);
 
   const handleClearReviewedAnnotations = useCallback(() => {
     clearReviewedAnnotations(() => setShowReviewQueue(false));
@@ -1070,38 +709,29 @@ export function PageFeedbackToolbarCSS({
     };
   }, []);
 
-  // Fire webhook for annotation events - returns true on success, false on failure
-  const fireWebhook = useCallback(
-    async (
-      event: string,
-      payload: Record<string, unknown>,
-      force?: boolean,
-    ): Promise<boolean> => {
-      // Settings webhookUrl overrides prop
-      const targetUrl = settings.webhookUrl || webhookUrl;
-      // Skip if no URL, or if webhooks disabled (unless force is true for manual sends)
-      if (!targetUrl || (!settings.webhooksEnabled && !force)) return false;
-
-      try {
-        const response = await fetch(targetUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            event,
-            timestamp: Date.now(),
-            url:
-              typeof window !== "undefined" ? window.location.href : undefined,
-            ...payload,
-          }),
-        });
-        return response.ok;
-      } catch (error) {
-        console.warn("[Agentation] Webhook failed:", error);
-        return false;
-      }
-    },
-    [webhookUrl, settings.webhookUrl, settings.webhooksEnabled],
-  );
+  const {
+    copied,
+    sendState,
+    fireWebhook,
+    clearAll,
+    copyOutput,
+    sendToWebhook,
+  } = useAnnotationActions({
+    annotations,
+    pathname,
+    settings,
+    effectiveReactMode,
+    copyToClipboard,
+    resolvedEndpoint,
+    webhookUrl,
+    onAnnotationsClear,
+    onCopy,
+    onSubmit,
+    setAnnotations,
+    setAnimatedMarkers,
+    setIsClearing,
+    removeLocalStorageItem,
+  });
 
   const {
     addAnnotation,
@@ -1140,289 +770,6 @@ export function PageFeedbackToolbarCSS({
     onAnnotationDelete,
     onAnnotationUpdate,
   });
-
-  // Clear all with staggered animation
-  const clearAll = useCallback(() => {
-    const count = annotations.length;
-    if (count === 0) return;
-
-    // Fire callback with all annotations before clearing
-    onAnnotationsClear?.(annotations);
-    fireWebhook("annotations.clear", { annotations });
-
-    // Sync deletions to server (non-blocking)
-    if (resolvedEndpoint) {
-      Promise.all(
-        annotations.map((a) =>
-          deleteAnnotationFromServer(resolvedEndpoint, a.id).catch((error) => {
-            console.warn(
-              "[Agentation] Failed to delete annotation from server:",
-              error,
-            );
-          }),
-        ),
-      );
-    }
-
-    setIsClearing(true);
-    setCleared(true);
-
-    const totalAnimationTime = count * 30 + 200;
-    originalSetTimeout(() => {
-      setAnnotations([]);
-      setAnimatedMarkers(new Set()); // Reset animated markers
-      removeLocalStorageItem(getStorageKey(pathname));
-      setIsClearing(false);
-    }, totalAnimationTime);
-
-    originalSetTimeout(() => setCleared(false), 1500);
-  }, [pathname, annotations, onAnnotationsClear, fireWebhook, resolvedEndpoint]);
-
-  // Copy output
-  const copyOutput = useCallback(async () => {
-    const displayUrl =
-      typeof window !== "undefined"
-        ? window.location.pathname +
-          window.location.search +
-          window.location.hash
-        : pathname;
-    const output = generateOutput(
-      annotations,
-      displayUrl,
-      settings.outputDetail,
-      effectiveReactMode,
-    );
-    if (!output) return;
-
-    if (copyToClipboard) {
-      try {
-        await navigator.clipboard.writeText(output);
-      } catch {
-        // Clipboard may fail (permissions, not HTTPS, etc.) - continue anyway
-      }
-    }
-
-    // Fire callback with markdown output (always, regardless of clipboard success)
-    onCopy?.(output);
-
-    setCopied(true);
-    originalSetTimeout(() => setCopied(false), 2000);
-
-    if (settings.autoClearAfterCopy) {
-      originalSetTimeout(() => clearAll(), 500);
-    }
-  }, [
-    annotations,
-    pathname,
-    settings.outputDetail,
-    effectiveReactMode,
-    settings.autoClearAfterCopy,
-    clearAll,
-    copyToClipboard,
-    onCopy,
-  ]);
-
-  // Send to webhook
-  const sendToWebhook = useCallback(async () => {
-    const displayUrl =
-      typeof window !== "undefined"
-        ? window.location.pathname +
-          window.location.search +
-          window.location.hash
-        : pathname;
-    const output = generateOutput(
-      annotations,
-      displayUrl,
-      settings.outputDetail,
-      effectiveReactMode,
-    );
-    if (!output) return;
-
-    // Fire onSubmit callback
-    if (onSubmit) {
-      onSubmit(output, annotations);
-    }
-
-    // Start sending (arrow fades)
-    setSendState("sending");
-
-    // Brief delay for the fade effect
-    await new Promise((resolve) => originalSetTimeout(resolve, 150));
-
-    // Fire webhook and check result (force=true to bypass webhooksEnabled check for manual sends)
-    const success = await fireWebhook("submit", { output, annotations }, true);
-
-    // Show result
-    setSendState(success ? "sent" : "failed");
-    originalSetTimeout(() => setSendState("idle"), 2500);
-
-    // Clear annotations if send succeeded and autoClearAfterCopy is enabled
-    if (success && settings.autoClearAfterCopy) {
-      originalSetTimeout(() => clearAll(), 500);
-    }
-  }, [
-    onSubmit,
-    fireWebhook,
-    annotations,
-    pathname,
-    settings.outputDetail,
-    effectiveReactMode,
-    settings.autoClearAfterCopy,
-    clearAll,
-  ]);
-
-  // Toolbar dragging - mousemove and mouseup
-  useEffect(() => {
-    if (!dragStartPos) return;
-
-    const DRAG_THRESHOLD = 10; // pixels
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - dragStartPos.x;
-      const deltaY = e.clientY - dragStartPos.y;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-      // Start dragging once threshold is exceeded
-      if (!isDraggingToolbar && distance > DRAG_THRESHOLD) {
-        setIsDraggingToolbar(true);
-      }
-
-      if (isDraggingToolbar || distance > DRAG_THRESHOLD) {
-        // Calculate new position
-        let newX = dragStartPos.toolbarX + deltaX;
-        let newY = dragStartPos.toolbarY + deltaY;
-
-        // Constrain to viewport
-        const padding = 20;
-        const wrapperWidth = 297; // .toolbar wrapper width
-        const toolbarHeight = 44;
-
-        // Content is right-aligned within wrapper via margin-left: auto
-        // Calculate content width based on state
-        const contentWidth = isActive
-          ? connectionStatus === "connected"
-            ? 297
-            : 257
-          : 44; // collapsed circle
-
-        // Content offset from wrapper left edge
-        const contentOffset = wrapperWidth - contentWidth;
-
-        // Min X: content left edge >= padding
-        const minX = padding - contentOffset;
-        // Max X: wrapper right edge <= viewport - padding
-        const maxX = window.innerWidth - padding - wrapperWidth;
-
-        newX = Math.max(minX, Math.min(maxX, newX));
-        newY = Math.max(
-          padding,
-          Math.min(window.innerHeight - toolbarHeight - padding, newY),
-        );
-
-        setToolbarPosition({ x: newX, y: newY });
-      }
-    };
-
-    const handleMouseUp = () => {
-      // If we were actually dragging, set flag to prevent click event
-      if (isDraggingToolbar) {
-        justFinishedToolbarDragRef.current = true;
-      }
-      setIsDraggingToolbar(false);
-      setDragStartPos(null);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [dragStartPos, isDraggingToolbar, isActive, connectionStatus]);
-
-  // Handle toolbar drag start
-  const handleToolbarMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      // Only drag when clicking the toolbar background (not buttons or settings)
-      if (
-        (e.target as HTMLElement).closest("button") ||
-        (e.target as HTMLElement).closest(`.${styles.settingsPanel}`)
-      ) {
-        return;
-      }
-
-      // Don't prevent default yet - let onClick work for collapsed state
-
-      // Get toolbar parent's actual current position (toolbarPosition is applied to parent)
-      const toolbarParent = (e.currentTarget as HTMLElement).parentElement;
-      if (!toolbarParent) return;
-
-      const rect = toolbarParent.getBoundingClientRect();
-      const currentX = toolbarPosition?.x ?? rect.left;
-      const currentY = toolbarPosition?.y ?? rect.top;
-
-      // Generate random rotation between -5 and 5 degrees
-      const randomRotation = (Math.random() - 0.5) * 10; // -5 to +5
-      setDragRotation(randomRotation);
-
-      setDragStartPos({
-        x: e.clientX,
-        y: e.clientY,
-        toolbarX: currentX,
-        toolbarY: currentY,
-      });
-      // Don't set isDraggingToolbar yet - wait for actual movement
-    },
-    [toolbarPosition],
-  );
-
-  // Keep toolbar in view on window resize and when toolbar expands/collapses
-  useEffect(() => {
-    if (!toolbarPosition) return;
-
-    const constrainPosition = () => {
-      const padding = 20;
-      const wrapperWidth = 297; // .toolbar wrapper width
-      const toolbarHeight = 44;
-
-      let newX = toolbarPosition.x;
-      let newY = toolbarPosition.y;
-
-      // Content is right-aligned within wrapper via margin-left: auto
-      // Calculate content width based on state
-      const contentWidth = isActive
-        ? connectionStatus === "connected"
-          ? 297
-          : 257
-        : 44; // collapsed circle
-
-      // Content offset from wrapper left edge
-      const contentOffset = wrapperWidth - contentWidth;
-
-      // Min X: content left edge >= padding
-      const minX = padding - contentOffset;
-      // Max X: wrapper right edge <= viewport - padding
-      const maxX = window.innerWidth - padding - wrapperWidth;
-
-      newX = Math.max(minX, Math.min(maxX, newX));
-      newY = Math.max(
-        padding,
-        Math.min(window.innerHeight - toolbarHeight - padding, newY),
-      );
-
-      // Only update if position changed
-      if (newX !== toolbarPosition.x || newY !== toolbarPosition.y) {
-        setToolbarPosition({ x: newX, y: newY });
-      }
-    };
-
-    // Constrain immediately when isActive changes or on mount
-    constrainPosition();
-
-    window.addEventListener("resize", constrainPosition);
-    return () => window.removeEventListener("resize", constrainPosition);
-  }, [toolbarPosition, isActive, connectionStatus]);
 
   const {
     isAltSelectionHeld,
@@ -1604,20 +951,31 @@ export function PageFeedbackToolbarCSS({
     setHoveredComponentMenuIndex(null);
   }
 
+  const toolbarContainerClassName = `${styles.toolbarContainer} ${
+    !isDarkMode ? styles.light : ""
+  } ${isActive ? styles.expanded : styles.collapsed} ${
+    showEntranceAnimation ? styles.entrance : ""
+  } ${isToolbarHiding ? styles.hiding : ""} ${
+    isDraggingToolbar ? styles.dragging : ""
+  } ${
+    !settings.webhooksEnabled &&
+    (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || ""))
+      ? styles.serverConnected
+      : ""
+  }`;
+
   return createPortal(
     <div ref={portalWrapperRef} style={{ display: "contents" }}>
       {/* Toolbar */}
       <ToolbarShell className={userClassName} toolbarPosition={toolbarPosition}>
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={toolbarContainerClassName}
           onClick={
             !isActive
-              ? (e) => {
-                  // Don't activate if we just finished dragging
-                  if (justFinishedToolbarDragRef.current) {
-                    justFinishedToolbarDragRef.current = false;
-                    e.preventDefault();
+              ? (event) => {
+                  if (consumeJustFinishedToolbarDrag()) {
+                    event.preventDefault();
                     return;
                   }
                   setIsActive(true);
@@ -1728,569 +1086,43 @@ export function PageFeedbackToolbarCSS({
         startEditAnnotation={startEditAnnotation}
       />
 
-      {/* Interactive overlay */}
-      {isActive && (
-        <div
-          className={styles.overlay}
-          data-feedback-toolbar
-          style={
-            pendingAnnotation || editingAnnotation
-              ? { zIndex: 99999 }
-              : undefined
-          }
-        >
-          {/* Hover highlight */}
-          {hoverInfo?.rect &&
-            !pendingAnnotation &&
-            !isScrolling &&
-            !isDragging && (
-              <div
-                className={`${styles.hoverHighlight} ${styles.enter}`}
-                style={{
-                  left: hoverInfo.rect.left,
-                  top: hoverInfo.rect.top,
-                  width: hoverInfo.rect.width,
-                  height: hoverInfo.rect.height,
-                  borderColor: `${settings.annotationColor}80`,
-                  backgroundColor: `${settings.annotationColor}0A`,
-                  ...(hoverInfo.isPiercing ? { borderStyle: "dashed" } : {}),
-                }}
-              />
-            )}
-
-          {/* Cmd+shift+click multi-select highlights (during selection, before releasing modifiers) */}
-          {pendingMultiSelectElements
-            .filter((item) => document.contains(item.element))
-            .map((item, index) => {
-              const rect = item.element.getBoundingClientRect();
-              // Only show green if 2+ elements selected, otherwise use default blue
-              const isMulti = pendingMultiSelectElements.length > 1;
-              return (
-                <div
-                  key={index}
-                  className={
-                    isMulti
-                      ? styles.multiSelectOutline
-                      : styles.singleSelectOutline
-                  }
-                  style={{
-                    position: "fixed",
-                    left: rect.left,
-                    top: rect.top,
-                    width: rect.width,
-                    height: rect.height,
-                    ...(isMulti
-                      ? {}
-                      : {
-                          borderColor: `${settings.annotationColor}99`,
-                          backgroundColor: `${settings.annotationColor}0D`,
-                        }),
-                  }}
-                />
-              );
-            })}
-
-          {/* Marker hover outline (shows bounding box of hovered annotation) */}
-          {hoveredMarkerId &&
-            !pendingAnnotation &&
-            (() => {
-              const hoveredAnnotation = annotations.find(
-                (a) => a.id === hoveredMarkerId,
-              );
-              if (!hoveredAnnotation?.boundingBox) return null;
-
-              // Render individual element boxes if available (cmd+shift+click multi-select)
-              if (hoveredAnnotation.elementBoundingBoxes?.length) {
-                // Use live positions from hoveredTargetElements when available
-                if (hoveredTargetElements.length > 0) {
-                  return hoveredTargetElements
-                    .filter((el) => document.contains(el))
-                    .map((el, index) => {
-                      const rect = el.getBoundingClientRect();
-                      return (
-                        <div
-                          key={`hover-outline-live-${index}`}
-                          className={`${styles.multiSelectOutline} ${styles.enter}`}
-                          style={{
-                            left: rect.left,
-                            top: rect.top,
-                            width: rect.width,
-                            height: rect.height,
-                          }}
-                        />
-                      );
-                    });
-                }
-                // Fallback to stored bounding boxes
-                return hoveredAnnotation.elementBoundingBoxes.map(
-                  (bb, index) => (
-                    <div
-                      key={`hover-outline-${index}`}
-                      className={`${styles.multiSelectOutline} ${styles.enter}`}
-                      style={{
-                        left: bb.x,
-                        top: bb.y - scrollY,
-                        width: bb.width,
-                        height: bb.height,
-                      }}
-                    />
-                  ),
-                );
-              }
-
-              // Single element: use live position from hoveredTargetElement when available
-              const rect =
-                hoveredTargetElement && document.contains(hoveredTargetElement)
-                  ? hoveredTargetElement.getBoundingClientRect()
-                  : null;
-
-              const bb = rect
-                ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
-                : {
-                    x: hoveredAnnotation.boundingBox.x,
-                    y: hoveredAnnotation.isFixed
-                      ? hoveredAnnotation.boundingBox.y
-                      : hoveredAnnotation.boundingBox.y - scrollY,
-                    width: hoveredAnnotation.boundingBox.width,
-                    height: hoveredAnnotation.boundingBox.height,
-                  };
-
-              const isMulti = hoveredAnnotation.isMultiSelect;
-              return (
-                <div
-                  className={`${isMulti ? styles.multiSelectOutline : styles.singleSelectOutline} ${styles.enter}`}
-                  style={{
-                    left: bb.x,
-                    top: bb.y,
-                    width: bb.width,
-                    height: bb.height,
-                    ...(isMulti
-                      ? {}
-                      : {
-                          borderColor: `${settings.annotationColor}99`,
-                          backgroundColor: `${settings.annotationColor}0D`,
-                        }),
-                  }}
-                />
-              );
-            })()}
-
-          {/* Hover tooltip */}
-          {hoverInfo && !pendingAnnotation && !isScrolling && !isDragging && (
-            <div
-              className={`${styles.hoverTooltip} ${styles.enter}`}
-              style={{
-                left: Math.max(
-                  8,
-                  Math.min(hoverPosition.x, window.innerWidth - 100),
-                ),
-                top: Math.max(
-                  hoverPosition.y - (hoverInfo.isPiercing ? 62 : hoverInfo.reactComponents ? 48 : 32),
-                  8,
-                ),
-              }}
-            >
-              {hoverInfo.isPiercing && (
-                <div className={styles.hoverPierceIndicator}>
-                  {"⇣ deep select"}
-                </div>
-              )}
-              {hoverInfo.reactComponents && (
-                <div className={styles.hoverReactPath}>
-                  {hoverInfo.reactComponents}
-                </div>
-              )}
-              <div className={styles.hoverElementName}>
-                {hoverInfo.elementName}
-              </div>
-            </div>
-          )}
-
-          {componentMenu && (
-            <div
-              data-component-source-menu
-              style={{
-                position: "fixed",
-                left: Math.min(componentMenu.x, window.innerWidth - 440),
-                top: Math.min(
-                  componentMenu.y,
-                  Math.max(16, window.innerHeight - 24 - componentMenu.items.length * 72),
-                ),
-                zIndex: 2147483647,
-                minWidth: 420,
-                maxWidth: 460,
-                background: isDarkMode ? "#111827" : "#ffffff",
-                color: isDarkMode ? "#f9fafb" : "#111827",
-                fontFamily:
-                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.12)" : "rgba(17,24,39,0.12)"}`,
-                borderRadius: 12,
-                boxShadow: "0 24px 48px rgba(0,0,0,0.22)",
-                padding: 8,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              {componentMenu.items.map((item, index) => {
-                const propNames = Object.keys(item.props);
-                const sourceLabel = formatComponentSourcePath(item.source);
-
-                return (
-                  <button
-                    key={`${item.displayName}-${item.source.fileName}-${item.source.lineNumber}-${index}`}
-                    type="button"
-                    onClick={() => {
-                      void openComponentSource(item);
-                    }}
-                    onMouseEnter={() => setHoveredComponentMenuIndex(index)}
-                    onMouseLeave={() => setHoveredComponentMenuIndex((current) => current === index ? null : current)}
-                    onFocus={() => setHoveredComponentMenuIndex(index)}
-                    onBlur={() => setHoveredComponentMenuIndex((current) => current === index ? null : current)}
-                    style={{
-                      all: "unset",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                      background:
-                        hoveredComponentMenuIndex === index
-                          ? isDarkMode
-                            ? "rgba(96,165,250,0.22)"
-                            : "rgba(59,130,246,0.14)"
-                          : isDarkMode
-                            ? "rgba(255,255,255,0.04)"
-                            : "rgba(15,23,42,0.03)",
-                      boxShadow:
-                        hoveredComponentMenuIndex === index
-                          ? isDarkMode
-                            ? "inset 0 0 0 1px rgba(147,197,253,0.28)"
-                            : "inset 0 0 0 1px rgba(59,130,246,0.2)"
-                          : "none",
-                      transform: hoveredComponentMenuIndex === index ? "translateY(-1px)" : "none",
-                      transition: "background 120ms ease, box-shadow 120ms ease, transform 120ms ease",
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
-                      {`<${item.displayName}>`}
-                    </div>
-                    {propNames.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {propNames.map((propName) => (
-                          <span
-                            key={propName}
-                            title={item.props[propName]}
-                            style={{
-                              fontSize: 11,
-                              lineHeight: 1,
-                              padding: "4px 6px",
-                              borderRadius: 999,
-                              background: isDarkMode ? "rgba(96,165,250,0.18)" : "rgba(59,130,246,0.12)",
-                              color: isDarkMode ? "#bfdbfe" : "#1d4ed8",
-                            }}
-                          >
-                            {propName}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <div
-                      title={sourceLabel}
-                      style={{
-                        fontSize: 11,
-                        lineHeight: 1.3,
-                        opacity: 0.75,
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        direction: "rtl",
-                        textAlign: "left",
-                      }}
-                    >
-                      {sourceLabel}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Pending annotation marker + popup */}
-          {pendingAnnotation && (
-            <>
-              {/* Show element/area outline while adding annotation */}
-              {pendingAnnotation.multiSelectElements?.length
-                ? // Cmd+shift+click multi-select: show individual boxes with live positions
-                  pendingAnnotation.multiSelectElements
-                    .filter((el) => document.contains(el))
-                    .map((el, index) => {
-                      const rect = el.getBoundingClientRect();
-                      return (
-                        <div
-                          key={`pending-multi-${index}`}
-                          className={`${styles.multiSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
-                          style={{
-                            left: rect.left,
-                            top: rect.top,
-                            width: rect.width,
-                            height: rect.height,
-                          }}
-                        />
-                      );
-                    })
-                : // Single element or drag multi-select: show single box
-                  pendingAnnotation.targetElement &&
-                  document.contains(pendingAnnotation.targetElement)
-                    ? // Single-click: use live getBoundingClientRect for consistent positioning
-                      (() => {
-                        const rect =
-                          pendingAnnotation.targetElement!.getBoundingClientRect();
-                        return (
-                          <div
-                            className={`${styles.singleSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
-                            style={{
-                              left: rect.left,
-                              top: rect.top,
-                              width: rect.width,
-                              height: rect.height,
-                              borderColor: `${settings.annotationColor}99`,
-                              backgroundColor: `${settings.annotationColor}0D`,
-                            }}
-                          />
-                        );
-                      })()
-                    : // Drag selection or fallback: use stored boundingBox
-                      pendingAnnotation.boundingBox && (
-                        <div
-                          className={`${pendingAnnotation.isMultiSelect ? styles.multiSelectOutline : styles.singleSelectOutline} ${pendingExiting ? styles.exit : styles.enter}`}
-                          style={{
-                            left: pendingAnnotation.boundingBox.x,
-                            top: pendingAnnotation.boundingBox.y - scrollY,
-                            width: pendingAnnotation.boundingBox.width,
-                            height: pendingAnnotation.boundingBox.height,
-                            ...(pendingAnnotation.isMultiSelect
-                              ? {}
-                              : {
-                                  borderColor: `${settings.annotationColor}99`,
-                                  backgroundColor: `${settings.annotationColor}0D`,
-                                }),
-                          }}
-                        />
-                      )}
-
-              {(() => {
-                // Use stored coordinates - they match what will be saved
-                const markerX = pendingAnnotation.x;
-                const markerY = pendingAnnotation.isFixed
-                  ? pendingAnnotation.y
-                  : pendingAnnotation.y - scrollY;
-
-                return (
-                  <>
-                    <div
-                      className={`${styles.marker} ${styles.pending} ${pendingAnnotation.isMultiSelect ? styles.multiSelect : ""} ${pendingExiting ? styles.exit : styles.enter}`}
-                      style={{
-                        left: `${markerX}%`,
-                        top: markerY,
-                        backgroundColor: pendingAnnotation.isMultiSelect
-                          ? "#34C759"
-                          : settings.annotationColor,
-                      }}
-                    >
-                      <IconPlus size={12} />
-                    </div>
-
-                    <AnnotationPopupCSS
-                      ref={popupRef}
-                      element={pendingAnnotation.element}
-                      selectedText={pendingAnnotation.selectedText}
-                      computedStyles={pendingAnnotation.computedStylesObj}
-                      placeholder={
-                        pendingAnnotation.element === "Area selection"
-                          ? "What should change in this area?"
-                          : pendingAnnotation.isMultiSelect
-                            ? "Feedback for this group of elements..."
-                            : "What should change?"
-                      }
-                      onSubmit={addAnnotation}
-                      onCancel={cancelAnnotation}
-                      isExiting={pendingExiting}
-                      lightMode={!isDarkMode}
-                      accentColor={
-                        pendingAnnotation.isMultiSelect
-                          ? "#34C759"
-                          : settings.annotationColor
-                      }
-                      style={{
-                        // Popup is 280px wide, centered with translateX(-50%), so 140px each side
-                        // Clamp so popup stays 20px from viewport edges
-                        left: Math.max(
-                          160,
-                          Math.min(
-                            window.innerWidth - 160,
-                            (markerX / 100) * window.innerWidth,
-                          ),
-                        ),
-                        // Position popup above or below marker to keep marker visible
-                        ...(markerY > window.innerHeight - 290
-                          ? { bottom: window.innerHeight - markerY + 20 }
-                          : { top: markerY + 20 }),
-                      }}
-                    />
-                  </>
-                );
-              })()}
-            </>
-          )}
-
-          {/* Edit annotation popup */}
-          {editingAnnotation && (
-            <>
-              {/* Show element/area outline while editing */}
-              {editingAnnotation.elementBoundingBoxes?.length
-                ? // Cmd+shift+click: show individual element boxes (use live rects when available)
-                  (() => {
-                    // Use live positions from editingTargetElements when available
-                    if (editingTargetElements.length > 0) {
-                      return editingTargetElements
-                        .filter((el) => document.contains(el))
-                        .map((el, index) => {
-                          const rect = el.getBoundingClientRect();
-                          return (
-                            <div
-                              key={`edit-multi-live-${index}`}
-                              className={`${styles.multiSelectOutline} ${styles.enter}`}
-                              style={{
-                                left: rect.left,
-                                top: rect.top,
-                                width: rect.width,
-                                height: rect.height,
-                              }}
-                            />
-                          );
-                        });
-                    }
-                    // Fallback to stored bounding boxes
-                    return editingAnnotation.elementBoundingBoxes!.map(
-                      (bb, index) => (
-                        <div
-                          key={`edit-multi-${index}`}
-                          className={`${styles.multiSelectOutline} ${styles.enter}`}
-                          style={{
-                            left: bb.x,
-                            top: bb.y - scrollY,
-                            width: bb.width,
-                            height: bb.height,
-                          }}
-                        />
-                      ),
-                    );
-                  })()
-                : // Single element or drag multi-select: show single box
-                  (() => {
-                    // Use live position from editingTargetElement when available
-                    const rect =
-                      editingTargetElement &&
-                      document.contains(editingTargetElement)
-                        ? editingTargetElement.getBoundingClientRect()
-                        : null;
-
-                    const bb = rect
-                      ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
-                      : editingAnnotation.boundingBox
-                        ? {
-                            x: editingAnnotation.boundingBox.x,
-                            y: editingAnnotation.isFixed
-                              ? editingAnnotation.boundingBox.y
-                              : editingAnnotation.boundingBox.y - scrollY,
-                            width: editingAnnotation.boundingBox.width,
-                            height: editingAnnotation.boundingBox.height,
-                          }
-                        : null;
-
-                    if (!bb) return null;
-
-                    return (
-                      <div
-                        className={`${editingAnnotation.isMultiSelect ? styles.multiSelectOutline : styles.singleSelectOutline} ${styles.enter}`}
-                        style={{
-                          left: bb.x,
-                          top: bb.y,
-                          width: bb.width,
-                          height: bb.height,
-                          ...(editingAnnotation.isMultiSelect
-                            ? {}
-                            : {
-                                borderColor: `${settings.annotationColor}99`,
-                                backgroundColor: `${settings.annotationColor}0D`,
-                              }),
-                        }}
-                      />
-                    );
-                  })()}
-
-              <AnnotationPopupCSS
-                ref={editPopupRef}
-                element={editingAnnotation.element}
-                selectedText={editingAnnotation.selectedText}
-                computedStyles={parseComputedStylesString(
-                  editingAnnotation.computedStyles,
-                )}
-                placeholder="Edit your feedback..."
-                initialValue={editingAnnotation.comment}
-                submitLabel="Save"
-                onSubmit={updateAnnotation}
-                onCancel={cancelEditAnnotation}
-                onDelete={() => deleteAnnotation(editingAnnotation.id)}
-                isExiting={editExiting}
-                lightMode={!isDarkMode}
-                thread={editingAnnotation.thread}
-                onReply={resolvedEndpoint ? handleThreadReply : undefined}
-                isReplySending={isReplySending}
-                accentColor={
-                  editingAnnotation.isMultiSelect
-                    ? "#34C759"
-                    : settings.annotationColor
-                }
-                style={(() => {
-                  const markerY = editingAnnotation.isFixed
-                    ? editingAnnotation.y
-                    : editingAnnotation.y - scrollY;
-                  return {
-                    // Popup is 280px wide, centered with translateX(-50%), so 140px each side
-                    // Clamp so popup stays 20px from viewport edges
-                    left: Math.max(
-                      160,
-                      Math.min(
-                        window.innerWidth - 160,
-                        (editingAnnotation.x / 100) * window.innerWidth,
-                      ),
-                    ),
-                    // Position popup above or below marker to keep marker visible
-                    ...(markerY > window.innerHeight - 290
-                      ? { bottom: window.innerHeight - markerY + 20 }
-                      : { top: markerY + 20 }),
-                  };
-                })()}
-              />
-            </>
-          )}
-
-          {/* Drag selection - all visuals use refs for smooth 60fps */}
-          {isDragging && (
-            <>
-              <div ref={dragRectRef} className={styles.dragSelection} />
-              <div
-                ref={highlightsContainerRef}
-                className={styles.highlightsContainer}
-              />
-            </>
-          )}
-        </div>
-      )}
+      <InteractionOverlay
+        isActive={isActive}
+        pendingAnnotation={pendingAnnotation}
+        editingAnnotation={editingAnnotation}
+        hoverInfo={hoverInfo}
+        isScrolling={isScrolling}
+        isDragging={isDragging}
+        annotationColor={settings.annotationColor}
+        pendingMultiSelectElements={pendingMultiSelectElements}
+        hoveredMarkerId={hoveredMarkerId}
+        annotations={annotations}
+        hoveredTargetElement={hoveredTargetElement}
+        hoveredTargetElements={hoveredTargetElements}
+        scrollY={scrollY}
+        hoverPosition={hoverPosition}
+        componentMenu={componentMenu}
+        isDarkMode={isDarkMode}
+        hoveredComponentMenuIndex={hoveredComponentMenuIndex}
+        setHoveredComponentMenuIndex={setHoveredComponentMenuIndex}
+        openComponentSource={openComponentSource}
+        pendingExiting={pendingExiting}
+        popupRef={popupRef}
+        addAnnotation={addAnnotation}
+        cancelAnnotation={cancelAnnotation}
+        editingTargetElement={editingTargetElement}
+        editingTargetElements={editingTargetElements}
+        editPopupRef={editPopupRef}
+        updateAnnotation={updateAnnotation}
+        cancelEditAnnotation={cancelEditAnnotation}
+        deleteAnnotation={deleteAnnotation}
+        editExiting={editExiting}
+        resolvedEndpoint={resolvedEndpoint}
+        handleThreadReply={handleThreadReply}
+        isReplySending={isReplySending}
+        dragRectRef={dragRectRef}
+        highlightsContainerRef={highlightsContainerRef}
+      />
     </div>,
     document.body,
   );
