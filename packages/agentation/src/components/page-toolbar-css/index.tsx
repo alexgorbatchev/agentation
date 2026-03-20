@@ -500,7 +500,7 @@ export type PageFeedbackToolbarCSSProps = {
   onSubmit?: (output: string, annotations: Annotation[]) => void;
   /** Whether to copy to clipboard when the copy button is clicked. Defaults to true. */
   copyToClipboard?: boolean;
-  /** Server URL for sync (e.g., "http://127.0.0.1:4747"). Optional; auto-defaults to local Agentation endpoint in development. */
+  /** Server URL for sync (e.g., "http://127.0.0.1:4747"). Optional; if omitted, Agentation probes the local endpoint once on page load. */
   endpoint?: string;
   /** Project identifier used to scope server sessions for multi-project agent loops. */
   projectId?: string;
@@ -569,15 +569,40 @@ export function PageFeedbackToolbarCSS({
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
 
+  const [autoDiscoveredEndpoint, setAutoDiscoveredEndpoint] = useState("");
   const hasExplicitEndpoint =
     typeof endpoint === "string" && endpoint.trim() !== "";
-  const shouldAutoDiscoverEndpoint =
-    typeof process !== "undefined" && process.env.NODE_ENV === "development";
+  const shouldAutoConnectOnce =
+    !hasExplicitEndpoint &&
+    typeof process !== "undefined" &&
+    process.env.NODE_ENV !== "test";
   const resolvedEndpoint = hasExplicitEndpoint
     ? endpoint.trim()
-    : shouldAutoDiscoverEndpoint
-      ? DEFAULT_AGENTATION_ENDPOINT
-      : "";
+    : autoDiscoveredEndpoint;
+
+  useEffect(() => {
+    if (!shouldAutoConnectOnce || autoDiscoveredEndpoint) {
+      return;
+    }
+
+    let cancelled = false;
+    const probeDefaultEndpoint = async (): Promise<void> => {
+      try {
+        const response = await fetch(`${DEFAULT_AGENTATION_ENDPOINT}/health`);
+        if (!cancelled && response.ok) {
+          setAutoDiscoveredEndpoint(DEFAULT_AGENTATION_ENDPOINT);
+        }
+      } catch {
+        // Ignore probe failures and keep local-only mode.
+      }
+    };
+
+    void probeDefaultEndpoint();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoDiscoveredEndpoint, shouldAutoConnectOnce]);
 
   // Stop native events from bubbling past document.body when they originate
   // inside the toolbar portal. Without this, clicks on the toolbar propagate to

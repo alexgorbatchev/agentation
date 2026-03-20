@@ -428,8 +428,8 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       expect(toolbar).toBeTruthy();
     });
 
-    it("uses default endpoint in development when endpoint prop is not provided", async () => {
-      vi.stubEnv("NODE_ENV", "development");
+    it("uses default endpoint when endpoint prop is not provided", async () => {
+      vi.stubEnv("NODE_ENV", "production");
       setupBasicServerMocks("session-default-endpoint");
       render(<PageFeedbackToolbarCSS />);
 
@@ -441,6 +441,31 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         );
         expect(sessionCalls.length).toBeGreaterThanOrEqual(1);
       });
+    });
+
+    it("probes the default endpoint once on page load when endpoint prop is not provided", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === "http://127.0.0.1:4747/health") {
+          return { ok: false, status: 503 } as Response;
+        }
+        return { ok: false, status: 404 } as Response;
+      });
+
+      render(<PageFeedbackToolbarCSS />);
+
+      await waitFor(() => {
+        const probeCalls = mockFetch.mock.calls.filter(
+          ([url]: [string]) => url === "http://127.0.0.1:4747/health"
+        );
+        expect(probeCalls.length).toBe(1);
+      });
+
+      const sessionCalls = mockFetch.mock.calls.filter(
+        ([url, opts]: [string, RequestInit?]) =>
+          url === "http://127.0.0.1:4747/sessions" && opts?.method === "POST"
+      );
+      expect(sessionCalls.length).toBe(0);
     });
   });
 

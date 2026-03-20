@@ -53,7 +53,7 @@ The toolbar appears in the bottom-right corner. Click to activate, then click an
 | `onCopy` | `(markdown: string) => void` | - | Callback with markdown output when copy is clicked |
 | `onSubmit` | `(output: string, annotations: Annotation[]) => void` | - | Called when "Send Annotations" is clicked |
 | `copyToClipboard` | `boolean` | `true` | Set to false to prevent writing to clipboard |
-| `endpoint` | `string` | _optional_ | Server URL for Agent Sync (auto-defaults to `http://127.0.0.1:4747` in development) |
+| `endpoint` | `string` | _optional_ | Server URL for Agent Sync (if omitted, Agentation probes `http://127.0.0.1:4747` once on page load and uses it when reachable) |
 | `projectId` | `string` | _required_ | Project scope ID used by Agentation CLI/watch routing |
 | `sessionId` | `string` | - | Pre-existing session ID to join |
 | `onSessionCreated` | `(sessionId: string) => void` | - | Called when a new session is created |

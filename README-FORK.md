@@ -12,6 +12,7 @@ This fork exists because I wanted a set of workflow features for my own day-to-d
 - **Review queue for resolved annotations** to manage follow-up workflows
 - **MCP replaced by the local CLI** workflow ([`cli/README.md`](cli/README.md))
 - **Local CLI/server support** for surfacing human thread replies in local environments ([`cli/README.md`](cli/README.md))
+- **Endpoint auto-probe on load**: if `endpoint` is omitted, the toolbar attempts one health probe against `http://127.0.0.1:4747` and uses local sync only when reachable
 - **Storybook + expanded automated test coverage**
 - **Neovim integration** with local multi-project routing support ([`nvim/README.md`](nvim/README.md))
 - **[pi](https://pi.dev) plugin integration** ([`packages/pi-agentation/README.md`](packages/pi-agentation/README.md))
