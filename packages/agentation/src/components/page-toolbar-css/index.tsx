@@ -5,18 +5,8 @@ import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
 import type { AnnotationPopupCSSHandle } from "../annotation-popup-css";
-import {
-  identifyElement,
-  getNearbyText,
-  getElementClasses,
-} from "../../utils/element-identification";
-import {
-  saveAnnotations,
-  getStorageKey,
-  saveAnnotationsWithSyncMarker,
-  loadToolbarHidden,
-  saveToolbarHidden,
-} from "../../utils/storage";
+import { identifyElement } from "../../utils/element-identification";
+import { loadToolbarHidden, saveToolbarHidden } from "../../utils/storage";
 import { getReactComponentName } from "../../utils/react-detection";
 import {
   getSourceLocation,
@@ -38,8 +28,10 @@ import {
 
 import type { Annotation } from "../../types";
 import { useAnnotationActions } from "./hooks/useAnnotationActions";
+import { useAnnotationPersistence } from "./hooks/useAnnotationPersistence";
 import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
 import { useAnnotationState } from "./hooks/useAnnotationState";
+import { useDemoAnnotations } from "./hooks/useDemoAnnotations";
 import { useDragSelectionLifecycle } from "./hooks/useDragSelectionLifecycle";
 import { useEndpointDiscovery } from "./hooks/useEndpointDiscovery";
 import {
@@ -56,6 +48,7 @@ import { useToolbarActiveLifecycle } from "./hooks/useToolbarActiveLifecycle";
 import { useToolbarDragging } from "./hooks/useToolbarDragging";
 import { useToolbarInteractions } from "./hooks/useToolbarInteractions";
 import { useToolbarPreferences } from "./hooks/useToolbarPreferences";
+import { useScrollState } from "./hooks/useScrollState";
 import { useToolbarRenderTransitions } from "./hooks/useToolbarRenderTransitions";
 import { InteractionOverlay } from "./components/InteractionOverlay";
 import { MarkersLayer } from "./components/MarkersLayer";
@@ -388,7 +381,6 @@ export function PageFeedbackToolbarCSS({
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
 
   const {
     isDragging,
@@ -404,9 +396,10 @@ export function PageFeedbackToolbarCSS({
     selectedElementHighlightClassName: styles.selectedElementHighlight,
   });
 
-  useEffect(() => {
-    setScrollY(window.scrollY);
-  }, []);
+  useScrollState({
+    setScrollY,
+    setIsScrolling,
+  });
 
   const handleClearReviewedAnnotations = useCallback(() => {
     clearReviewedAnnotations(() => setShowReviewQueue(false));
@@ -425,99 +418,23 @@ export function PageFeedbackToolbarCSS({
     }, 400);
   }, [isToolbarHiding]);
 
-  // Demo annotations
-  useEffect(() => {
-    if (!enableDemoMode) return;
-    if (!mounted || !demoAnnotations || demoAnnotations.length === 0) return;
-    if (annotations.length > 0) return;
+  useDemoAnnotations({
+    enableDemoMode,
+    mounted,
+    demoAnnotations,
+    demoDelay,
+    hasAnnotations: annotations.length > 0,
+    setIsActive,
+    setAnnotations,
+  });
 
-    const timeoutIds: ReturnType<typeof originalSetTimeout>[] = [];
-    const initialActivationDelay = Math.max(0, demoDelay - 200);
-
-    timeoutIds.push(
-      originalSetTimeout(() => {
-        setIsActive(true);
-      }, initialActivationDelay),
-    );
-
-    demoAnnotations.forEach((demo, index) => {
-      const annotationDelay = demoDelay + index * 300;
-
-      timeoutIds.push(
-        originalSetTimeout(() => {
-          const element = document.querySelector(demo.selector) as HTMLElement;
-          if (!element) return;
-
-          const rect = element.getBoundingClientRect();
-          const { name, path } = identifyElement(element);
-
-          const newAnnotation: Annotation = {
-            id: `demo-${Date.now()}-${index}`,
-            x: ((rect.left + rect.width / 2) / window.innerWidth) * 100,
-            y: rect.top + rect.height / 2 + window.scrollY,
-            comment: demo.comment,
-            element: name,
-            elementPath: path,
-            timestamp: Date.now(),
-            selectedText: demo.selectedText,
-            boundingBox: {
-              x: rect.left,
-              y: rect.top + window.scrollY,
-              width: rect.width,
-              height: rect.height,
-            },
-            nearbyText: getNearbyText(element),
-            cssClasses: getElementClasses(element),
-          };
-
-          setAnnotations((prev) => [...prev, newAnnotation]);
-        }, annotationDelay),
-      );
-    });
-
-    return () => {
-      timeoutIds.forEach(clearTimeout);
-    };
-  }, [enableDemoMode, mounted, demoAnnotations, demoDelay]);
-
-  // Track scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-      setIsScrolling(true);
-
-      if (scrollTimeoutRef.current) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
-
-      scrollTimeoutRef.current = originalSetTimeout(() => {
-        setIsScrolling(false);
-      }, 150);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (scrollTimeoutRef.current) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Save annotations (preserving sync markers if connected to a session)
-  useEffect(() => {
-    if (mounted && annotations.length > 0) {
-      if (currentSessionId) {
-        // Connected to session - save with sync marker to prevent re-upload on refresh
-        saveAnnotationsWithSyncMarker(pathname, annotations, currentSessionId);
-      } else {
-        // Not connected - save without markers (will sync when connected)
-        saveAnnotations(pathname, annotations);
-      }
-    } else if (mounted && annotations.length === 0) {
-      removeLocalStorageItem(getStorageKey(pathname));
-    }
-  }, [annotations, pathname, mounted, currentSessionId]);
+  useAnnotationPersistence({
+    mounted,
+    annotations,
+    pathname,
+    currentSessionId,
+    removeLocalStorageItem,
+  });
 
   // Freeze animations (delegates to freeze-animations utility)
   const freezeAnimations = useCallback(() => {
