@@ -1107,7 +1107,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       expect(connecting).toBeNull();
     });
 
-    it("does not show MCP indicator when disconnected", async () => {
+    it("shows MCP disconnected indicator when disconnected", async () => {
       // Both health and session fail
       mockFetch.mockImplementation(async () => {
         throw new Error("Network error");
@@ -1121,11 +1121,11 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         expect(console.warn).toHaveBeenCalled();
       });
 
-      // Should not show Connected or Connecting indicator
-      // (disconnected status means no indicator rendered per the condition:
-      //  endpoint && connectionStatus !== "disconnected")
+      const disconnected = document.querySelector('[title="MCP Disconnected"]');
       const connected = document.querySelector('[title="MCP Connected"]');
       const connecting = document.querySelector('[title="MCP Connecting..."]');
+
+      expect(disconnected).toBeTruthy();
       expect(connected).toBeNull();
       expect(connecting).toBeNull();
     });

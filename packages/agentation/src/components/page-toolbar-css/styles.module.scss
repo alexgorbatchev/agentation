@@ -559,6 +559,11 @@ $green: #34c759;
     animation: mcpIndicatorPulseConnecting 1.5s ease-in-out infinite;
   }
 
+  &.disconnected {
+    background: $red;
+    animation: none;
+  }
+
   &.hidden {
     opacity: 0;
     transform: scale(0);
@@ -1407,6 +1412,11 @@ $green: #34c759;
   &.connecting {
     background: #f5a623;
     animation: mcpPulse 1.5s ease-in-out infinite;
+  }
+
+  &.disconnected {
+    background: $red;
+    animation: mcpPulseError 2s infinite;
   }
 }
 

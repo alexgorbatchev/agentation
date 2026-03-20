@@ -1936,13 +1936,15 @@ export function PageFeedbackToolbarCSS({
               >
                 <IconGear size={24} />
               </button>
-              {resolvedEndpoint && connectionStatus !== "disconnected" && (
+              {resolvedEndpoint && (
                 <span
                   className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
                   title={
                     connectionStatus === "connected"
                       ? "MCP Connected"
-                      : "MCP Connecting..."
+                      : connectionStatus === "connecting"
+                        ? "MCP Connecting..."
+                        : "MCP Disconnected"
                   }
                 />
               )}
@@ -2254,7 +2256,7 @@ export function PageFeedbackToolbarCSS({
                   >
                     <span>Manage Connections</span>
                     <span className={styles.settingsNavLinkRight}>
-                      {resolvedEndpoint && connectionStatus !== "disconnected" && (
+                      {resolvedEndpoint && (
                         <span
                           className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
                         />
