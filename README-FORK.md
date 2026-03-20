@@ -14,12 +14,12 @@ This fork exists because I wanted a set of workflow features for my own day-to-d
 - **Local CLI/server support** for surfacing human thread replies in local environments ([`cli/README.md`](cli/README.md))
 - **Storybook + expanded automated test coverage**
 - **Neovim integration** with local multi-project routing support ([`nvim/README.md`](nvim/README.md))
-- **[pi](https://pi.dev) plugin integration** ([`package/plugins/pi/README.md`](package/plugins/pi/README.md))
+- **[pi](https://pi.dev) plugin integration** ([`packages/pi-agentation/README.md`](packages/pi-agentation/README.md))
 
 ## Repository structure (high level)
 
 - `package/` — npm package and example app
-- `package/plugins/` — plugin integrations (including [pi](https://pi.dev))
+- `packages/pi-agentation/` — [pi](https://pi.dev) plugin integration package
 - `cli/` — Go-based local service/router tooling
 - `nvim/` — Neovim integration
 

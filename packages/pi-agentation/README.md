@@ -1,6 +1,6 @@
 # Agentation Pi Plugin
 
-`package/plugins/pi/agentation.ts`
+`packages/pi-agentation/agentation.ts`
 
 A Pi extension that continuously runs an Agentation fix loop by repeatedly sending:
 
@@ -26,19 +26,19 @@ It starts automatically when the session starts and keeps re-queuing the same pr
 From this monorepo:
 
 ```bash
-pi -e ./package/plugins/pi/agentation.ts
+pi -e ./packages/pi-agentation/agentation.ts
 ```
 
-From an installed `agentation` package (bin entry):
+From this workspace package (after `pnpm install`):
 
 ```bash
-npx agentation-pi
+pnpm --filter agentation-pi exec agentation-pi
 ```
 
 Pass normal Pi flags/args through it:
 
 ```bash
-npx agentation-pi -- --list-models
+pnpm --filter agentation-pi exec agentation-pi -- --list-models
 ```
 
 Or copy/symlink it into your Pi extensions directory for auto-discovery:

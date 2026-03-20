@@ -21,14 +21,8 @@
     }
   },
   "files": [
-    "dist",
-    "bin/agentation-pi",
-    "plugins/pi/agentation.ts",
-    "plugins/pi/README.md"
+    "dist"
   ],
-  "bin": {
-    "agentation-pi": "./bin/agentation-pi"
-  },
   "scripts": {
     "build": "tsup",
     "watch": "tsup --watch",
