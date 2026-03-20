@@ -2,34 +2,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
-import type { Annotation } from "../../../types";
 import {
+  PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY,
+  activateToolbar,
+  findButtonByTooltip,
+  installPageToolbarTestGlobals,
+  makeAnnotation,
   resetPageToolbarTestEnvironment,
-  stubLocalOnlyFetch,
+  seedAnnotations,
 } from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${Math.random().toString(36).slice(2)}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
 
 async function flushAsyncEffects(): Promise<void> {
   await act(async () => {
@@ -38,72 +23,15 @@ async function flushAsyncEffects(): Promise<void> {
   });
 }
 
-/**
- * Activate the toolbar by clicking the collapsed container.
- */
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    expect(screen.queryByTitle("Start feedback mode")).toBeNull();
-  });
-}
-
-/**
- * Find a control button by the text content of its sibling tooltip span.
- */
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const toolbarEls = document.querySelectorAll("[data-feedback-toolbar]");
-  for (const toolbar of toolbarEls) {
-    const spans = toolbar.querySelectorAll("span");
-    for (const span of spans) {
-      if (span.textContent?.trim().startsWith(tooltipText)) {
-        const wrapper = span.parentElement;
-        if (wrapper) {
-          const button = wrapper.querySelector("button");
-          if (button) return button;
-        }
-      }
-    }
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // Global Mocks
 // ---------------------------------------------------------------------------
 
-// Mock clipboard API
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
-// Mock EventSource (used by component for SSE)
-class MockEventSource {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  close = vi.fn();
-  constructor(_url: string) {}
-}
-
 beforeEach(() => {
-  // Clear storage
-  localStorage.clear();
-  sessionStorage.clear();
-
-  stubLocalOnlyFetch();
-
-  // Mock clipboard
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: mockWriteText },
-    writable: true,
-    configurable: true,
-  });
   mockWriteText.mockClear();
-
-  // Mock elementFromPoint (jsdom doesn't implement it)
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  // Mock EventSource
-  vi.stubGlobal("EventSource", MockEventSource);
+  installPageToolbarTestGlobals({ writeText: mockWriteText });
 });
 
 afterEach(() => {
@@ -1324,8 +1252,6 @@ describe("PageFeedbackToolbarCSS", () => {
         })
       );
 
-      stubLocalOnlyFetch();
-
       render(<PageFeedbackToolbarCSS onSubmit={onSubmit} />);
       await activateToolbar();
 
@@ -1417,7 +1343,7 @@ describe("PageFeedbackToolbarCSS", () => {
     });
 
     it("renders correctly when localStorage has corrupted annotation data", () => {
-      localStorage.setItem(STORAGE_KEY, "not-valid-json{{{");
+      localStorage.setItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY, "not-valid-json{{{");
 
       expect(() => render(<PageFeedbackToolbarCSS />)).not.toThrow();
 

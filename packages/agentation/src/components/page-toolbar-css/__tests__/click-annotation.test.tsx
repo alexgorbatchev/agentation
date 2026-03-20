@@ -1,18 +1,18 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import {
+  PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY,
   activateToolbar,
   clickAtPoint,
   createMockTarget,
   findButtonByTooltip,
+  installPageToolbarTestGlobals,
   makeAnnotation,
-  PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY,
   resetPageToolbarTestEnvironment,
   seedAnnotations,
-  stubLocalOnlyFetch,
 } from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
@@ -21,30 +21,9 @@ import {
 
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
-class MockEventSource {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  close = vi.fn();
-  constructor(_url: string) {}
-}
-
 beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
-
-  stubLocalOnlyFetch();
-
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: mockWriteText },
-    writable: true,
-    configurable: true,
-  });
   mockWriteText.mockClear();
-
-  // jsdom does not implement elementFromPoint
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  vi.stubGlobal("EventSource", MockEventSource);
+  installPageToolbarTestGlobals({ writeText: mockWriteText });
 });
 
 afterEach(() => {
@@ -1036,7 +1015,6 @@ describe("Click-to-annotate flow", () => {
         }),
       );
 
-      stubLocalOnlyFetch();
       const mockFetch = vi.mocked(fetch);
 
       render(<PageFeedbackToolbarCSS />);
@@ -1404,7 +1382,6 @@ describe("Click-to-annotate flow", () => {
 
   describe("Webhook and callback integration", () => {
     it("fires webhook on annotation add when webhooks are enabled", async () => {
-      stubLocalOnlyFetch();
       const mockFetch = vi.mocked(fetch);
 
       localStorage.setItem(

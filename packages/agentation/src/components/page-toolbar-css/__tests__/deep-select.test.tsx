@@ -1,71 +1,15 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function createMockTarget(
-  tag: string = "button",
-  text: string = "Click me",
-): HTMLElement {
-  const el = document.createElement(tag);
-  el.textContent = text;
-  el.setAttribute("data-mock-target", "true");
-  document.body.appendChild(el);
-  return el;
-}
-
-function mockRect(
-  el: HTMLElement,
-  rect: Partial<DOMRect> = {},
-): void {
-  vi.spyOn(el, "getBoundingClientRect").mockReturnValue({
-    left: 100,
-    top: 100,
-    right: 300,
-    bottom: 150,
-    width: 200,
-    height: 50,
-    x: 100,
-    y: 100,
-    toJSON: () => ({}),
-    ...rect,
-  } as DOMRect);
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
-  });
-}
-
-function clickAtPoint(
-  x: number,
-  y: number,
-  options: Partial<MouseEventInit> = {},
-) {
-  const event = new MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
-    clientX: x,
-    clientY: y,
-    ...options,
-  });
-  document.body.dispatchEvent(event);
-}
+import {
+  activateToolbar,
+  clickAtPoint,
+  createMockTarget,
+  installPageToolbarTestGlobals,
+  mockElementRect,
+  resetPageToolbarTestEnvironment,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Global Mocks
@@ -73,44 +17,16 @@ function clickAtPoint(
 
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
-class MockEventSource {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  close = vi.fn();
-  constructor(_url: string) {}
-}
-
 beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
-
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: mockWriteText },
-    writable: true,
-    configurable: true,
-  });
   mockWriteText.mockClear();
-
-  // jsdom does not implement elementFromPoint
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  // jsdom does not implement elementsFromPoint
-  document.elementsFromPoint = vi.fn().mockReturnValue([]);
-
-  vi.stubGlobal("EventSource", MockEventSource);
+  installPageToolbarTestGlobals({
+    writeText: mockWriteText,
+    includeElementsFromPoint: true,
+  });
 });
 
 afterEach(() => {
-  cleanup();
-  document.querySelectorAll("[data-feedback-toolbar]").forEach((el) => el.remove());
-  document.querySelectorAll("[data-annotation-marker]").forEach((el) => el.remove());
-  document.querySelectorAll("[data-annotation-popup]").forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  document.querySelectorAll("[data-mock-target]").forEach((el) => el.remove());
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
@@ -129,11 +45,11 @@ describe("Deep select / Pierce mode", () => {
 
       // Create a content element behind an overlay
       const contentEl = createMockTarget("p", "Real content");
-      mockRect(contentEl);
+      mockElementRect(contentEl);
 
       // Create an overlay div that intercepts pointer events
       const overlay = createMockTarget("div", "");
-      mockRect(overlay, { width: 500, height: 500 });
+      mockElementRect(overlay, { width: 500, height: 500 });
 
       // elementFromPoint returns the overlay (top element)
       vi.spyOn(document, "elementFromPoint").mockReturnValue(overlay);
@@ -170,7 +86,7 @@ describe("Deep select / Pierce mode", () => {
       await activateToolbar();
 
       const contentEl = createMockTarget("button", "Action");
-      mockRect(contentEl);
+      mockElementRect(contentEl);
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(contentEl);
 
@@ -193,7 +109,7 @@ describe("Deep select / Pierce mode", () => {
       await activateToolbar();
 
       const mockEl = createMockTarget("button", "Normal hover");
-      mockRect(mockEl);
+      mockElementRect(mockEl);
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(mockEl);
 
@@ -224,7 +140,7 @@ describe("Deep select / Pierce mode", () => {
       await activateToolbar();
 
       const mockEl = createMockTarget("button", "Pierced element");
-      mockRect(mockEl);
+      mockElementRect(mockEl);
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(mockEl);
 
@@ -260,7 +176,7 @@ describe("Deep select / Pierce mode", () => {
       await activateToolbar();
 
       const mockEl = createMockTarget("button", "Normal element");
-      mockRect(mockEl);
+      mockElementRect(mockEl);
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(mockEl);
 
@@ -300,13 +216,13 @@ describe("Deep select / Pierce mode", () => {
 
       // Create a paragraph with real text content
       const textEl = createMockTarget("p", "Price: $54");
-      mockRect(textEl);
+      mockElementRect(textEl);
 
       // Create an empty overlay div
       const overlay = document.createElement("div");
       overlay.setAttribute("data-mock-target", "true");
       document.body.appendChild(overlay);
-      mockRect(overlay, { width: 1000, height: 1000 });
+      mockElementRect(overlay, { width: 1000, height: 1000 });
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(overlay);
       vi.spyOn(document, "elementsFromPoint").mockReturnValue([
@@ -341,13 +257,13 @@ describe("Deep select / Pierce mode", () => {
       bar.setAttribute("data-mock-target", "true");
       bar.className = "timeline-bar";
       document.body.appendChild(bar);
-      mockRect(bar, { width: 50, height: 10 });
+      mockElementRect(bar, { width: 50, height: 10 });
 
       // Create a large overlay
       const overlay = document.createElement("div");
       overlay.setAttribute("data-mock-target", "true");
       document.body.appendChild(overlay);
-      mockRect(overlay, { width: 500, height: 500, left: 0, top: 0, right: 500, bottom: 500 });
+      mockElementRect(overlay, { width: 500, height: 500, left: 0, top: 0, right: 500, bottom: 500 });
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(overlay);
       vi.spyOn(document, "elementsFromPoint").mockReturnValue([
@@ -377,7 +293,7 @@ describe("Deep select / Pierce mode", () => {
 
       // Top element already has content — no need to pierce further
       const contentEl = createMockTarget("button", "Click me");
-      mockRect(contentEl);
+      mockElementRect(contentEl);
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(contentEl);
 
@@ -407,7 +323,7 @@ describe("Deep select / Pierce mode", () => {
       await activateToolbar();
 
       const contentEl = createMockTarget("button", "Submit");
-      mockRect(contentEl);
+      mockElementRect(contentEl);
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(contentEl);
 
@@ -428,7 +344,7 @@ describe("Deep select / Pierce mode", () => {
       await activateToolbar();
 
       const el1 = createMockTarget("button", "First");
-      mockRect(el1);
+      mockElementRect(el1);
       vi.spyOn(document, "elementFromPoint").mockReturnValue(el1);
 
       // Cmd+Shift+click for multi-select
@@ -480,19 +396,19 @@ describe("Deep select / Pierce mode", () => {
       invisible.setAttribute("data-mock-target", "true");
       invisible.textContent = "Hidden text";
       document.body.appendChild(invisible);
-      mockRect(invisible, { width: 200, height: 50 });
+      mockElementRect(invisible, { width: 200, height: 50 });
       // Mock checkVisibility to return false
       invisible.checkVisibility = vi.fn().mockReturnValue(false);
 
       // Create a visible content element
       const visible = createMockTarget("p", "Visible text");
-      mockRect(visible, { width: 200, height: 50 });
+      mockElementRect(visible, { width: 200, height: 50 });
 
       // Create overlay
       const overlay = document.createElement("div");
       overlay.setAttribute("data-mock-target", "true");
       document.body.appendChild(overlay);
-      mockRect(overlay, { width: 500, height: 500 });
+      mockElementRect(overlay, { width: 500, height: 500 });
 
       vi.spyOn(document, "elementFromPoint").mockReturnValue(overlay);
       vi.spyOn(document, "elementsFromPoint").mockReturnValue([
@@ -530,8 +446,8 @@ describe("Deep select / Pierce mode", () => {
       innerBtn.textContent = "Shadow button";
       shadow.appendChild(innerBtn);
 
-      mockRect(host);
-      mockRect(innerBtn);
+      mockElementRect(host);
+      mockElementRect(innerBtn);
 
       // elementFromPoint returns the host
       vi.spyOn(document, "elementFromPoint").mockReturnValue(host);

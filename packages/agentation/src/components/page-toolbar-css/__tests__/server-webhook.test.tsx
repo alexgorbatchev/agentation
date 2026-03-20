@@ -7,6 +7,7 @@ import type { Annotation } from "../../../types";
 import {
   activateToolbar,
   findButtonByTooltip,
+  installPageToolbarTestGlobals,
   makeAnnotation,
   resetPageToolbarTestEnvironment,
   seedAnnotations,
@@ -62,34 +63,24 @@ class MockEventSource {
 // ---------------------------------------------------------------------------
 
 const mockFetch = vi.fn<(url: string, options?: RequestInit) => Promise<unknown>>();
+const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
 // ---------------------------------------------------------------------------
 // Setup / Teardown
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
   lastEventSource = null;
+  mockWriteText.mockClear();
+  installPageToolbarTestGlobals({
+    writeText: mockWriteText,
+    eventSourceClass: MockEventSource,
+    fetchMode: "none",
+  });
 
-  // Stub fetch
   vi.stubGlobal("fetch", mockFetch);
   mockFetch.mockReset();
 
-  // Stub EventSource
-  vi.stubGlobal("EventSource", MockEventSource);
-
-  // Mock clipboard
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: vi.fn().mockResolvedValue(undefined) },
-    writable: true,
-    configurable: true,
-  });
-
-  // Mock elementFromPoint (jsdom doesn't implement it)
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  // Suppress expected warnings
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 

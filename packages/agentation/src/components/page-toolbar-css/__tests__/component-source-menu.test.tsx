@@ -34,11 +34,12 @@ import { PageFeedbackToolbarCSS } from "../index";
 import {
   activateToolbar,
   createMockTarget,
+  installPageToolbarTestGlobals,
   resetPageToolbarTestEnvironment,
-  stubLocalOnlyFetch,
 } from "./pageToolbarTestUtils";
 
 const navigateToUrlMock = vi.fn<(url: string) => void>();
+const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
 describe("component source menu", () => {
   afterEach(() => {
@@ -49,14 +50,9 @@ describe("component source menu", () => {
     hooks.createUrl.mockClear();
     hooks.inspect.mockClear();
     navigateToUrlMock.mockClear();
+    mockWriteText.mockClear();
+    installPageToolbarTestGlobals({ writeText: mockWriteText });
     document.elementFromPoint = vi.fn();
-    Object.defineProperty(navigator, "clipboard", {
-      value: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
-      configurable: true,
-    });
-    stubLocalOnlyFetch();
   });
 
   it("opens a component menu on alt+right-click and navigates on selection", async () => {

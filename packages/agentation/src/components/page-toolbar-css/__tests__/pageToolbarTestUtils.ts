@@ -14,9 +14,13 @@ type MockTargetOptions = {
   rect?: Partial<DOMRect>;
 };
 
+type EventSourceConstructor = new (url: string) => unknown;
+
 type InstallPageToolbarTestGlobalsOptions = {
   writeText: (text: string) => Promise<void>;
   includeElementsFromPoint?: boolean;
+  eventSourceClass?: EventSourceConstructor;
+  fetchMode?: "local-only" | "none";
 };
 
 export class MockEventSource {
@@ -111,10 +115,14 @@ export function stubLocalOnlyFetch(): void {
 export function installPageToolbarTestGlobals({
   writeText,
   includeElementsFromPoint = false,
+  eventSourceClass = MockEventSource,
+  fetchMode = "local-only",
 }: InstallPageToolbarTestGlobalsOptions): void {
   localStorage.clear();
   sessionStorage.clear();
-  stubLocalOnlyFetch();
+  if (fetchMode === "local-only") {
+    stubLocalOnlyFetch();
+  }
 
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText },
@@ -134,7 +142,7 @@ export function installPageToolbarTestGlobals({
     }
   }
 
-  vi.stubGlobal("EventSource", MockEventSource);
+  vi.stubGlobal("EventSource", eventSourceClass);
 }
 
 export async function activateToolbar(): Promise<void> {

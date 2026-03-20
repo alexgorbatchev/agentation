@@ -7,11 +7,11 @@ import {
   clickAtPoint,
   createMockTarget,
   findButtonByTooltip,
+  installPageToolbarTestGlobals,
   makeAnnotation,
   resetPageToolbarTestEnvironment,
   seedAnnotations,
   seedSettings,
-  stubLocalOnlyFetch,
 } from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
@@ -20,34 +20,13 @@ import {
 
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
-class MockEventSource {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  close = vi.fn();
-  constructor(_url: string) {}
-}
-
 beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
-
-  stubLocalOnlyFetch();
-  vi.spyOn(console, "warn").mockImplementation(() => {});
-
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: mockWriteText },
-    writable: true,
-    configurable: true,
-  });
   mockWriteText.mockClear();
-
-  // jsdom does not implement elementFromPoint
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  // jsdom does not implement elementsFromPoint
-  document.elementsFromPoint = vi.fn().mockReturnValue([]);
-
-  vi.stubGlobal("EventSource", MockEventSource);
+  installPageToolbarTestGlobals({
+    writeText: mockWriteText,
+    includeElementsFromPoint: true,
+  });
+  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(() => {
