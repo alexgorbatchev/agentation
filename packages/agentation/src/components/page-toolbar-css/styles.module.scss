@@ -513,8 +513,8 @@ $green: #34c759;
   }
 }
 
-// MCP connection indicator dot (near settings button)
-@keyframes mcpIndicatorPulseConnected {
+// Server connection indicator dot (near settings button)
+@keyframes serverIndicatorPulseConnected {
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba($green, 0.5);
@@ -524,7 +524,7 @@ $green: #34c759;
   }
 }
 
-@keyframes mcpIndicatorPulseConnecting {
+@keyframes serverIndicatorPulseConnecting {
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba(#f5a623, 0.5);
@@ -534,7 +534,7 @@ $green: #34c759;
   }
 }
 
-.mcpIndicator {
+.serverIndicator {
   position: absolute;
   top: 3px;
   right: 3px;
@@ -551,12 +551,12 @@ $green: #34c759;
 
   &.connected {
     background: $green;
-    animation: mcpIndicatorPulseConnected 2.5s ease-in-out infinite;
+    animation: serverIndicatorPulseConnected 2.5s ease-in-out infinite;
   }
 
   &.connecting {
     background: #f5a623;
-    animation: mcpIndicatorPulseConnecting 1.5s ease-in-out infinite;
+    animation: serverIndicatorPulseConnecting 1.5s ease-in-out infinite;
   }
 
   &.disconnected {
@@ -648,7 +648,7 @@ $green: #34c759;
   transition-delay: 0s;
 }
 
-// Send button wrapper - animates width when MCP connects/disconnects
+// Send button wrapper - animates width when server connects/disconnects
 .sendButtonWrapper {
   width: 0;
   opacity: 0;
@@ -1398,7 +1398,7 @@ $green: #34c759;
   gap: 6px;
 }
 
-.mcpNavIndicator {
+.serverNavIndicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -1406,17 +1406,17 @@ $green: #34c759;
 
   &.connected {
     background: $green;
-    animation: mcpPulse 2.5s ease-in-out infinite;
+    animation: serverPulse 2.5s ease-in-out infinite;
   }
 
   &.connecting {
     background: #f5a623;
-    animation: mcpPulse 1.5s ease-in-out infinite;
+    animation: serverPulse 1.5s ease-in-out infinite;
   }
 
   &.disconnected {
     background: $red;
-    animation: mcpPulseError 2s infinite;
+    animation: serverPulseError 2s infinite;
   }
 }
 
@@ -2413,8 +2413,8 @@ $green: #34c759;
   }
 }
 
-// MCP Status Dot
-@keyframes mcpPulse {
+// Server status dot
+@keyframes serverPulse {
   0% {
     box-shadow: 0 0 0 0 rgba($green, 0.5);
   }
@@ -2426,7 +2426,7 @@ $green: #34c759;
   }
 }
 
-@keyframes mcpPulseError {
+@keyframes serverPulseError {
   0% {
     box-shadow: 0 0 0 0 rgba($red, 0.5);
   }
@@ -2438,7 +2438,7 @@ $green: #34c759;
   }
 }
 
-.mcpStatusDot {
+.serverStatusDot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -2447,19 +2447,19 @@ $green: #34c759;
   // Connecting state
   &.connecting {
     background: #f5a623;
-    animation: mcpPulse 1.5s infinite;
+    animation: serverPulse 1.5s infinite;
   }
 
   // Connected state - subtle pulse
   &.connected {
     background: $green;
-    animation: mcpPulse 2.5s ease-in-out infinite;
+    animation: serverPulse 2.5s ease-in-out infinite;
   }
 
   // Disconnected/error state
   &.disconnected {
     background: $red;
-    animation: mcpPulseError 2s infinite;
+    animation: serverPulseError 2s infinite;
   }
 }
 

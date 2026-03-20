@@ -266,13 +266,13 @@ export function ToolbarControls({
           </button>
           {resolvedEndpoint && (
             <span
-              className={`${styles.mcpIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
+              className={`${styles.serverIndicator} ${!isDarkMode ? styles.light : ""} ${styles[connectionStatus]} ${showSettings ? styles.hidden : ""}`}
               title={
                 connectionStatus === "connected"
-                  ? "MCP Connected"
+                  ? "Server Connected"
                   : connectionStatus === "connecting"
-                    ? "MCP Connecting..."
-                    : "MCP Disconnected"
+                    ? "Server Connecting..."
+                    : "Server Disconnected"
               }
             />
           )}

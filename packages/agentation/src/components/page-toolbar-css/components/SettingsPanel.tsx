@@ -357,7 +357,7 @@ export function SettingsPanel({
               <span className={styles.settingsNavLinkRight}>
                 {resolvedEndpoint && (
                   <span
-                    className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
+                    className={`${styles.serverNavIndicator} ${styles[connectionStatus]}`}
                   />
                 )}
                 <svg
@@ -410,7 +410,7 @@ export function SettingsPanel({
               </span>
               {resolvedEndpoint && (
                 <div
-                  className={`${styles.mcpStatusDot} ${styles[connectionStatus]}`}
+                  className={`${styles.serverStatusDot} ${styles[connectionStatus]}`}
                   title={
                     connectionStatus === "connected"
                       ? "Connected"
@@ -427,7 +427,7 @@ export function SettingsPanel({
             >
               Server connection allows agents to receive and act on annotations.{" "}
               <a
-                href="https://agentation.dev/mcp"
+                href="https://agentation.dev/server"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`${styles.learnMoreLink} ${!isDarkMode ? styles.light : ""}`}
@@ -445,7 +445,7 @@ export function SettingsPanel({
                     Neovim Bridge
                   </span>
                   <div
-                    className={`${styles.mcpStatusDot} ${styles[neovimConnectionStatus]}`}
+                    className={`${styles.serverStatusDot} ${styles[neovimConnectionStatus]}`}
                     title={
                       neovimConnectionStatus === "connected"
                         ? "Connected"
