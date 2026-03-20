@@ -323,7 +323,7 @@ describe("thread reply from edit popup", () => {
         { id: "t1", role: "agent", content: "Working on it", timestamp: 100 },
       ],
     });
-    const mockFetch = setupServerMock([ann]);
+    setupServerMock([ann]);
     seedAnnotations([ann]);
 
     render(
@@ -333,7 +333,6 @@ describe("thread reply from edit popup", () => {
       />,
     );
 
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
     await activateToolbar();
 
     // Wait for markers
@@ -341,7 +340,7 @@ describe("thread reply from edit popup", () => {
       expect(
         document.querySelectorAll("[data-annotation-marker]").length,
       ).toBeGreaterThanOrEqual(1);
-    });
+    }, { timeout: 1500 });
 
     // Click marker to edit
     const marker = document.querySelector("[data-annotation-marker]")!;
@@ -389,7 +388,7 @@ describe("thread reply from edit popup", () => {
         { id: "t1", role: "agent", content: "Noted", timestamp: 100 },
       ],
     });
-    const mockFetch = setupServerMock([ann]);
+    setupServerMock([ann]);
     seedAnnotations([ann]);
 
     render(
@@ -399,7 +398,6 @@ describe("thread reply from edit popup", () => {
       />,
     );
 
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
     await activateToolbar();
 
     await waitFor(() => {

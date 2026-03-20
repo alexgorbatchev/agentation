@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
+import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -143,6 +144,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  try {
+    unfreezeAll();
+  } catch {
+    // ignore if already unfrozen
+  }
+
   cleanup();
   document
     .querySelectorAll("[data-feedback-toolbar]")

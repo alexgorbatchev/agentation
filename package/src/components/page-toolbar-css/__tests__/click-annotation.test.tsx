@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
+import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -126,7 +127,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  cleanup(); // MUST be first — unmounts React components
+  try {
+    unfreezeAll();
+  } catch {
+    // ignore if already unfrozen
+  }
+
+  cleanup();
   // Clean up portal remnants that survive React unmount
   document.querySelectorAll("[data-feedback-toolbar]").forEach((el) => el.remove());
   document.querySelectorAll("[data-annotation-marker]").forEach((el) => el.remove());
