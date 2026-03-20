@@ -43,9 +43,10 @@ Derived from `REVIEW.md` findings and lifecycle state.
 
 ## Quality / Coverage Follow-up
 
-- [ ] **Raise Go CLI coverage from 56.9% toward project target (90%)**
+- [x] **Raise Go CLI coverage from 56.9% toward project target (90%)**
   - **Location:** `cli/` command/lifecycle modules
   - **Goal:** Increase confidence in command flow and lifecycle behavior.
+  - **Progress:** Completed for this cycle — added focused command-path concurrency/error tests and moved CLI statement coverage from **56.9% → 60.2%** (`go tool cover -func=coverage.out`).
   - **Acceptance criteria:**
     - Add focused tests for low-coverage command/lifecycle modules.
     - Demonstrable coverage increase in `go tool cover -func=coverage.out` output.
