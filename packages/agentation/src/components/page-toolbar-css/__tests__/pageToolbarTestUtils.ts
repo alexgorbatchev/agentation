@@ -14,6 +14,19 @@ type MockTargetOptions = {
   rect?: Partial<DOMRect>;
 };
 
+type InstallPageToolbarTestGlobalsOptions = {
+  writeText: (text: string) => Promise<void>;
+  includeElementsFromPoint?: boolean;
+};
+
+export class MockEventSource {
+  addEventListener: (type?: string, listener?: EventListenerOrEventListenerObject | null) => void = vi.fn();
+  removeEventListener: (type?: string, listener?: EventListenerOrEventListenerObject | null) => void = vi.fn();
+  close: () => void = vi.fn();
+
+  constructor(_url: string) {}
+}
+
 function resolveFetchUrl(input: string | URL | Request): string {
   if (typeof input === "string") {
     return input;
@@ -93,6 +106,35 @@ export function stubLocalOnlyFetch(): void {
       return new Response("ok", { status: 200 });
     }),
   );
+}
+
+export function installPageToolbarTestGlobals({
+  writeText,
+  includeElementsFromPoint = false,
+}: InstallPageToolbarTestGlobalsOptions): void {
+  localStorage.clear();
+  sessionStorage.clear();
+  stubLocalOnlyFetch();
+
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    writable: true,
+    configurable: true,
+  });
+
+  document.elementFromPoint = vi.fn().mockReturnValue(null);
+
+  if (includeElementsFromPoint) {
+    if (!document.elementsFromPoint) {
+      (document as unknown as Record<string, unknown>).elementsFromPoint = vi
+        .fn()
+        .mockReturnValue([]);
+    } else {
+      vi.spyOn(document, "elementsFromPoint").mockReturnValue([]);
+    }
+  }
+
+  vi.stubGlobal("EventSource", MockEventSource);
 }
 
 export async function activateToolbar(): Promise<void> {
@@ -178,6 +220,16 @@ export function clickAtPoint(
   });
 
   document.body.dispatchEvent(event);
+}
+
+export async function waitForMarkers(count = 1): Promise<void> {
+  await waitFor(
+    () => {
+      const markers = document.querySelectorAll("[data-annotation-marker]");
+      expect(markers.length).toBeGreaterThanOrEqual(count);
+    },
+    { timeout: 3000 },
+  );
 }
 
 export function resetPageToolbarTestEnvironment(): void {

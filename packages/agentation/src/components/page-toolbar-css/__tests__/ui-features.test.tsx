@@ -1,85 +1,18 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
-import type { Annotation } from "../../../types";
 import {
-  unfreeze as unfreezeAll,
-} from "../../../utils/freeze-animations";
-import { stubLocalOnlyFetch } from "./pageToolbarTestUtils";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${Math.random().toString(36).slice(2)}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
-
-function seedSettings(overrides: Record<string, unknown> = {}) {
-  const defaults = {
-    outputDetail: "standard",
-    autoClearAfterCopy: false,
-    annotationColor: "#3c82f7",
-    blockInteractions: true,
-    reactEnabled: true,
-    markerClickBehavior: "edit",
-    webhookUrl: "",
-    webhooksEnabled: true,
-  };
-  localStorage.setItem(
-    "feedback-toolbar-settings",
-    JSON.stringify({ ...defaults, ...overrides }),
-  );
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
-  });
-}
-
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const toolbarEls = document.querySelectorAll("[data-feedback-toolbar]");
-  for (const toolbar of toolbarEls) {
-    const spans = toolbar.querySelectorAll("span");
-    for (const span of spans) {
-      if (span.textContent?.trim().startsWith(tooltipText)) {
-        const wrapper = span.parentElement;
-        if (wrapper) {
-          const button = wrapper.querySelector("button");
-          if (button) return button;
-        }
-      }
-    }
-  }
-  return null;
-}
+  PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY,
+  activateToolbar,
+  findButtonByTooltip,
+  installPageToolbarTestGlobals,
+  makeAnnotation,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+  seedSettings,
+} from "./pageToolbarTestUtils";
+import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
 
 // ---------------------------------------------------------------------------
 // Global Mocks
@@ -87,49 +20,13 @@ function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
 
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
-class MockEventSource {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  close = vi.fn();
-  constructor(_url: string) {}
-}
-
 beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
-  stubLocalOnlyFetch();
-
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: mockWriteText },
-    writable: true,
-    configurable: true,
-  });
   mockWriteText.mockClear();
-
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  vi.stubGlobal("EventSource", MockEventSource);
+  installPageToolbarTestGlobals({ writeText: mockWriteText });
 });
 
 afterEach(() => {
-  // Unfreeze animations to restore setTimeout/setInterval/rAF to normal
-  // (prevents frozen state from leaking into subsequent tests)
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if already unfrozen
-  }
-
-  cleanup();
-  document.querySelectorAll("[data-feedback-toolbar]").forEach((el) => el.remove());
-  document.querySelectorAll("[data-annotation-marker]").forEach((el) => el.remove());
-  document.querySelectorAll("[data-annotation-popup]").forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  document.getElementById("feedback-freeze-styles")?.remove();
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
@@ -770,7 +667,7 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       render(<PageFeedbackToolbarCSS />);
 
       await waitFor(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY);
         expect(stored).toBeTruthy();
         const parsed = JSON.parse(stored!);
         expect(parsed.length).toBe(1);
@@ -796,7 +693,7 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
 
       await waitFor(
         () => {
-          const stored = localStorage.getItem(STORAGE_KEY);
+          const stored = localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY);
           expect(stored).toBeNull();
         },
         { timeout: 3000 },
@@ -1011,7 +908,7 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       // After copy + 500ms delay + clear animation time, annotations should be gone
       await waitFor(
         () => {
-          const stored = localStorage.getItem(STORAGE_KEY);
+          const stored = localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY);
           expect(stored).toBeNull();
         },
         { timeout: 5000 },
@@ -1038,7 +935,7 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
         await new Promise((r) => setTimeout(r, 1000));
       });
 
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY);
       expect(stored).toBeTruthy();
       const parsed = JSON.parse(stored!);
       expect(parsed.length).toBe(1);

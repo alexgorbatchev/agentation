@@ -1,129 +1,19 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
-import type { Annotation } from "../../../types";
-import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
-import { stubLocalOnlyFetch } from "./pageToolbarTestUtils";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
-  return {
-    id: `test-${Math.random().toString(36).slice(2)}`,
-    x: 50,
-    y: 200,
-    comment: "Test feedback",
-    element: "Button",
-    elementPath: "body > div > button",
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-const STORAGE_KEY = "feedback-annotations-/";
-const SETTINGS_KEY = "feedback-toolbar-settings";
-
-function seedAnnotations(annotations: Annotation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
-}
-
-function seedSettings(overrides: Record<string, unknown> = {}) {
-  const defaults = {
-    outputDetail: "standard",
-    autoClearAfterCopy: false,
-    annotationColor: "#3c82f7",
-    blockInteractions: true,
-    reactEnabled: true,
-    markerClickBehavior: "edit",
-    webhookUrl: "",
-    webhooksEnabled: true,
-  };
-  localStorage.setItem(
-    SETTINGS_KEY,
-    JSON.stringify({ ...defaults, ...overrides }),
-  );
-}
-
-async function activateToolbar() {
-  const activateButton = screen.getByTitle("Start feedback mode");
-  fireEvent.click(activateButton);
-  await waitFor(() => {
-    const toolbar = document.querySelector("[data-feedback-toolbar]");
-    expect(toolbar).toBeTruthy();
-  });
-}
-
-function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
-  const toolbarEls = document.querySelectorAll("[data-feedback-toolbar]");
-  for (const toolbar of toolbarEls) {
-    const spans = toolbar.querySelectorAll("span");
-    for (const span of spans) {
-      if (span.textContent?.trim().startsWith(tooltipText)) {
-        const wrapper = span.parentElement;
-        if (wrapper) {
-          const button = wrapper.querySelector("button");
-          if (button) return button;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Wait until at least one [data-annotation-marker] is present in the DOM.
- */
-async function waitForMarkers(count = 1) {
-  await waitFor(
-    () => {
-      const markers = document.querySelectorAll("[data-annotation-marker]");
-      expect(markers.length).toBeGreaterThanOrEqual(count);
-    },
-    { timeout: 3000 },
-  );
-}
-
-/**
- * Create a mock target element and append it to the body.
- */
-function createMockTarget(
-  tag: string = "button",
-  text: string = "Click me",
-): HTMLElement {
-  const el = document.createElement(tag);
-  el.textContent = text;
-  el.setAttribute("data-mock-target", "true");
-  document.body.appendChild(el);
-  return el;
-}
-
-/**
- * Simulate a click at given viewport coordinates.
- */
-function clickAtPoint(
-  x: number,
-  y: number,
-  options: Partial<MouseEventInit> = {},
-) {
-  const event = new MouseEvent("click", {
-    bubbles: true,
-    cancelable: true,
-    clientX: x,
-    clientY: y,
-    ...options,
-  });
-  document.body.dispatchEvent(event);
-}
+import {
+  activateToolbar,
+  clickAtPoint,
+  createMockTarget,
+  findButtonByTooltip,
+  installPageToolbarTestGlobals,
+  makeAnnotation,
+  resetPageToolbarTestEnvironment,
+  seedAnnotations,
+  seedSettings,
+  waitForMarkers,
+} from "./pageToolbarTestUtils";
 
 // ---------------------------------------------------------------------------
 // Global Mocks
@@ -131,69 +21,16 @@ function clickAtPoint(
 
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
 
-class MockEventSource {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  close = vi.fn();
-  constructor(_url: string) {}
-}
-
 beforeEach(() => {
-  localStorage.clear();
-  sessionStorage.clear();
-  stubLocalOnlyFetch();
-
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: mockWriteText },
-    writable: true,
-    configurable: true,
-  });
   mockWriteText.mockClear();
-
-  // jsdom does not implement elementFromPoint
-  document.elementFromPoint = vi.fn().mockReturnValue(null);
-
-  // jsdom does not implement elementsFromPoint
-  if (!document.elementsFromPoint) {
-    (document as unknown as Record<string, unknown>).elementsFromPoint = vi
-      .fn()
-      .mockReturnValue([]);
-  } else {
-    vi.spyOn(document, "elementsFromPoint").mockReturnValue([]);
-  }
-
-  vi.stubGlobal("EventSource", MockEventSource);
+  installPageToolbarTestGlobals({
+    writeText: mockWriteText,
+    includeElementsFromPoint: true,
+  });
 });
 
 afterEach(() => {
-  try {
-    unfreezeAll();
-  } catch {
-    // ignore if already unfrozen
-  }
-
-  cleanup();
-  document
-    .querySelectorAll("[data-feedback-toolbar]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-marker]")
-    .forEach((el) => el.remove());
-  document
-    .querySelectorAll("[data-annotation-popup]")
-    .forEach((el) => el.remove());
-  document.getElementById("feedback-cursor-styles")?.remove();
-  document.getElementById("feedback-freeze-styles")?.remove();
-  document
-    .querySelectorAll("[data-mock-target]")
-    .forEach((el) => el.remove());
-  document.querySelectorAll("style").forEach((s) => {
-    if (s.id?.includes("agentation") || s.id?.includes("freeze")) s.remove();
-  });
-  localStorage.clear();
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetPageToolbarTestEnvironment();
 });
 
 // =============================================================================
