@@ -168,10 +168,7 @@ async function clickToolbar() {
   btn.blur();
 }
 
-const storybookEndpoint =
-  ((import.meta as { env?: Record<string, string | undefined> }).env?.
-    STORYBOOK_AGENTATION_ENDPOINT as string | undefined) ||
-  "http://127.0.0.1:4747";
+const storybookEndpoint = import.meta.env.STORYBOOK_AGENTATION_ENDPOINT ?? "http://127.0.0.1:4747";
 
 const meta: Meta<typeof PageFeedbackToolbarCSS> = {
   title: "PageToolbar",

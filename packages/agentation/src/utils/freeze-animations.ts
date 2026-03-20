@@ -30,9 +30,17 @@ const STATE_KEY = "__agentation_freeze";
 interface FreezeState {
   frozen: boolean;
   installed: boolean;
-  origSetTimeout: typeof setTimeout;
-  origSetInterval: typeof setInterval;
-  origRAF: typeof requestAnimationFrame;
+  origSetTimeout: (
+    handler: TimerHandler,
+    timeout?: number,
+    ...args: unknown[]
+  ) => number;
+  origSetInterval: (
+    handler: TimerHandler,
+    timeout?: number,
+    ...args: unknown[]
+  ) => number;
+  origRAF: (callback: FrameRequestCallback) => number;
   // Queues live on window so they survive HMR module re-execution
   pausedAnimations: Animation[];
   frozenTimeoutQueue: Array<() => void>;
@@ -45,9 +53,9 @@ function getState(): FreezeState {
     return {
       frozen: false,
       installed: true, // prevent patching on server
-      origSetTimeout: setTimeout,
-      origSetInterval: setInterval,
-      origRAF: (cb: FrameRequestCallback) => 0 as any,
+      origSetTimeout: () => 0,
+      origSetInterval: () => 0,
+      origRAF: () => 0,
       pausedAnimations: [],
       frozenTimeoutQueue: [],
       frozenRAFQueue: [],
@@ -85,7 +93,7 @@ if (typeof window !== "undefined" && !_s.installed) {
     handler: TimerHandler,
     timeout?: number,
     ...args: any[]
-  ): ReturnType<typeof setTimeout> => {
+  ): number => {
     if (typeof handler === "string") {
       return _s.origSetTimeout(handler, timeout);
     }
@@ -107,7 +115,7 @@ if (typeof window !== "undefined" && !_s.installed) {
     handler: TimerHandler,
     timeout?: number,
     ...args: any[]
-  ): ReturnType<typeof setInterval> => {
+  ): number => {
     if (typeof handler === "string") {
       return _s.origSetInterval(handler, timeout);
     }

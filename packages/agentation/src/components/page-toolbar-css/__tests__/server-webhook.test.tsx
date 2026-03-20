@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import assert from "node:assert";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
@@ -111,7 +112,7 @@ class MockEventSource {
 // Mock fetch
 // ---------------------------------------------------------------------------
 
-const mockFetch = vi.fn();
+const mockFetch = vi.fn<(url: string, options?: RequestInit) => Promise<unknown>>();
 
 // ---------------------------------------------------------------------------
 // Setup / Teardown
@@ -456,7 +457,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
       await waitFor(() => {
         const probeCalls = mockFetch.mock.calls.filter(
-          ([url]: [string]) => url === "http://127.0.0.1:4747/health"
+          ([url]) => url === "http://127.0.0.1:4747/health"
         );
         expect(probeCalls.length).toBe(1);
       });
@@ -481,7 +482,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
       await waitFor(() => {
         const healthCalls = mockFetch.mock.calls.filter(
-          ([url]: [string]) => url === "http://localhost:4747/health"
+          ([url]) => url === "http://localhost:4747/health"
         );
         expect(healthCalls.length).toBeGreaterThanOrEqual(1);
       });
@@ -841,8 +842,12 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         );
         expect(webhookCalls.length).toBeGreaterThanOrEqual(1);
 
-        const [, opts] = webhookCalls[0];
-        const body = JSON.parse(opts.body as string);
+        const firstWebhookCall = webhookCalls[0];
+        assert(firstWebhookCall);
+        const [, opts] = firstWebhookCall;
+        assert(opts);
+        assert(typeof opts.body === "string");
+        const body = JSON.parse(opts.body);
         expect(body.event).toBe("submit");
         expect(body.timestamp).toBeDefined();
         expect(typeof body.timestamp).toBe("number");
@@ -1166,7 +1171,12 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         );
         expect(syncCalls.length).toBeGreaterThanOrEqual(1);
         // Verify it synced local-merge-1 (the one not on server)
-        const syncedBody = JSON.parse(syncCalls[0][1].body as string);
+        const firstSyncCall = syncCalls[0];
+        assert(firstSyncCall);
+        const [, firstSyncOptions] = firstSyncCall;
+        assert(firstSyncOptions);
+        assert(typeof firstSyncOptions.body === "string");
+        const syncedBody = JSON.parse(firstSyncOptions.body);
         expect(syncedBody.id).toBe("local-merge-1");
       });
     });
@@ -1192,7 +1202,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       // Wait for session to initialize
       await waitFor(() => {
         const getCalls = mockFetch.mock.calls.filter(
-          ([url]: [string]) =>
+          ([url]) =>
             url === "http://localhost:4747/sessions/session-dedup-1"
         );
         expect(getCalls.length).toBeGreaterThanOrEqual(1);

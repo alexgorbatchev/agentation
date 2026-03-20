@@ -108,8 +108,8 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
     const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
     const threadMessagesRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
-    const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelTimerRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
+    const shakeTimerRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
     const [replyText, setReplyText] = useState("");
 
     // Sync with parent exit state
@@ -138,10 +138,10 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
         }
       }, 50);
       return () => {
-        clearTimeout(enterTimer);
-        clearTimeout(focusTimer);
-        if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
-        if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
+        window.clearTimeout(enterTimer);
+        window.clearTimeout(focusTimer);
+        if (cancelTimerRef.current) window.clearTimeout(cancelTimerRef.current);
+        if (shakeTimerRef.current) window.clearTimeout(shakeTimerRef.current);
       };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -155,7 +155,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
 
     // Shake animation
     const shake = useCallback(() => {
-      if (shakeTimerRef.current) clearTimeout(shakeTimerRef.current);
+      if (shakeTimerRef.current) window.clearTimeout(shakeTimerRef.current);
       setIsShaking(true);
       shakeTimerRef.current = originalSetTimeout(() => {
         setIsShaking(false);

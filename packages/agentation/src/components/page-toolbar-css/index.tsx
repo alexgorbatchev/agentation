@@ -848,7 +848,7 @@ export function PageFeedbackToolbarCSS({
 
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
 
   const {
     isDragging,
@@ -944,7 +944,7 @@ export function PageFeedbackToolbarCSS({
     if (!mounted || !demoAnnotations || demoAnnotations.length === 0) return;
     if (annotations.length > 0) return;
 
-    const timeoutIds: ReturnType<typeof setTimeout>[] = [];
+    const timeoutIds: ReturnType<typeof originalSetTimeout>[] = [];
     const initialActivationDelay = Math.max(0, demoDelay - 200);
 
     timeoutIds.push(
@@ -1000,7 +1000,7 @@ export function PageFeedbackToolbarCSS({
       setIsScrolling(true);
 
       if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
+        window.clearTimeout(scrollTimeoutRef.current);
       }
 
       scrollTimeoutRef.current = originalSetTimeout(() => {
@@ -1012,7 +1012,7 @@ export function PageFeedbackToolbarCSS({
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
+        window.clearTimeout(scrollTimeoutRef.current);
       }
     };
   }, []);
