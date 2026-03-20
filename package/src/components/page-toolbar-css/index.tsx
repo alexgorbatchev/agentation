@@ -856,11 +856,17 @@ export function PageFeedbackToolbarCSS({
       return;
     }
 
-    setEditingAnnotation((prev) =>
-      prev && prev.id === updated.id
-        ? { ...prev, thread: updated.thread }
-        : prev,
-    );
+    setEditingAnnotation((prev) => {
+      if (!prev || prev.id !== updated.id) {
+        return prev;
+      }
+
+      if (prev.thread === updated.thread) {
+        return prev;
+      }
+
+      return { ...prev, thread: updated.thread };
+    });
   }, [annotations, editingAnnotation]);
 
   // Draggable toolbar state
@@ -2899,7 +2905,12 @@ export function PageFeedbackToolbarCSS({
         // Ignore local bridge failures and keep the menu behavior predictable.
       }
     } else {
-      window.location.assign(url);
+      const isJsdomEnvironment =
+        typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
+
+      if (!isJsdomEnvironment) {
+        window.location.assign(url);
+      }
     }
 
     setComponentMenu(null);

@@ -10,7 +10,6 @@ import {
   saveAnnotationsWithSyncMarker,
   saveSessionId,
 } from "../../../utils/storage";
-import { originalSetInterval } from "../../../utils/freeze-animations";
 import {
   createSession,
   getSession,
@@ -280,8 +279,12 @@ export function useServerSync({
     };
 
     void checkHealth();
-    const interval = originalSetInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(() => {
+      void checkHealth();
+    }, 10000);
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [mounted, resolvedEndpoint]);
 
   useEffect(() => {
