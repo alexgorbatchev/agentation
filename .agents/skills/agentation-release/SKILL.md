@@ -22,7 +22,7 @@ Read `references/troubleshooting.md` if the release workflow fails.
 
 ## Determine the release scope
 
-- Read `packages/agentation/CLAUDE.md` and `.github/workflows/release.yml`.
+- Read `packages/agentation/README.md`, `packages/agentation/package.json`, and `.github/workflows/release.yml`.
 - Treat runtime behavior changes as release-significant even if the API surface is unchanged.
 - Keep the changelog entry aligned with the actual change.
 

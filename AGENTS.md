@@ -2,8 +2,8 @@
 
 Monorepo containing:
 
-1. **npm package** (`packages/agentation/`) - See `packages/agentation/CLAUDE.md`
-2. **Website/docs** (`packages/example/`) - See `packages/example/CLAUDE.md`
+1. **npm package** (`packages/agentation/`) - See `packages/agentation/README.md` and the `.agents/skills/agentation-release/` skill for release workflow
+2. **Website/docs** (`packages/example/`) - Public site content; see the `.agents/skills/agentation-vercel/` skill for deployment and debugging workflow
 
 ## What is Agentation?
 
