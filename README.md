@@ -45,7 +45,20 @@ The local Agentation server is required. By default, the toolbar probes `http://
 
 The toolbar appears in the bottom-right corner. Click to activate, then click any element to annotate it.
 
-`<Agentation />` is a production no-op: when `NODE_ENV === "production"` it returns `null`.
+`<Agentation />` renders wherever you mount it. If you only want it in development, gate it in your application:
+
+```tsx
+function App() {
+  const shouldRenderAgentation = process.env.NODE_ENV !== 'production';
+
+  return (
+    <>
+      <YourApp />
+      {shouldRenderAgentation ? <Agentation projectId="my-project" /> : null}
+    </>
+  );
+}
+```
 
 ## Features
 
