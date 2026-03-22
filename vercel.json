@@ -1,6 +1,0 @@
-{
-  "buildCommand": "pnpm build && cd packages/example && pnpm build",
-  "outputDirectory": "packages/example/out",
-  "framework": null,
-  "installCommand": "pnpm install"
-}
