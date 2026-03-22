@@ -35,3 +35,4 @@ coverage/
 .cache/
 tmp/
 .vercel
+/packages/example/tsconfig.tsbuildinfo
