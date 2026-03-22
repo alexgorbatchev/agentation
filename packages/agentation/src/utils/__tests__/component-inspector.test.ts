@@ -69,6 +69,60 @@ describe("inspectComponentElement", () => {
     ]);
   });
 
+  it("falls back to standard source fields on the fiber chain", () => {
+    const owner = {
+      type: { displayName: "Card" },
+      memoizedProps: {
+        tone: "info",
+        count: 3,
+        __source: {
+          fileName: "/src/Card.tsx",
+          lineNumber: 12,
+          columnNumber: 4,
+        },
+      },
+      return: null,
+    };
+
+    const fiber = {
+      type: { displayName: "PrimaryButton" },
+      __source: {
+        fileName: "/src/Button.tsx",
+        lineNumber: 42,
+        columnNumber: 8,
+      },
+      memoizedProps: { variant: "primary", disabled: false, child: { nested: true } },
+      return: owner,
+    };
+
+    const element = document.createElement("button");
+    attachFiber(element, fiber);
+
+    const result = inspectComponentElement(element);
+    expect(result).toEqual<ComponentInspection[]>([
+      {
+        displayName: "PrimaryButton",
+        props: { variant: "primary", disabled: "false" },
+        source: {
+          fileName: "/src/Button.tsx",
+          lineNumber: 42,
+          columnNumber: 8,
+          componentName: "PrimaryButton",
+        },
+      },
+      {
+        displayName: "Card",
+        props: { tone: "info", count: "3" },
+        source: {
+          fileName: "/src/Card.tsx",
+          lineNumber: 12,
+          columnNumber: 4,
+          componentName: "Card",
+        },
+      },
+    ]);
+  });
+
   it("returns an empty array when no React fiber is present", () => {
     expect(inspectComponentElement(document.createElement("div"))).toEqual([]);
   });

@@ -1,9 +1,11 @@
-<img src="https://raw.githubusercontent.com/benjitaylor/agentation/main/package/logo.svg" alt="Agentation" width="50" />
+<img src="https://raw.githubusercontent.com/alexgorbatchev/agentation/main/packages/agentation/logo.svg" alt="Agentation" width="50" />
 
 [![npm version](https://img.shields.io/npm/v/%40alexgorbatchev%2Fagentation)](https://www.npmjs.com/package/@alexgorbatchev/agentation)
 [![downloads](https://img.shields.io/npm/dm/%40alexgorbatchev%2Fagentation)](https://www.npmjs.com/package/@alexgorbatchev/agentation)
 
 **[Agentation](https://agentation.dev)** is an agent-agnostic visual feedback tool. Click elements on your page, add notes, and copy structured output that helps AI coding agents find the exact code you're referring to.
+
+This npm package is maintained in the [`alexgorbatchev/agentation`](https://github.com/alexgorbatchev/agentation) fork.
 
 ## Install
 
@@ -39,7 +41,7 @@ function App() {
 }
 ```
 
-The local Agentation server is required. By default, the toolbar probes `http://127.0.0.1:4747` on load and connects to the running local CLI/server automatically.
+For the full synced workflow, run the local Agentation server first. By default, the toolbar probes `http://127.0.0.1:4747` on load and connects to the running local CLI/server automatically. If no local server is discovered, Agentation falls back to local-only copy/paste mode.
 
 If you want component-source links to open in Neovim, install [`@alexgorbatchev/agentation.nvim`](https://github.com/alexgorbatchev/agentation.nvim) separately.
 
@@ -76,19 +78,25 @@ function App() {
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
+| `projectId` | `string` | _required_ | Project scope ID used by the local CLI/server for session reuse, pending queues, and watch flows |
 | `onAnnotationAdd` | `(annotation: Annotation) => void` | - | Called when an annotation is created |
 | `onAnnotationDelete` | `(annotation: Annotation) => void` | - | Called when an annotation is deleted |
-| `onAnnotationUpdate` | `(annotation: Annotation) => void` | - | Called when an annotation is edited |
-| `onAnnotationsClear` | `(annotations: Annotation[]) => void` | - | Called when all annotations are cleared |
-| `onCopy` | `(markdown: string) => void` | - | Callback with markdown output when copy is clicked |
-| `onSubmit` | `(output: string, annotations: Annotation[]) => void` | - | Called when "Send Annotations" is clicked |
-| `copyToClipboard` | `boolean` | `true` | Set to false to prevent writing to clipboard |
-| `endpoint` | `string` | _optional_ | URL for the required local Agentation server (if omitted, Agentation probes `http://127.0.0.1:4747` once on page load and uses that default endpoint) |
-| `projectId` | `string` | _required_ | Project scope ID used by Agentation CLI/watch routing |
+| `onAnnotationUpdate` | `(annotation: Annotation) => void` | - | Called when an annotation comment or server-backed fields are updated |
+| `onAnnotationsClear` | `(annotations: Annotation[]) => void` | - | Called when all local annotations are cleared |
+| `onCopy` | `(markdown: string) => void` | - | Receives generated markdown when the copy action runs |
+| `onSubmit` | `(output: string, annotations: Annotation[]) => void` | - | Receives the rendered output plus annotations when the send action runs |
+| `copyToClipboard` | `boolean` | `true` | Set to `false` to disable clipboard writes and handle copied output yourself |
+| `endpoint` | `string` | _optional_ | Server URL for sync; if omitted, Agentation probes `http://127.0.0.1:4747` once and otherwise stays local-only |
 | `sessionId` | `string` | - | Pre-existing session ID to join |
-| `onSessionCreated` | `(sessionId: string) => void` | - | Called when a new session is created |
-| `webhookUrl` | `string` | - | Webhook URL to receive annotation events |
+| `onSessionCreated` | `(sessionId: string) => void` | - | Called when a new server-backed session is created |
+| `webhookUrl` | `string` | - | Default webhook target for annotation events |
+| `className` | `string` | - | Custom class applied to the toolbar container |
+| `componentEditor` | `"cursor" \| "neovim" \| "vscode" \| "vscode-insiders" \| "webstorm"` | `"vscode"` | Editor protocol used for component-source links |
+| `getComponentEditorUrl` | `(params: ComponentSourceUrlParams) => string` | - | Override editor URL generation entirely |
 | `navigateToUrl` | `(url: string) => void` | `window.location.assign` | Override navigation side effects when opening component source links |
+| `neovimBridgeUrl` | `string` | `http://127.0.0.1:8777` | Base URL for the Neovim router when `componentEditor="neovim"` |
+| `neovimProjectId` | `string` | - | Optional project ID passed to the Neovim router |
+| `copyComponentSourcePath` | `boolean` | `true` | Copy the resolved source path when opening a component source link |
 
 ### Programmatic Integration
 
@@ -145,10 +153,12 @@ type Annotation = {
   accessibility?: string;
   isMultiSelect?: boolean;
   isFixed?: boolean;
+  reactComponents?: string;
+  sourceFile?: string;         // e.g. src/components/Button.tsx:42:5
 };
 ```
 
-> **Note:** This is a simplified type. The full type includes additional fields for Agent Sync (`url`, `status`, `thread`, `reactComponents`, etc.). See [agentation.dev/schema](https://agentation.dev/schema) for the complete schema.
+> **Note:** This is a simplified type. The full type also includes server-backed fields such as `sessionId`, `status`, `thread`, `createdAt`, `updatedAt`, `resolvedAt`, and `authorId`. See [agentation.dev/schema](https://agentation.dev/schema) for the complete schema.
 
 ## How it works
 
@@ -169,6 +179,6 @@ Agentation captures class names, selectors, and element positions so AI agents c
 
 ## License
 
-© 2026 Benji Taylor
+Original work © 2026 Benji Taylor. Current fork maintained by Alex Gorbatchev.
 
 Licensed under PolyForm Shield 1.0.0
