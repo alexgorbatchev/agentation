@@ -34,6 +34,10 @@
       "type": "string",
       "description": "Tag name (e.g. \"button\", \"div\", \"input\")"
     },
+    "sessionId": {
+      "type": "string",
+      "description": "Server session this annotation belongs to"
+    },
     "url": {
       "type": "string",
       "format": "uri",
@@ -53,6 +57,10 @@
     "reactComponents": {
       "type": "string",
       "description": "React component tree (e.g. \"App > Dashboard > Button\")"
+    },
+    "sourceFile": {
+      "type": "string",
+      "description": "Detected source path + line (e.g. \"src/Button.tsx:42:5\")"
     },
     "cssClasses": {
       "type": "string",
@@ -90,6 +98,20 @@
       "type": "string",
       "description": "Info about nearby DOM elements"
     },
+    "elementBoundingBoxes": {
+      "type": "array",
+      "description": "Individual boxes for multi-select annotations",
+      "items": {
+        "type": "object",
+        "required": ["x", "y", "width", "height"],
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "width": { "type": "number" },
+          "height": { "type": "number" }
+        }
+      }
+    },
     "intent": {
       "type": "string",
       "enum": ["fix", "change", "question", "approve"],
@@ -105,6 +127,16 @@
       "enum": ["pending", "acknowledged", "resolved", "dismissed"],
       "description": "Annotation lifecycle status"
     },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp when created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp when last updated"
+    },
     "resolvedAt": {
       "type": "string",
       "format": "date-time",
@@ -114,6 +146,10 @@
       "type": "string",
       "enum": ["human", "agent"],
       "description": "Who resolved the annotation"
+    },
+    "authorId": {
+      "type": "string",
+      "description": "Optional actor identity"
     },
     "thread": {
       "type": "array",
