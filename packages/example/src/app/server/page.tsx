@@ -69,15 +69,12 @@ agentation resolve <annotation-id> --summary "Updated spacing in Hero.tsx"`}
         <section>
           <h2 id="service-configuration">Service Configuration</h2>
           <p>
-            Both services start by default. You can disable either by setting its address to <code>0</code>.
+            The local server is required. The router also starts by default, but advanced setups can disable only the router by setting its address to <code>0</code>.
           </p>
           <CodeBlock
             language="bash"
             copyable
-            code={`# disable server
-AGENTATION_SERVER_ADDR=0 agentation start
-
-# disable router
+            code={`# disable router only
 AGENTATION_ROUTER_ADDR=0 agentation start
 
 # custom addresses

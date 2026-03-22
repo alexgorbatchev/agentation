@@ -1,20 +1,33 @@
 <img src="https://raw.githubusercontent.com/benjitaylor/agentation/main/package/logo.svg" alt="Agentation" width="50" />
 
-[![npm version](https://img.shields.io/npm/v/agentation)](https://www.npmjs.com/package/agentation)
-[![downloads](https://img.shields.io/npm/dm/agentation)](https://www.npmjs.com/package/agentation)
+[![npm version](https://img.shields.io/npm/v/%40alexgorbatchev%2Fagentation)](https://www.npmjs.com/package/@alexgorbatchev/agentation)
+[![downloads](https://img.shields.io/npm/dm/%40alexgorbatchev%2Fagentation)](https://www.npmjs.com/package/@alexgorbatchev/agentation)
 
 **[Agentation](https://agentation.dev)** is an agent-agnostic visual feedback tool. Click elements on your page, add notes, and copy structured output that helps AI coding agents find the exact code you're referring to.
 
 ## Install
 
+Install both the frontend package and the CLI companion:
+
 ```bash
-npm install agentation -D
+npm install @alexgorbatchev/agentation -D
+npm install -g @alexgorbatchev/agentation-cli
 ```
+
+If you prefer, you can install the CLI from source or another package manager via [`@alexgorbatchev/agentation-cli`](https://github.com/alexgorbatchev/agentation-cli).
 
 ## Usage
 
+Start the local Agentation stack first:
+
+```bash
+agentation start
+```
+
+Then add the component to your app:
+
 ```tsx
-import { Agentation } from 'agentation';
+import { Agentation } from '@alexgorbatchev/agentation';
 
 function App() {
   return (
@@ -25,6 +38,10 @@ function App() {
   );
 }
 ```
+
+The local Agentation server is required. By default, the toolbar probes `http://127.0.0.1:4747` on load and connects to the running local CLI/server automatically.
+
+If you want component-source links to open in Neovim, install [`@alexgorbatchev/agentation.nvim`](https://github.com/alexgorbatchev/agentation.nvim) separately.
 
 The toolbar appears in the bottom-right corner. Click to activate, then click any element to annotate it.
 
@@ -53,7 +70,7 @@ The toolbar appears in the bottom-right corner. Click to activate, then click an
 | `onCopy` | `(markdown: string) => void` | - | Callback with markdown output when copy is clicked |
 | `onSubmit` | `(output: string, annotations: Annotation[]) => void` | - | Called when "Send Annotations" is clicked |
 | `copyToClipboard` | `boolean` | `true` | Set to false to prevent writing to clipboard |
-| `endpoint` | `string` | _optional_ | Server URL for Agent Sync (if omitted, Agentation probes `http://127.0.0.1:4747` once on page load and uses it when reachable) |
+| `endpoint` | `string` | _optional_ | URL for the required local Agentation server (if omitted, Agentation probes `http://127.0.0.1:4747` once on page load and uses that default endpoint) |
 | `projectId` | `string` | _required_ | Project scope ID used by Agentation CLI/watch routing |
 | `sessionId` | `string` | - | Pre-existing session ID to join |
 | `onSessionCreated` | `(sessionId: string) => void` | - | Called when a new session is created |
@@ -65,7 +82,7 @@ The toolbar appears in the bottom-right corner. Click to activate, then click an
 Use callbacks to receive annotation data directly:
 
 ```tsx
-import { Agentation, type Annotation } from 'agentation';
+import { Agentation, type Annotation } from '@alexgorbatchev/agentation';
 
 function App() {
   const handleAnnotation = (annotation: Annotation) => {
@@ -131,7 +148,11 @@ Agentation captures class names, selectors, and element positions so AI agents c
 
 ## Docs
 
-Full documentation at [agentation.dev](https://agentation.dev)
+- [agentation.dev](https://agentation.dev) — public docs and examples
+- [@alexgorbatchev/agentation-cli](https://github.com/alexgorbatchev/agentation-cli) — required local server/router CLI
+- [@alexgorbatchev/agentation.nvim](https://github.com/alexgorbatchev/agentation.nvim) — optional Neovim bridge plugin ([npm](https://www.npmjs.com/package/@alexgorbatchev/agentation.nvim))
+- [@alexgorbatchev/agentation-skills](https://github.com/alexgorbatchev/agentation-skills) — shared coding-agent skills
+- [@alexgorbatchev/pi-agentation](https://github.com/alexgorbatchev/pi-agentation) — Pi integration package
 
 ## License
 

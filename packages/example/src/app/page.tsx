@@ -162,7 +162,7 @@ function ShadowModal({ isOpen, isExiting, onClose }: { isOpen: boolean; isExitin
 
 function InstallSnippet() {
   const [copied, setCopied] = useState(false);
-  const command = "npm install agentation";
+  const command = "npm install @alexgorbatchev/agentation -D";
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(command);

@@ -27,7 +27,7 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "How do I install it?",
-        answer: "Install via npm with <code>npm install agentation -D</code>, then import and add the <code>&lt;Agentation /&gt;</code> component to your app. Works with React 18 and Next.js."
+        answer: "Install via npm with <code>npm install @alexgorbatchev/agentation -D</code>, then import and add the <code>&lt;Agentation /&gt;</code> component to your app. Works with React 18 and Next.js."
       },
       {
         question: "Is there a Claude Code integration?",
@@ -64,11 +64,11 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "Where are annotations stored?",
-        answer: "By default, annotations are stored in <code>localStorage</code>, keyed by page pathname. They persist across page refreshes but are cleared after 7 days. With Agent Sync enabled, annotations are stored on the local Agentation server, which persists across pages and sessions."
+        answer: "In the supported setup, annotations are stored on the local Agentation server started by <code>agentation start</code>. The browser may keep local UI state for continuity, but the server is the authoritative store used across pages, sessions, and agent workflows."
       },
       {
         question: "What is Agent Sync?",
-        answer: "Agent Sync connects the browser toolbar to the local Agentation server, enabling real-time sync between reviewers and AI agents. Start the stack with <code>agentation start</code>, then use CLI commands like <code>agentation pending</code>, <code>agentation watch</code>, and <code>agentation resolve</code> in your agent workflow."
+        answer: "Agent Sync is the standard Agentation workflow: the browser toolbar talks to the local Agentation server, and your coding agent consumes that shared state through CLI commands. Start the stack with <code>agentation start</code>, then use commands like <code>agentation pending</code>, <code>agentation watch</code>, and <code>agentation resolve</code> in your agent workflow."
       },
     ]
   },
@@ -85,7 +85,7 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "Can multiple people share annotations?",
-        answer: "With Agent Sync enabled, annotations sync to a shared server and can be accessed by multiple users or agents. Without Agent Sync, annotations are stored locally in each user's browser - you can still share by copying the markdown output."
+        answer: "Yes. Because Agentation uses the local server as the shared source of truth, annotations can be consumed by multiple users or agents connected to the same workflow. You can also still share the copied markdown output when needed."
       },
     ]
   },

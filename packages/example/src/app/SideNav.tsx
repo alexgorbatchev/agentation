@@ -355,7 +355,7 @@ export function SideNav() {
   const [npmVersion, setNpmVersion] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('https://registry.npmjs.org/agentation')
+    fetch('https://registry.npmjs.org/@alexgorbatchev%2fagentation')
       .then(res => res.json())
       .then(data => {
         const latest = data['dist-tags']?.latest;
@@ -509,7 +509,7 @@ export function SideNav() {
       <div className="nav-meta">
         {npmVersion && (
           <a
-            href="https://www.npmjs.com/package/agentation"
+            href="https://www.npmjs.com/package/@alexgorbatchev/agentation"
             target="_blank"
             rel="noopener noreferrer"
             className="nav-version"

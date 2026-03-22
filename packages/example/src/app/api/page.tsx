@@ -125,7 +125,7 @@ export default function APIPage() {
             Receive annotation data directly in your code:
           </p>
           <CodeBlock
-            code={`import { Agentation, Annotation } from "agentation";
+            code={`import { Agentation, Annotation } from "@alexgorbatchev/agentation";
 
 function App() {
   const handleAnnotation = (annotation: Annotation) => {

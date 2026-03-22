@@ -196,7 +196,7 @@ export default function ChangelogPage() {
               }
             >
               <a
-                href={`https://www.npmjs.com/package/agentation/v/${release.version}`}
+                href={`https://www.npmjs.com/package/@alexgorbatchev/agentation/v/${release.version}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{

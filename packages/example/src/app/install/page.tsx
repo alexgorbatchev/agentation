@@ -207,18 +207,18 @@ export default function InstallPage() {
         <section>
           <h2>Choose your setup</h2>
           <ul>
-            <li><strong>Just want annotations?</strong> &rarr; Basic Setup below (copy-paste to agent)</li>
+            <li><strong>Standard setup</strong> &rarr; Install the package, install the CLI, and run <code>agentation start</code></li>
             <li><strong>Using Claude Code?</strong> &rarr; Add the <code>/agentation</code> skill (sets up component + local server)</li>
-            <li><strong>Building a custom agent?</strong> &rarr; Run <code>agentation start</code> for real-time sync</li>
+            <li><strong>Building a custom agent?</strong> &rarr; Use the CLI commands for pending, watch, acknowledge, and resolve workflows</li>
           </ul>
           <p style={{ fontSize: "0.875rem", color: "rgba(0,0,0,0.5)", marginTop: "0.5rem" }}>
-            Most users: Basic Setup. Claude Code users: Use the skill for full auto-setup.
+            The local Agentation server is required for the supported setup.
           </p>
         </section>
 
         <section>
           <h2>Install the package</h2>
-          <CodeBlock code="npm install agentation -D" language="bash" copyable />
+          <CodeBlock code="npm install @alexgorbatchev/agentation -D" language="bash" copyable />
           <p
             style={{
               fontSize: "0.875rem",
@@ -227,9 +227,23 @@ export default function InstallPage() {
             }}
           >
             Or use{" "}
-            <CopyablePackageManager name="yarn" command="yarn add agentation --dev" />,{" "}
-            <CopyablePackageManager name="pnpm" command="pnpm add agentation -D" />, or{" "}
-            <CopyablePackageManager name="bun" command="bun add agentation -d" />.
+            <CopyablePackageManager name="yarn" command="yarn add @alexgorbatchev/agentation --dev" />,{" "}
+            <CopyablePackageManager name="pnpm" command="pnpm add @alexgorbatchev/agentation -D" />, or{" "}
+            <CopyablePackageManager name="bun" command="bun add @alexgorbatchev/agentation -d" />.
+          </p>
+        </section>
+
+        <section>
+          <h2>Install the CLI</h2>
+          <CodeBlock code="npm install -g @alexgorbatchev/agentation-cli" language="bash" copyable />
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "rgba(0,0,0,0.5)",
+              marginTop: "0.5rem",
+            }}
+          >
+            The CLI runs the required local Agentation server and powers pending queues, watch flows, and agent integrations.
           </p>
         </section>
 
@@ -241,7 +255,7 @@ export default function InstallPage() {
             development.
           </p>
           <CodeBlock
-            code={`import { Agentation } from "agentation";
+            code={`import { Agentation } from "@alexgorbatchev/agentation";
 
 function App() {
   return (
@@ -272,15 +286,15 @@ function App() {
               marginTop: "0.375rem",
             }}
           >
-            Detects your framework, installs the package, wires it into your layout, and recommends local CLI/server setup.
+            Detects your framework, installs the package, wires it into your layout, and sets up the required local CLI/server workflow.
           </p>
         </section>
 
         <section>
-          <h2>Agent Integration <span className="sketchy-underline" style={{ "--marker-color": "#febc2e" } as React.CSSProperties}>Recommended</span></h2>
+          <h2>Agent Integration <span className="sketchy-underline" style={{ "--marker-color": "#febc2e" } as React.CSSProperties}>Required</span></h2>
           <p>
             Run the local Agentation stack and let your coding agent consume annotations via CLI commands.
-            This enables real-time annotation syncing and bidirectional communication.
+            This is the supported setup and enables real-time annotation syncing and bidirectional communication.
           </p>
 
           <h3>1. Start Agentation</h3>
@@ -295,7 +309,7 @@ function App() {
               marginTop: "0.375rem",
             }}
           >
-            By default this starts both services. Set <code>AGENTATION_SERVER_ADDR=0</code> or <code>AGENTATION_ROUTER_ADDR=0</code> to disable either one.
+            By default this starts both services. The server is required; advanced setups may disable the router, but not the server.
           </p>
 
           <h3>2. Verify setup</h3>
@@ -325,11 +339,11 @@ function App() {
               marginTop: "0.5rem",
             }}
           >
-            Annotations are stored locally and synced to the server when connected.
+            Annotations are created in the browser UI and synced against the local server, which is the supported source of truth.
           </p>
 
           <ul style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.6)", marginTop: "0.75rem", paddingLeft: "1.25rem" }}>
-            <li style={{ marginBottom: "0.375rem" }}><strong>Local-first</strong> &mdash; Works offline, syncs when server is available</li>
+            <li style={{ marginBottom: "0.375rem" }}><strong>Server-backed sessions</strong> &mdash; The local server keeps annotation state stable across refreshes and agent runs</li>
             <li style={{ marginBottom: "0.375rem" }}><strong>Session continuity</strong> &mdash; Rejoins the same session on page refresh</li>
             <li style={{ marginBottom: "0.375rem" }}><strong>No duplicates</strong> &mdash; Only new annotations are uploaded; existing ones are skipped</li>
             <li><strong>Server authority</strong> &mdash; Agent changes (resolve, dismiss) take precedence on rejoin</li>
@@ -342,7 +356,7 @@ function App() {
               marginTop: "0.75rem",
             }}
           >
-            This means you can annotate freely, refresh the page, and the agent will see a continuous session
+            This means you can annotate freely, refresh the page, and the agent will see a continuous server-backed session
             rather than fragmented duplicates.
           </p>
 
@@ -376,7 +390,7 @@ function App() {
         <section>
           <h2>Props</h2>
           <p>
-            All props are optional. The component works with zero configuration.
+            Most props are optional once the local Agentation server is running. The component can auto-discover the default local endpoint.
           </p>
 
           <h3 style={{ marginTop: "1.5rem", marginBottom: "0.5rem" }}>Callbacks</h3>
