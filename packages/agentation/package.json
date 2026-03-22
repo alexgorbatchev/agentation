@@ -1,6 +1,6 @@
 {
   "name": "@alexgorbatchev/agentation",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Visual feedback for AI coding agents",
   "sideEffects": false,
   "license": "PolyForm-Shield-1.0.0",

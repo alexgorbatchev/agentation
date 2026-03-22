@@ -30,6 +30,14 @@ function isMajorVersion(version: string): boolean {
 
 const releases: Release[] = [
   {
+    version: "3.0.1",
+    date: "March 22, 2026",
+    changes: [
+      { type: "improved", text: <><code>{"<Agentation />"}</code> now renders wherever it is mounted, allowing apps to decide their own development and production gating policy</> },
+      { type: "fixed", text: "Production docs and preview deployments can now render the toolbar when the host app opts in" },
+    ],
+  },
+  {
     version: "2.3.2",
     date: "March 9, 2026",
     changes: [
