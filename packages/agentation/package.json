@@ -4,6 +4,10 @@
   "description": "Visual feedback for AI coding agents",
   "sideEffects": false,
   "license": "PolyForm-Shield-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexgorbatchev/agentation"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
