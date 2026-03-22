@@ -30,7 +30,7 @@ function isMajorVersion(version: string): boolean {
 
 const releases: Release[] = [
   {
-    version: "3.0.2",
+    version: "3.0.3",
     date: "March 22, 2026",
     changes: [
       { type: "improved", text: <><code>{"<Agentation />"}</code> now renders wherever it is mounted, allowing apps to decide their own development and production gating policy</> },
