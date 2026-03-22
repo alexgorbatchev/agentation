@@ -64,11 +64,131 @@ export type SourceLocationNotFoundReason =
   | "element-not-in-react-tree"
   | "unknown";
 
+export type StandardSourceShape = {
+  fileName: string;
+  lineNumber: number;
+  columnNumber?: number;
+};
+
+export type StandardSourceCarrier = {
+  _debugSource?: StandardSourceShape | null;
+  _debugOwner?: StandardSourceCarrier | null;
+  return?: StandardSourceCarrier | null;
+  memoizedProps?: Record<string, unknown>;
+};
+
+export type StandardSourceResolution<TFiber extends StandardSourceCarrier> = {
+  fiber: TFiber;
+  source: SourceLocation;
+};
+
+function isStandardSourceShape(value: unknown): value is StandardSourceShape {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "fileName" in value &&
+    typeof value.fileName === "string" &&
+    "lineNumber" in value &&
+    typeof value.lineNumber === "number"
+  );
+}
+
+function getDirectStandardSource(fiber: StandardSourceCarrier): StandardSourceShape | null {
+  if (isStandardSourceShape(fiber._debugSource)) {
+    return fiber._debugSource;
+  }
+
+  const fiberRecord = fiber as Record<string, unknown>;
+  const possibleSourceKeys = ["__source", "_source", "debugSource"];
+  for (const key of possibleSourceKeys) {
+    const source = fiberRecord[key];
+    if (isStandardSourceShape(source)) {
+      return source;
+    }
+  }
+
+  const propSource = fiber.memoizedProps?.__source;
+  if (isStandardSourceShape(propSource)) {
+    return propSource;
+  }
+
+  return null;
+}
+
+function createStandardSourceLocation<TFiber extends StandardSourceCarrier>(
+  fiber: TFiber,
+  source: StandardSourceShape,
+  getComponentName: (fiber: TFiber) => string | null,
+): SourceLocation {
+  return {
+    fileName: cleanSourcePath(source.fileName),
+    lineNumber: source.lineNumber,
+    columnNumber: source.columnNumber,
+    componentName: getComponentName(fiber) || undefined,
+  };
+}
+
+export function resolveStandardFiberSource<TFiber extends StandardSourceCarrier>(
+  fiber: TFiber,
+  getComponentName: (fiber: TFiber) => string | null,
+): StandardSourceResolution<TFiber> | null {
+  const directSource = getDirectStandardSource(fiber);
+  if (directSource) {
+    return {
+      fiber,
+      source: createStandardSourceLocation(fiber, directSource, getComponentName),
+    };
+  }
+
+  const owner = fiber._debugOwner as TFiber | null | undefined;
+  if (owner) {
+    const ownerSource = getDirectStandardSource(owner);
+    if (ownerSource) {
+      return {
+        fiber: owner,
+        source: createStandardSourceLocation(owner, ownerSource, getComponentName),
+      };
+    }
+  }
+
+  if (!isUnsafeSourceProbeEnabled()) {
+    return null;
+  }
+
+  const directProbedSource = probeComponentSource(fiber as unknown as ReactFiber);
+  if (directProbedSource) {
+    return {
+      fiber,
+      source: {
+        ...directProbedSource,
+        componentName: getComponentName(fiber) || directProbedSource.componentName,
+      },
+    };
+  }
+
+  if (!owner) {
+    return null;
+  }
+
+  const ownerProbedSource = probeComponentSource(owner as unknown as ReactFiber);
+  if (!ownerProbedSource) {
+    return null;
+  }
+
+  return {
+    fiber: owner,
+    source: {
+      ...ownerProbedSource,
+      componentName: getComponentName(owner) || ownerProbedSource.componentName,
+    },
+  };
+}
+
 /**
  * React Fiber node structure (partial, for type safety)
  * Based on React's internal FiberNode type
  */
-interface ReactFiber {
+interface ReactFiber extends StandardSourceCarrier {
   // Debug source info (only in development)
   _debugSource?: {
     fileName: string;
@@ -284,29 +404,24 @@ function getComponentName(fiber: ReactFiber): string | null {
  */
 function findDebugSource(
   fiber: ReactFiber,
-  maxDepth = 50
+  maxDepth = 50,
 ): { source: ReactFiber["_debugSource"]; componentName: string | null } | null {
   let current: ReactFiber | null | undefined = fiber;
   let depth = 0;
 
   while (current && depth < maxDepth) {
-    // Check current fiber for debug source
-    if (current._debugSource) {
+    const resolvedSource = resolveStandardFiberSource(current, getComponentName);
+    if (resolvedSource) {
       return {
-        source: current._debugSource,
-        componentName: getComponentName(current),
+        source: {
+          fileName: resolvedSource.source.fileName,
+          lineNumber: resolvedSource.source.lineNumber,
+          columnNumber: resolvedSource.source.columnNumber,
+        },
+        componentName: resolvedSource.source.componentName || null,
       };
     }
 
-    // Check debug owner (for components that wrap the element)
-    if (current._debugOwner?._debugSource) {
-      return {
-        source: current._debugOwner._debugSource,
-        componentName: getComponentName(current._debugOwner),
-      };
-    }
-
-    // Move up the tree
     current = current.return;
     depth++;
   }
@@ -321,60 +436,9 @@ function findDebugSource(
  * @returns Source location info or null
  */
 function findDebugSourceReact19(
-  fiber: ReactFiber
+  fiber: ReactFiber,
 ): { source: ReactFiber["_debugSource"]; componentName: string | null } | null {
-  // React 19 may store debug info differently
-  // This is a forward-compatible attempt based on React 19 RFCs
-
-  let current: ReactFiber | null | undefined = fiber;
-  let depth = 0;
-  const maxDepth = 50;
-
-  while (current && depth < maxDepth) {
-    // Check for new React 19 debug patterns
-    const anyFiber = current as unknown as Record<string, unknown>;
-
-    // Possible React 19 locations for debug info
-    const possibleSourceKeys = [
-      "_debugSource",
-      "__source",
-      "_source",
-      "debugSource",
-    ];
-
-    for (const key of possibleSourceKeys) {
-      const source = anyFiber[key];
-      if (source && typeof source === "object" && "fileName" in source) {
-        return {
-          source: source as ReactFiber["_debugSource"],
-          componentName: getComponentName(current),
-        };
-      }
-    }
-
-    // Check if debug info is in the element itself
-    if (current.memoizedProps) {
-      const props = current.memoizedProps as Record<string, unknown>;
-      if (props.__source && typeof props.__source === "object") {
-        const source = props.__source as { fileName?: string; lineNumber?: number };
-        if (source.fileName && source.lineNumber) {
-          return {
-            source: {
-              fileName: source.fileName,
-              lineNumber: source.lineNumber,
-              columnNumber: (source as { columnNumber?: number }).columnNumber,
-            },
-            componentName: getComponentName(current),
-          };
-        }
-      }
-    }
-
-    current = current.return;
-    depth++;
-  }
-
-  return null;
+  return findDebugSource(fiber);
 }
 
 // =============================================================================
@@ -896,13 +960,14 @@ export function getComponentHierarchy(element: HTMLElement): SourceLocation[] {
 
   while (current && depth < maxDepth) {
     if (current._debugSource) {
-      const key = `${current._debugSource.fileName}:${current._debugSource.lineNumber}`;
+      const cleanedFileName = cleanSourcePath(current._debugSource.fileName);
+      const key = `${cleanedFileName}:${current._debugSource.lineNumber}`;
 
       // Avoid duplicates
       if (!seenFiles.has(key)) {
         seenFiles.add(key);
         sources.push({
-          fileName: current._debugSource.fileName,
+          fileName: cleanedFileName,
           lineNumber: current._debugSource.lineNumber,
           columnNumber: current._debugSource.columnNumber,
           componentName: getComponentName(current) || undefined,
