@@ -1,4 +1,3 @@
 packages:
   - 'packages/agentation'
   - 'packages/example'
-  - 'packages/pi-agentation'

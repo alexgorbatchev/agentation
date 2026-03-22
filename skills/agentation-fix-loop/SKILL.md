@@ -1,1 +1,0 @@
-../../cli/cmd/agentation/embedded/agentation-fix-loop-skill.md

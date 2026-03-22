@@ -4,7 +4,6 @@ Monorepo containing:
 
 1. **npm package** (`packages/agentation/`) - See `packages/agentation/CLAUDE.md`
 2. **Website/docs** (`packages/example/`) - See `packages/example/CLAUDE.md`
-3. **Pi integration package** (`packages/pi-agentation/`)
 
 ## What is Agentation?
 
