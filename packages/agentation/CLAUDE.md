@@ -1,6 +1,6 @@
 # Agentation Package
 
-This is the publishable npm package. Changes here affect everyone who installs `agentation`.
+This is the publishable npm package. Changes here affect everyone who installs `@alexgorbatchev/agentation`.
 
 ## Critical Rules
 
@@ -22,7 +22,7 @@ This is the publishable npm package. Changes here affect everyone who installs `
 ## Main Export
 
 ```tsx
-import { Agentation } from 'agentation';
+import { Agentation } from '@alexgorbatchev/agentation';
 ```
 
 No external runtime dependencies beyond React.
@@ -55,12 +55,13 @@ The component exposes these callback props (added in 1.2.0):
 
 When instructed to publish a new npm version:
 
-1. Bump version in `package.json`
-2. Run `pnpm build`
-3. Commit the version bump
-4. Run `npm publish --access public` (will prompt for OTP)
-5. Push to main
-6. Update changelog in `packages/example/src/app/changelog/page.tsx` (add new entry to `releases` array)
-7. Commit and push the changelog update
+1. Bump `packages/agentation/package.json` to the intended release version.
+2. Update changelog content in `packages/example/src/app/changelog/page.tsx` as needed.
+3. Run `pnpm build` and verify the package still compiles cleanly.
+4. Commit the release prep to `main`.
+5. Create and push a matching `vX.Y.Z` git tag.
+6. GitHub Actions (`.github/workflows/release.yml`) will sync the package version from the tag, build the package, and publish it to npm via trusted publishing.
+
+Only use local `npm publish` as an explicit fallback if the workflow path is unavailable and the user specifically instructs it.
 
 Always analyze what changed since the last version to write accurate changelog entries.

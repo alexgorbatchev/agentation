@@ -3,17 +3,17 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter agentation watch & pnpm --filter feedback-tool-example dev",
-    "storybook": "pnpm --filter agentation storybook",
+    "dev": "pnpm --filter @alexgorbatchev/agentation watch & pnpm --filter feedback-tool-example dev",
+    "storybook": "pnpm --filter @alexgorbatchev/agentation storybook",
     "typecheck": "pnpm -r --if-present run typecheck",
     "pretest": "pnpm typecheck",
     "test": "pnpm -r run test",
     "test:watch": "pnpm -r run test:watch",
     "build": "pnpm -r run build",
-    "build:agentation": "pnpm --filter agentation build",
-    "build:storybook": "pnpm --filter agentation build-storybook",
-    "pack": "pnpm build && pnpm --filter agentation pack",
-    "publish:agentation": "pnpm --filter agentation publish --access public",
+    "build:agentation": "pnpm --filter @alexgorbatchev/agentation build",
+    "build:storybook": "pnpm --filter @alexgorbatchev/agentation build-storybook",
+    "pack": "pnpm build && pnpm --filter @alexgorbatchev/agentation pack",
+    "publish:agentation": "pnpm --filter @alexgorbatchev/agentation publish --access public",
     "publish:all": "pnpm publish:agentation"
   },
   "pnpm": {

@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'export',
   // Allow importing from parent directory (the package source)
-  transpilePackages: ['agentation'],
+  transpilePackages: ['@alexgorbatchev/agentation'],
 };
 
 module.exports = nextConfig;

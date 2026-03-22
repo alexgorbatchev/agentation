@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Agentation } from "agentation";
+import { Agentation } from "@alexgorbatchev/agentation";
 
 export function ToolbarProvider() {
   const [isMobile, setIsMobile] = useState(false);

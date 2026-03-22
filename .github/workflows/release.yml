@@ -1,0 +1,58 @@
+name: Release npm Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Derive release version from tag
+        run: |
+          set -euo pipefail
+          release_version="${GITHUB_REF_NAME#v}"
+          if [[ -z "$release_version" || "$release_version" == "$GITHUB_REF_NAME" ]]; then
+            echo "Expected a tag like v1.2.3, got: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
+
+      - name: Sync package version from the release tag
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const packageJsonPath = 'packages/agentation/package.json';
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          packageJson.version = process.env.RELEASE_VERSION;
+          fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+          EOF
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm --filter @alexgorbatchev/agentation build
+
+      - name: Publish package
+        working-directory: packages/agentation
+        run: npm publish --provenance

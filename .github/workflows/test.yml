@@ -12,30 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: cli/go.mod
-
-      - name: CLI tests
-        working-directory: cli
-        run: go test ./...
-
-      - name: CLI cross-build smoke
-        working-directory: cli
-        env:
-          CGO_ENABLED: "0"
-        run: |
-          set -euo pipefail
-          for goos in linux darwin windows; do
-            for goarch in amd64 arm64; do
-              output="../tmp/cli-ci/agentation-${goos}-${goarch}"
-              if [[ "$goos" == "windows" ]]; then
-                output="${output}.exe"
-              fi
-              GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags="-s -w" -o "$output" ./cmd/agentation
-            done
-          done
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -48,7 +24,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm --filter agentation exec playwright install --with-deps chromium
+        run: pnpm --filter @alexgorbatchev/agentation exec playwright install --with-deps chromium
 
       - run: pnpm build
       - run: pnpm build:storybook

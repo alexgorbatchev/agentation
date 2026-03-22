@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "agentation": "workspace:*",
+    "@alexgorbatchev/agentation": "workspace:*",
     "beautiful-mermaid": "^0.1.2",
     "framer-motion": "^12.28.1",
     "next": "^14.0.0",
