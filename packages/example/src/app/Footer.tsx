@@ -2,7 +2,7 @@ export function Footer() {
   return (
     <footer className="footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 20 }}>
       <p>
-        Made by{" "}
+        Originally by{" "}
         <a
           href="https://x.com/benjitaylor"
           target="_blank"
@@ -26,6 +26,7 @@ export function Footer() {
         >
           Alex Vanderzon
         </a>
+        . Maintained in the <a href="https://github.com/alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">alexgorbatchev/agentation</a> fork.
       </p>
       <a href="/colophon">Colophon</a>
     </footer>

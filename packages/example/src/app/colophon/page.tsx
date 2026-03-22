@@ -216,10 +216,12 @@ export default function ColophonPage() {
           <p>
             Agentation is a React component for annotating web pages and generating structured
             feedback for AI coding agents. Zero runtime dependencies beyond React 18+, written
-            in TypeScript with full type definitions. Available on <a href="https://www.npmjs.com/package/@alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">npm</a> and <a href="https://github.com/benjitaylor/agentation" target="_blank" rel="noopener noreferrer">GitHub</a>.
+            in TypeScript with full type definitions. This site documents the maintained fork,
+            available on <a href="https://www.npmjs.com/package/@alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">npm</a> and <a href="https://github.com/alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">GitHub</a>.
           </p>
           <p>
-            Made by <a href="https://x.com/benjitaylor" target="_blank" rel="noopener noreferrer">Benji Taylor</a>, <a href="https://x.com/seldom" target="_blank" rel="noopener noreferrer">Dennis Jin</a>, and <a href="https://x.com/alexvanderzon" target="_blank" rel="noopener noreferrer">Alex Vanderzon</a>,
+            Originally created by <a href="https://x.com/benjitaylor" target="_blank" rel="noopener noreferrer">Benji Taylor</a>, <a href="https://x.com/seldom" target="_blank" rel="noopener noreferrer">Dennis Jin</a>, and <a href="https://x.com/alexvanderzon" target="_blank" rel="noopener noreferrer">Alex Vanderzon</a>.
+            The current fork is maintained by <a href="https://github.com/alexgorbatchev" target="_blank" rel="noopener noreferrer">Alex Gorbatchev</a>,
             with help from <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer">Claude Code</a>.<br />
             See <a href="https://benji.org/annotating" target="_blank" rel="noopener noreferrer">the original post</a> for
             more on the motivation behind the project.
@@ -249,7 +251,7 @@ export default function ColophonPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" height="11" viewBox="0 0 20 20" width="11" fill="currentColor" style={{ opacity: 0.5 }}><path d="M10.75,6.37C11.39,6.15,11.9,5.64,12.12,5H15l-2.5,5.75c0,1.24,1.23,2.25,2.75,2.25c1.52,0,2.75-1.01,2.75-2.25L15.5,5H17 V3.5h-4.88C11.81,2.63,10.98,2,10,2S8.19,2.63,7.88,3.5H3V5h1.5L2,10.75C2,11.99,3.23,13,4.75,13s2.75-1.01,2.75-2.25L5,5h2.88 C8.1,5.64,8.61,6.15,9.25,6.37v9.13H2V17h16v-1.5h-7.25V6.37z M16.91,10.75h-3.32l1.66-3.82L16.91,10.75z M6.41,10.75H3.09 l1.66-3.82L6.41,10.75z M10,5C9.59,5,9.25,4.66,9.25,4.25C9.25,3.84,9.59,3.5,10,3.5s0.75,0.34,0.75,0.75C10.75,4.66,10.41,5,10,5z"/></svg>
                 License
               </span>
-              <span className="colophon-row-value"><a href="https://github.com/benjitaylor/agentation/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">PolyForm Shield</a></span>
+              <span className="colophon-row-value"><a href="https://github.com/alexgorbatchev/agentation/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">PolyForm Shield</a></span>
             </div>
             </div>
           </div>

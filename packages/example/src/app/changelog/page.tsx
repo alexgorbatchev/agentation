@@ -194,6 +194,11 @@ export default function ChangelogPage() {
           <p className="tagline">Release history</p>
         </header>
 
+        <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.5)", marginTop: "0.75rem" }}>
+          Older entries preserve historical terminology from the upstream project (for example <em>MCP</em> or the old Claude Code setup flow).
+          The current fork standardizes on the local Agentation CLI/server workflow documented elsewhere on this site.
+        </p>
+
         {releases.map((release, i) => (
           <section key={release.version}>
             <h2

@@ -1,201 +1,10 @@
-"use client";
+import type { JSX } from "react";
 
-import { useState, useId, useRef, useEffect } from "react";
-import { motion, useAnimate, type AnimationSequence } from "framer-motion";
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
+import { CopyablePackageManager } from "./CopyablePackageManager";
 
-function CopyablePackageManager({ name, command }: { name: string; command: string }) {
-  const [copied, setCopied] = useState(false);
-  const [scope, animate] = useAnimate();
-  const maskId = useId();
-
-  // Same animation values as CodeBlock's CopyButton
-  const inSequence: AnimationSequence = [
-    [
-      '[data-part="square-front"]',
-      { y: [0, -4] },
-      { duration: 0.12, ease: "easeOut" },
-    ],
-    [
-      '[data-part="square-back"]',
-      { x: [0, -4] },
-      { at: "<", duration: 0.12, ease: "easeOut" },
-    ],
-    [
-      '[data-part="square-front"], [data-part="square-back"]',
-      {
-        rx: [2, 7.25],
-        width: [10.5, 14.5],
-        height: [10.5, 14.5],
-        rotate: [0, -45],
-      },
-      { at: "<", duration: 0.12, ease: "easeOut" },
-    ],
-    [
-      '[data-part="check"]',
-      { opacity: [0, 1], pathOffset: [1, 0] },
-      { at: "-0.03", duration: 0 },
-    ],
-    ['[data-part="check"]', { pathLength: [0, 1] }, { duration: 0.1 }],
-  ];
-
-  const outSequence: AnimationSequence = [
-    [
-      '[data-part="check"]',
-      { pathOffset: [0, 1] },
-      { duration: 0.1, ease: "easeOut" },
-    ],
-    [
-      '[data-part="check"]',
-      { opacity: [1, 0], pathLength: [1, 0] },
-      { duration: 0 },
-    ],
-    [
-      '[data-part="square-front"], [data-part="square-back"]',
-      {
-        rx: [7.25, 2],
-        width: [14.5, 10.5],
-        height: [14.5, 10.5],
-        rotate: [-45, 0],
-      },
-      { at: "+0.03", duration: 0.12, ease: "easeOut" },
-    ],
-    [
-      '[data-part="square-front"]',
-      { y: [-4, 0] },
-      { at: "<", duration: 0.12, ease: "easeOut" },
-    ],
-    [
-      '[data-part="square-back"]',
-      { x: [-4, 0] },
-      { at: "<", duration: 0.12, ease: "easeOut" },
-    ],
-  ];
-
-  const isFirstRender = useRef(true);
-  const hasAnimatedIn = useRef(false);
-  const inAnimation = useRef<ReturnType<typeof animate> | null>(null);
-  const outAnimation = useRef<ReturnType<typeof animate> | null>(null);
-
-  const animateIn = async () => {
-    if (!inAnimation.current && !outAnimation.current && !hasAnimatedIn.current) {
-      const animation = animate(inSequence);
-      inAnimation.current = animation;
-      await animation;
-      inAnimation.current = null;
-      if (animation.speed === 1) hasAnimatedIn.current = true;
-    } else if (outAnimation.current) {
-      outAnimation.current.speed = -1;
-    } else if (inAnimation.current) {
-      inAnimation.current.speed = 1;
-    }
-  };
-
-  const animateOut = async () => {
-    if (inAnimation.current) {
-      inAnimation.current.speed = -1;
-    } else if (hasAnimatedIn.current && !outAnimation.current) {
-      const animation = animate(outSequence);
-      outAnimation.current = animation;
-      await animation;
-      outAnimation.current = null;
-      if (animation.speed === 1) hasAnimatedIn.current = false;
-    } else if (outAnimation.current) {
-      outAnimation.current.speed = 1;
-    }
-  };
-
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    copied ? animateIn() : animateOut();
-  }, [copied]);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      title={`Copy: ${command}`}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        color: "#007AFF",
-        whiteSpace: "nowrap",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "0.125rem",
-      }}
-    >
-      {name}
-      <svg
-        ref={scope}
-        style={{ overflow: "visible", position: "relative", top: "1.5px" }}
-        width={20}
-        height={20}
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        aria-hidden="true"
-      >
-        <motion.rect
-          data-part="square-front"
-          x="4.75"
-          y="8.75"
-          width="10.5"
-          height="10.5"
-          rx="2"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        <g mask={`url(#${maskId})`}>
-          <motion.rect
-            data-part="square-back"
-            x="8.75"
-            y="4.75"
-            width="10.5"
-            height="10.5"
-            rx="2"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-        </g>
-        <motion.path
-          data-part="check"
-          initial={{ pathLength: 0, opacity: 0 }}
-          d="M9.25 12.25L11 14.25L15 10"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <mask id={maskId} maskUnits="userSpaceOnUse">
-          <rect width="24" height="24" fill="#fff" />
-          <motion.rect
-            data-part="square-front"
-            x="4.75"
-            y="8.75"
-            width="10.5"
-            height="10.5"
-            rx="2"
-            fill="#000"
-            stroke="#000"
-            strokeWidth="1.5"
-          />
-        </mask>
-      </svg>
-    </button>
-  );
-}
-
-export default function InstallPage() {
+export default function InstallPage(): JSX.Element {
   return (
     <>
       <article className="article">
@@ -208,11 +17,12 @@ export default function InstallPage() {
           <h2>Choose your setup</h2>
           <ul>
             <li><strong>Standard setup</strong> &rarr; Install the package, install the CLI, and run <code>agentation start</code></li>
-            <li><strong>Using Claude Code?</strong> &rarr; Add the <code>/agentation</code> skill (sets up component + local server)</li>
+            <li><strong>Using Pi?</strong> &rarr; Install the maintained Agentation fix-loop skill for Pi to consume pending annotations automatically</li>
             <li><strong>Building a custom agent?</strong> &rarr; Use the CLI commands for pending, watch, acknowledge, and resolve workflows</li>
           </ul>
           <p style={{ fontSize: "0.875rem", color: "rgba(0,0,0,0.5)", marginTop: "0.5rem" }}>
-            The local Agentation server is required for the supported setup.
+            The local Agentation server is the supported setup for synced sessions, agent loops, and threads. If no local server is discovered,
+            the toolbar still falls back to local-only copy/paste mode.
           </p>
         </section>
 
@@ -243,7 +53,7 @@ export default function InstallPage() {
               marginTop: "0.5rem",
             }}
           >
-            The CLI runs the required local Agentation server and powers pending queues, watch flows, and agent integrations.
+            The CLI runs the local Agentation server and powers pending queues, watch flows, and agent integrations.
           </p>
         </section>
 
@@ -270,15 +80,16 @@ function App() {
         </section>
 
         <section>
-          <h2>Claude Code</h2>
+          <h2>Agent skills</h2>
           <p>
-            If you use Claude Code, you can set up Agentation automatically with the <code>/agentation</code> skill. Install it:
+            This fork no longer ships the older one-command Claude Code setup skill. The maintained automation lives in
+            <code> @alexgorbatchev/agentation-skills</code> and is aimed at the fix loop once Agentation is already installed.
           </p>
-          <CodeBlock code="npx skills add benjitaylor/agentation" language="bash" copyable />
-          <p style={{ marginTop: "1rem" }}>
-            Then in Claude Code:
-          </p>
-          <CodeBlock code="/agentation" language="bash" copyable />
+          <CodeBlock
+            code="npx skills add alexgorbatchev/agentation-skills --skill agentation-fix-loop --agent pi"
+            language="bash"
+            copyable
+          />
           <p
             style={{
               fontSize: "0.8125rem",
@@ -286,7 +97,8 @@ function App() {
               marginTop: "0.375rem",
             }}
           >
-            Detects your framework, installs the package, wires it into your layout, and sets up the required local CLI/server workflow.
+            That skill wraps the current CLI workflow (<code>agentation pending</code>, <code>watch</code>, <code>ack</code>,
+            <code>reply</code>, <code>resolve</code>) for Pi. Other agents should use the same CLI commands directly.
           </p>
         </section>
 
@@ -325,7 +137,7 @@ function App() {
           <CodeBlock
             code={`<Agentation
   projectId="my-project"
-  endpoint="http://localhost:4747"
+  endpoint="http://127.0.0.1:4747"
   onSessionCreated={(sessionId) => {
     console.log("Session started:", sessionId);
   }}
@@ -485,7 +297,7 @@ function App() {
                   <code>endpoint</code>
                 </td>
                 <td style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>
-                  Server URL (e.g., <code style={{ color: "rgba(0,0,0,0.7)" }}>&quot;http://localhost:4747&quot;</code>)
+                  Server URL (e.g., <code style={{ color: "rgba(0,0,0,0.7)" }}>&quot;http://127.0.0.1:4747&quot;</code>)
                 </td>
               </tr>
               <tr>
@@ -516,26 +328,22 @@ function App() {
         <section>
           <h2>Security notes</h2>
           <p>
-            Agentation runs in your browser and reads DOM content to generate
-            feedback. By default, it does <strong>not</strong> send data anywhere &mdash;
-            everything stays local until you manually copy and paste.
+            Agentation runs in your browser and reads DOM content to generate feedback. By default, it does <strong>not</strong>
+            send anything to third-party services. If a local Agentation server is running, the toolbar may auto-discover
+            <code> http://127.0.0.1:4747</code> and sync there.
           </p>
           <ul>
             <li>
-              <strong>No external requests</strong> &mdash; all processing is
-              client-side by default
+              <strong>No third-party requests by default</strong> &mdash; output stays in the browser unless you configure a webhook or another destination
             </li>
             <li>
-              <strong>Local server only</strong> &mdash; when using the <code>endpoint</code> prop,
-              data is sent to your local machine only (localhost)
+              <strong>Local server only</strong> &mdash; when using the built-in sync flow, data is sent to your local machine only (<code>127.0.0.1</code> by default)
             </li>
             <li>
-              <strong>No data collection</strong> &mdash; nothing is tracked or
-              stored remotely
+              <strong>No hosted Agentation backend</strong> &mdash; this fork ships a local CLI/server workflow, not a managed cloud service
             </li>
             <li>
-              <strong>Dev-only</strong> &mdash; use the <code>NODE_ENV</code>{" "}
-              check to exclude from production
+              <strong>Production is opt-in</strong> &mdash; render <code>{"<Agentation />"}</code> only where you explicitly want it
             </li>
           </ul>
         </section>

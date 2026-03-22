@@ -1,9 +1,9 @@
-"use client";
+import type { JSX } from "react";
 
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
 
-export default function APIPage() {
+export default function APIPage(): JSX.Element {
   return (
     <>
       <article className="article">
@@ -28,93 +28,166 @@ export default function APIPage() {
 
         <section>
           <h2 id="props">Props</h2>
+          <p>
+            <code>{"<Agentation />"}</code> is a thin public wrapper around the CSS toolbar component. These are the current public props exported by
+            <code> @alexgorbatchev/agentation</code>.
+          </p>
+
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Required</h3>
+          <div className="props-list">
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">projectId</code>
+                <span className="prop-type">string</span>
+              </div>
+              <p className="prop-desc">Required project scope used by the local CLI/server for pending queues, session reuse, and watch flows.</p>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Callbacks</h3>
           <div className="props-list">
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onAnnotationAdd</code>
                 <span className="prop-type">(annotation: Annotation) =&gt; void</span>
               </div>
-              <p className="prop-desc">Called when an annotation is created</p>
+              <p className="prop-desc">Called when an annotation is created.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onAnnotationDelete</code>
                 <span className="prop-type">(annotation: Annotation) =&gt; void</span>
               </div>
-              <p className="prop-desc">Called when an annotation is deleted</p>
+              <p className="prop-desc">Called when an annotation is deleted.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onAnnotationUpdate</code>
                 <span className="prop-type">(annotation: Annotation) =&gt; void</span>
               </div>
-              <p className="prop-desc">Called when an annotation comment is edited</p>
+              <p className="prop-desc">Called when an annotation comment or server-backed fields are updated.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onAnnotationsClear</code>
                 <span className="prop-type">(annotations: Annotation[]) =&gt; void</span>
               </div>
-              <p className="prop-desc">Called when all annotations are cleared</p>
+              <p className="prop-desc">Called when all local annotations are cleared.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onCopy</code>
                 <span className="prop-type">(markdown: string) =&gt; void</span>
               </div>
-              <p className="prop-desc">Callback with the markdown output when copy is clicked</p>
+              <p className="prop-desc">Receives generated markdown when the copy action runs.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onSubmit</code>
                 <span className="prop-type">(output: string, annotations: Annotation[]) =&gt; void</span>
               </div>
-              <p className="prop-desc">Called when &quot;Send Annotations&quot; is clicked</p>
-            </div>
-            <div className="prop-item">
-              <div className="prop-header">
-                <code className="prop-name">copyToClipboard</code>
-                <span className="prop-type">boolean</span>
-                <span className="prop-default">default: true</span>
-              </div>
-              <p className="prop-desc">Set to false to prevent writing to clipboard (if handling via onCopy)</p>
-            </div>
-            <div className="prop-item">
-              <div className="prop-header">
-                <code className="prop-name">endpoint</code>
-                <span className="prop-type">string</span>
-              </div>
-              <p className="prop-desc">Server URL for syncing annotations</p>
-            </div>
-            <div className="prop-item">
-              <div className="prop-header">
-                <code className="prop-name">sessionId</code>
-                <span className="prop-type">string</span>
-              </div>
-              <p className="prop-desc">Pre-existing session ID to use</p>
+              <p className="prop-desc">Receives the rendered output plus annotations when the send action runs.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">onSessionCreated</code>
                 <span className="prop-type">(sessionId: string) =&gt; void</span>
               </div>
-              <p className="prop-desc">Called when a new session is created</p>
+              <p className="prop-desc">Called when a new server-backed session is created.</p>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Sync and delivery</h3>
+          <div className="props-list">
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">endpoint</code>
+                <span className="prop-type">string</span>
+              </div>
+              <p className="prop-desc">Optional server URL. If omitted, Agentation probes <code>http://127.0.0.1:4747</code> once and otherwise stays local-only.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">sessionId</code>
+                <span className="prop-type">string</span>
+              </div>
+              <p className="prop-desc">Join a pre-existing session instead of creating or reusing a project-scoped one.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">webhookUrl</code>
                 <span className="prop-type">string</span>
               </div>
-              <p className="prop-desc">Webhook URL to receive annotation events</p>
+              <p className="prop-desc">Default webhook target. Auto-send is controlled by toolbar settings, and the manual send action can still target this URL.</p>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Behavior and UI</h3>
+          <div className="props-list">
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">copyToClipboard</code>
+                <span className="prop-type">boolean</span>
+                <span className="prop-default">default: true</span>
+              </div>
+              <p className="prop-desc">Disable clipboard writes if you want to handle copied output yourself via <code>onCopy</code>.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">className</code>
+                <span className="prop-type">string</span>
+              </div>
+              <p className="prop-desc">Custom class applied to the toolbar container for z-index or positioning adjustments.</p>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Component-source navigation</h3>
+          <div className="props-list">
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">componentEditor</code>
+                <span className="prop-type">&quot;cursor&quot; | &quot;neovim&quot; | &quot;vscode&quot; | &quot;vscode-insiders&quot; | &quot;webstorm&quot;</span>
+                <span className="prop-default">default: &quot;vscode&quot;</span>
+              </div>
+              <p className="prop-desc">Editor protocol used when opening detected source files from the component menu.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">getComponentEditorUrl</code>
+                <span className="prop-type">(params: ComponentSourceUrlParams) =&gt; string</span>
+              </div>
+              <p className="prop-desc">Override editor URL generation entirely.</p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
                 <code className="prop-name">navigateToUrl</code>
                 <span className="prop-type">(url: string) =&gt; void</span>
+                <span className="prop-default">default: window.location.assign</span>
               </div>
-              <p className="prop-desc">
-                Override navigation side effects when opening component source links
-              </p>
+              <p className="prop-desc">Override the final navigation side effect when a component source link is opened.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">neovimBridgeUrl</code>
+                <span className="prop-type">string</span>
+                <span className="prop-default">default: http://127.0.0.1:8777</span>
+              </div>
+              <p className="prop-desc">Base URL for the Neovim router when <code>componentEditor=&quot;neovim&quot;</code>.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">neovimProjectId</code>
+                <span className="prop-type">string</span>
+              </div>
+              <p className="prop-desc">Optional project ID passed to the Neovim router for session resolution.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">copyComponentSourcePath</code>
+                <span className="prop-type">boolean</span>
+                <span className="prop-default">default: true</span>
+              </div>
+              <p className="prop-desc">Copy the resolved source path to the clipboard when opening a component source link.</p>
             </div>
           </div>
         </section>
@@ -125,7 +198,7 @@ export default function APIPage() {
             Receive annotation data directly in your code:
           </p>
           <CodeBlock
-            code={`import { Agentation, Annotation } from "@alexgorbatchev/agentation";
+            code={`import { Agentation, type Annotation } from "@alexgorbatchev/agentation";
 
 function App() {
   const handleAnnotation = (annotation: Annotation) => {
@@ -149,35 +222,42 @@ function App() {
           </p>
           <CodeBlock
             code={`type Annotation = {
-  // Required
-  id: string;              // Unique identifier
-  comment: string;         // User's annotation text
-  elementPath: string;     // CSS selector path
-  timestamp: number;       // Unix timestamp (ms)
-  x: number;               // % of viewport width (0-100)
-  y: number;               // px from document top
-  element: string;         // Tag name ("button", "div")
+  // Core fields
+  id: string;
+  x: number;                // % of viewport width
+  y: number;                // px from top of document (or viewport if isFixed)
+  comment: string;
+  element: string;
+  elementPath: string;
+  timestamp: number;
 
-  // Recommended
-  url?: string;            // Page URL
-  boundingBox?: {          // Element dimensions
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-
-  // Context (varies by output format)
-  reactComponents?: string;   // Component tree
-  cssClasses?: string;
-  computedStyles?: string;
-  accessibility?: string;
+  // Element context
+  selectedText?: string;
+  boundingBox?: { x: number; y: number; width: number; height: number };
   nearbyText?: string;
-  selectedText?: string;      // If text was selected
+  cssClasses?: string;
+  nearbyElements?: string;
+  computedStyles?: string;
+  fullPath?: string;
+  accessibility?: string;
+  isMultiSelect?: boolean;
+  isFixed?: boolean;
+  reactComponents?: string;
+  sourceFile?: string;      // e.g. "src/components/Button.tsx:42"
+  elementBoundingBoxes?: Array<{ x: number; y: number; width: number; height: number }>;
 
-  // Browser component fields
-  isFixed?: boolean;       // Fixed-position element
-  isMultiSelect?: boolean; // Created via drag selection
+  // Server-backed metadata
+  sessionId?: string;
+  url?: string;
+  intent?: "fix" | "change" | "question" | "approve";
+  severity?: "blocking" | "important" | "suggestion";
+  status?: "pending" | "acknowledged" | "resolved" | "dismissed";
+  thread?: ThreadMessage[];
+  createdAt?: string;
+  updatedAt?: string;
+  resolvedAt?: string;
+  resolvedBy?: "human" | "agent";
+  authorId?: string;
 };`}
           />
         </section>
@@ -291,16 +371,16 @@ function App() {
           <CodeBlock
             language="bash"
             code={`# Session-level: events for a single page
-curl -N http://localhost:4747/sessions/:id/events
+curl -N http://127.0.0.1:4747/sessions/:id/events
 
 # Global: events across ALL sessions
-curl -N http://localhost:4747/events
+curl -N http://127.0.0.1:4747/events
 
 # Filtered by domain: events for pages on a specific domain
-curl -N "http://localhost:4747/events?domain=localhost:3001"
+curl -N "http://127.0.0.1:4747/events?domain=localhost:3001"
 
 # Reconnect after disconnect (replay missed events)
-curl -N -H "Last-Event-ID: 42" http://localhost:4747/sessions/:id/events`}
+curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
           />
           <h3 style={{ marginTop: "1.25rem" }}>Event types</h3>
           <ul style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.65)", marginTop: "0.5rem" }}>
@@ -328,14 +408,34 @@ curl -N -H "Last-Event-ID: 42" http://localhost:4747/sessions/:id/events`}
             </thead>
             <tbody>
               <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_BASE_URL</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Default base URL for CLI data commands such as <code>pending</code>, <code>watch</code>, and <code>resolve</code></td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>http://localhost:4747</td>
+              </tr>
+              <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_STORE</td>
-                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Storage backend (<code>memory</code> or <code>sqlite</code>)</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Storage backend (<code>sqlite</code> or <code>memory</code>)</td>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>sqlite</td>
               </tr>
               <tr>
-                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_EVENT_RETENTION_DAYS</td>
-                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.6)" }}>Days to keep events</td>
-                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>7</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_DB_PATH</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Override the SQLite file path completely</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>derived from XDG_DATA_HOME</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>XDG_DATA_HOME</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Base directory used to derive the default SQLite location</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>~/.local/share</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_SERVER_ADDR</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Default address for <code>agentation start</code>; set to <code>0</code> to disable the HTTP server</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>127.0.0.1:4747</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_ROUTER_ADDR</td>
+                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.6)" }}>Default address for the optional router; set to <code>0</code> to disable it</td>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>127.0.0.1:8787</td>
               </tr>
             </tbody>
           </table>
@@ -344,8 +444,8 @@ curl -N -H "Last-Event-ID: 42" http://localhost:4747/sessions/:id/events`}
         <section>
           <h2 id="storage">Storage</h2>
           <p>
-            By default, data is persisted to SQLite at <code>~/.agentation/store.db</code>. To use
-            in-memory storage:
+            By default, data is persisted to SQLite at <code>$XDG_DATA_HOME/agentation/store.db</code> if <code>XDG_DATA_HOME</code> is set,
+            otherwise <code>~/.local/share/agentation/store.db</code>. To use in-memory storage:
           </p>
           <CodeBlock
             language="bash"
@@ -357,15 +457,18 @@ curl -N -H "Last-Event-ID: 42" http://localhost:4747/sessions/:id/events`}
         <section>
           <h2 id="programmatic-usage">Programmatic Usage</h2>
           <CodeBlock
-            language="typescript"
-            code={`// Start local stack (server + router)
+            language="bash"
+            code={`# Start local stack (server + router)
 agentation start
 
-// Or start in foreground while debugging
-agentation start --foreground`}
+# Or start in foreground while debugging
+agentation start --foreground
+
+# Target a non-default API endpoint
+AGENTATION_BASE_URL=http://127.0.0.1:5757 agentation pending my-project --json`}
           />
           <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem" }}>
-            See <a href="/server">Agentation Server (CLI)</a> for agent integration workflows.
+            See <a href="/server">Agentation Server (CLI)</a> for lifecycle and agent-integration workflows.
           </p>
         </section>
       </article>

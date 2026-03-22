@@ -1,10 +1,10 @@
-"use client";
+import type { JSX } from "react";
 
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
 import { WebhooksDiagram } from "../components/WebhooksDiagram";
 
-export default function WebhooksPage() {
+export default function WebhooksPage(): JSX.Element {
   return (
     <>
       <article className="article">

@@ -1,61 +1,10 @@
-"use client";
+import type { JSX } from "react";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Highlight, themes } from "prism-react-renderer";
 import { Footer } from "../Footer";
+import { getHighlightedCodeHtml } from "../lib/getHighlightedCodeHtml";
+import { OutputPageClient } from "./OutputPageClient";
 
-type OutputFormat = 'compact' | 'standard' | 'detailed' | 'forensic';
-
-const FORMAT_STORAGE_KEY = 'agentation-output-format';
-
-function CodeBlock({ code, language = "tsx", textOpacity = 1 }: { code: string; language?: string; textOpacity?: number }) {
-  return (
-    <Highlight theme={themes.github} code={code.trim()} language={language}>
-      {({ style, tokens, getLineProps, getTokenProps }) => (
-        <pre className="code-block" style={{ ...style, background: 'transparent' }}>
-          <div style={{ opacity: textOpacity, transition: 'opacity 0.15s ease-out' }}>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })}>
-                {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({ token })} />
-                ))}
-              </div>
-            ))}
-          </div>
-        </pre>
-      )}
-    </Highlight>
-  );
-}
-
-function AnimatedCodeBlock({ code, language }: { code: string; language?: string }) {
-  const [textOpacity, setTextOpacity] = useState(1);
-  const [displayedCode, setDisplayedCode] = useState(code);
-  const pendingCode = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (code === displayedCode) return;
-
-    // Store the target and fade out
-    pendingCode.current = code;
-    setTextOpacity(0);
-
-    // After fade, swap content and fade back in
-    const timer = setTimeout(() => {
-      if (pendingCode.current) {
-        setDisplayedCode(pendingCode.current);
-        pendingCode.current = null;
-        setTimeout(() => setTextOpacity(1), 20);
-      }
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [code, displayedCode]);
-
-  return (
-    <CodeBlock code={displayedCode} language={language} textOpacity={textOpacity} />
-  );
-}
+type OutputFormat = "compact" | "standard" | "detailed" | "forensic";
 
 const outputExamples: Record<OutputFormat, string> = {
   standard: `## Page Feedback: /dashboard
@@ -164,125 +113,22 @@ const outputExamples: Record<OutputFormat, string> = {
 **Issue:** Typo - should be "Settings"`,
 };
 
-export default function OutputPage() {
-  const [outputFormat, setOutputFormat] = useState<OutputFormat | null>(null);
+async function createHighlightedOutputExamples(): Promise<Record<OutputFormat, string>> {
+  return {
+    compact: await getHighlightedCodeHtml(outputExamples.compact, "markdown"),
+    standard: await getHighlightedCodeHtml(outputExamples.standard, "markdown"),
+    detailed: await getHighlightedCodeHtml(outputExamples.detailed, "markdown"),
+    forensic: await getHighlightedCodeHtml(outputExamples.forensic, "markdown"),
+  };
+}
 
-  useEffect(() => {
-    const savedFormat = localStorage.getItem(FORMAT_STORAGE_KEY);
-    if (savedFormat && ['compact', 'standard', 'detailed', 'forensic'].includes(savedFormat)) {
-      setOutputFormat(savedFormat as OutputFormat);
-    } else {
-      setOutputFormat('standard');
-    }
-  }, []);
-
-  const handleFormatChange = useCallback((format: OutputFormat) => {
-    setOutputFormat(format);
-    localStorage.setItem(FORMAT_STORAGE_KEY, format);
-    window.dispatchEvent(new CustomEvent('agentation-format-change', { detail: format }));
-  }, []);
+export default async function OutputPage(): Promise<JSX.Element> {
+  const highlightedOutputExamples = await createHighlightedOutputExamples();
 
   return (
     <>
-      <article className="article">
-      <header>
-        <h1>Output</h1>
-        <p className="tagline">How Agentation structures feedback for AI agents</p>
-      </header>
-
-      <section>
-        <p>
-          When you copy, you get structured markdown that agents can parse and act on.
-          Four formats are available:
-        </p>
-        {outputFormat && (
-          <>
-            <div className="format-toggle" style={{ marginTop: '0.75rem' }}>
-              <button
-                className={outputFormat === 'compact' ? 'active' : ''}
-                onClick={() => handleFormatChange('compact')}
-              >
-                Compact
-              </button>
-              <button
-                className={outputFormat === 'standard' ? 'active' : ''}
-                onClick={() => handleFormatChange('standard')}
-              >
-                Standard
-              </button>
-              <button
-                className={outputFormat === 'detailed' ? 'active' : ''}
-                onClick={() => handleFormatChange('detailed')}
-              >
-                Detailed
-              </button>
-              <button
-                className={outputFormat === 'forensic' ? 'active' : ''}
-                onClick={() => handleFormatChange('forensic')}
-              >
-                Forensic
-              </button>
-            </div>
-            <AnimatedCodeBlock code={outputExamples[outputFormat]} language="markdown" />
-          </>
-        )}
-      </section>
-
-      <section>
-        <h2>When to use each format</h2>
-        <ul>
-          <li><strong>Compact</strong> &mdash; Quick feedback with minimal context. Good for small fixes.</li>
-          <li><strong>Standard</strong> &mdash; Balanced detail for most use cases. Includes location and classes.</li>
-          <li><strong>Detailed</strong> &mdash; Full context with bounding boxes and nearby text. Good for complex issues.</li>
-          <li><strong>Forensic</strong> &mdash; Maximum detail including computed styles. For debugging layout/style issues.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>React component detection</h2>
-        <p>
-          In React apps, the output includes the component tree for each annotated element
-          (e.g., <code>&lt;App&gt; &lt;Dashboard&gt; &lt;SubmitButton&gt;</code>).
-          The level of detail adapts to your output format: Compact omits React data,
-          Standard shows filtered components, Detailed uses smart matching, and Forensic shows everything.
-          Toggle React detection on/off in settings.
-        </p>
-      </section>
-
-      <section>
-        <h2>Source file detection</h2>
-        <p>
-          In development mode, Agentation automatically detects the source file and line number
-          for annotated elements (e.g., <code>src/components/Button.tsx:42</code>).
-          This works with Vite, Next.js, Webpack, and Turbopack. Agents can use the <strong>Source</strong> line
-          to jump directly to the right file instead of searching.
-        </p>
-      </section>
-
-      <section>
-        <h2>Why structured output?</h2>
-        <p>
-          Selectors and class names let agents <code>grep</code> your codebase directly instead of guessing which element you mean.
-          See <a href="/">how it works</a> for more.
-        </p>
-      </section>
-
-      <section>
-        <h2>Customizing output</h2>
-        <p>
-          The copied output is plain markdown. Feel free to edit it before pasting
-          into your agent:
-        </p>
-        <ul>
-          <li><strong>Add context</strong> &mdash; prepend with &ldquo;I&rsquo;m working on the dashboard page...&rdquo;</li>
-          <li><strong>Prioritize</strong> &mdash; reorder annotations by importance</li>
-          <li><strong>Remove noise</strong> &mdash; delete annotations that aren&rsquo;t relevant</li>
-          <li><strong>Add instructions</strong> &mdash; append &ldquo;Fix these issues and run the tests&rdquo;</li>
-        </ul>
-      </section>
-    </article>
-
-    <Footer />
+      <OutputPageClient highlightedOutputExamples={highlightedOutputExamples} />
+      <Footer />
     </>
   );
 }

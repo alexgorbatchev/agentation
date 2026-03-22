@@ -27,11 +27,11 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "How do I install it?",
-        answer: "Install via npm with <code>npm install @alexgorbatchev/agentation -D</code>, then import and add the <code>&lt;Agentation /&gt;</code> component to your app. Works with React 18 and Next.js."
+        answer: "Install the package with <code>npm install @alexgorbatchev/agentation -D</code>, install the local CLI with <code>npm install -g @alexgorbatchev/agentation-cli</code>, then mount <code>&lt;Agentation /&gt;</code> in your app. React 18+ is required; Next.js is just one supported host."
       },
       {
         question: "Is there a Claude Code integration?",
-        answer: "Yes. Run <code>npx skills add benjitaylor/agentation</code> in your terminal, then <code>/agentation</code> in Claude Code. It detects your framework, installs the package, creates a provider component, and wires it into your layout."
+        answer: "Not as a maintained one-command setup in this fork. The supported automation today is the Pi fix-loop skill: <code>npx skills add alexgorbatchev/agentation-skills --skill agentation-fix-loop --agent pi</code>. For Claude Code and other agents, install Agentation manually and drive the workflow through <code>agentation pending</code>, <code>watch</code>, <code>ack</code>, <code>reply</code>, and <code>resolve</code>."
       },
     ]
   },
@@ -64,7 +64,7 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "Where are annotations stored?",
-        answer: "In the supported setup, annotations are stored on the local Agentation server started by <code>agentation start</code>. The browser may keep local UI state for continuity, but the server is the authoritative store used across pages, sessions, and agent workflows."
+        answer: "In the supported setup, annotations are stored on the local Agentation server started by <code>agentation start</code>. If no local server is discovered, Agentation still works in local-only mode and keeps browser state in local storage until you copy or clear it."
       },
       {
         question: "What is Agent Sync?",
@@ -114,7 +114,7 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "Can I annotate iframes or shadow DOM?",
-        answer: "Currently, Agentation only annotates elements in the main document. Iframes and shadow DOM content are not accessible due to browser security restrictions."
+        answer: "Shadow DOM is supported in this fork, so elements inside shadow roots can be identified and annotated. Cross-document iframes are still a hard browser boundary, so Agentation cannot inspect arbitrary iframe contents."
       },
       {
         question: "I'm having server startup issues",
@@ -122,7 +122,7 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "How do I report bugs or request features?",
-        answer: "Open an issue on <a href=\"https://github.com/benjitaylor/agentation/issues\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"faq-link\">GitHub</a>. Pull requests are welcome too."
+        answer: "Open an issue on <a href=\"https://github.com/alexgorbatchev/agentation/issues\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"faq-link\">GitHub</a>. Pull requests are welcome too."
       },
     ]
   },
@@ -147,7 +147,7 @@ function FAQToggle({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean;
       </button>
       <div className={`faq-answer ${isOpen ? 'open' : ''}`}>
         <div className="faq-answer-inner">
-          <p dangerouslySetInnerHTML={{ __html: item.answer }} />
+          <div dangerouslySetInnerHTML={{ __html: item.answer }} />
         </div>
       </div>
     </div>

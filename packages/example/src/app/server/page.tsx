@@ -1,9 +1,9 @@
-"use client";
+import type { JSX } from "react";
 
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
 
-export default function McpPage() {
+export default function McpPage(): JSX.Element {
   return (
     <>
       <article className="article">
@@ -69,7 +69,8 @@ agentation resolve <annotation-id> --summary "Updated spacing in Hero.tsx"`}
         <section>
           <h2 id="service-configuration">Service Configuration</h2>
           <p>
-            The local server is required. The router also starts by default, but advanced setups can disable only the router by setting its address to <code>0</code>.
+            The local server is required for synced sessions, CLI commands, and real-time agent workflows. If you only want local copy/paste output,
+            the browser toolbar can still run without it; the router remains optional and can be disabled by setting its address to <code>0</code>.
           </p>
           <CodeBlock
             language="bash"

@@ -24,7 +24,7 @@ export default function Agentation2Page() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.75rem" }}>
           <p style={{ margin: 0 }}>
-            Since launch, Agentation has already become part of how a lot of developers work with AI on UI, with over <a href="https://github.com/benjitaylor/agentation" target="_blank" rel="noopener noreferrer">1.8k GitHub stars</a> and <a href="https://www.npmjs.com/package/@alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">hundreds of thousands of installs</a> via npm.
+            Since launch, Agentation has already become part of how a lot of developers work with AI on UI — first in the upstream project, and now in the maintained <a href="https://github.com/alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">alexgorbatchev/agentation</a> fork with the current npm package at <a href="https://www.npmjs.com/package/@alexgorbatchev/agentation" target="_blank" rel="noopener noreferrer">@alexgorbatchev/agentation</a>.
           </p>
 
           <p style={{ margin: 0 }}>

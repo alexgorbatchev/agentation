@@ -348,8 +348,9 @@ export default function AgentationDocs() {
         <section>
           <h2>Licensing</h2>
           <p>
-            Agentation is free for individuals and companies for internal use. Use it to annotate your own projects, debug your own apps, or streamline feedback within your team. {" "}
-            <a href="mailto:benji@dip.org">Contact us</a> for a commercial license if you're redistributing Agentation as part of a product you sell.
+            Agentation is licensed under PolyForm Shield. Internal use in your own apps and workflows is the intended path; if you plan to redistribute
+            Agentation as part of a product, review the <a href="https://github.com/alexgorbatchev/agentation/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">license</a>
+            and use the <a href="https://github.com/alexgorbatchev/agentation/issues" target="_blank" rel="noopener noreferrer">repository issue tracker</a> for current licensing questions.
           </p>
         </section>
 

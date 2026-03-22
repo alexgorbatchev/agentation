@@ -41,7 +41,7 @@ function App() {
 }
 ```
 
-The local Agentation server is required. By default, the toolbar probes `http://127.0.0.1:4747` on load and connects to the running local CLI/server automatically.
+For the full synced workflow, run the local Agentation server first. By default, the toolbar probes `http://127.0.0.1:4747` on load and connects to the running local CLI/server automatically. If no local server is discovered, Agentation falls back to local-only copy/paste mode.
 
 The toolbar appears in the bottom-right corner. Click to activate, then click any element to annotate it.
 
@@ -150,6 +150,6 @@ Notes:
 
 ## License
 
-© 2026 Benji Taylor
+Original work © 2026 Benji Taylor. Current fork maintained by Alex Gorbatchev.
 
 Licensed under PolyForm Shield 1.0.0

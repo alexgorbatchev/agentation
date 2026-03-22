@@ -1,10 +1,10 @@
-"use client";
+import type { JSX } from "react";
 
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
 import { SchemaDiagram } from "../components/SchemaDiagram";
 
-export default function SchemaPage() {
+export default function SchemaPage(): JSX.Element {
   return (
     <>
       <article className="article">
@@ -122,6 +122,7 @@ export default function SchemaPage() {
             code={`{
   // React-specific (when available)
   reactComponents: string;  // Component tree ("App > Dashboard > Button")
+  sourceFile: string;       // Source path + line ("src/Button.tsx:42:5")
 
   // Element details
   cssClasses: string;       // Class list ("btn btn-primary disabled")
@@ -140,10 +141,14 @@ export default function SchemaPage() {
           <CodeBlock
             language="typescript"
             code={`{
+  sessionId: string;        // Server session this annotation belongs to
   status: "pending" | "acknowledged" | "resolved" | "dismissed";
+  thread: ThreadMessage[];  // Back-and-forth conversation
+  createdAt: string;        // ISO timestamp
+  updatedAt: string;        // ISO timestamp
   resolvedAt: string;       // ISO timestamp
   resolvedBy: "human" | "agent";
-  thread: ThreadMessage[];  // Back-and-forth conversation
+  authorId: string;         // Optional actor identity
 }`}
           />
 
@@ -158,6 +163,7 @@ export default function SchemaPage() {
   isMultiSelect: boolean;   // Created via drag selection
   fullPath: string;         // Full DOM path (vs shorter elementPath)
   nearbyElements: string;   // Info about nearby DOM elements
+  elementBoundingBoxes: Array<{ x: number; y: number; width: number; height: number }>;
 }`}
           />
         </section>
@@ -168,47 +174,42 @@ export default function SchemaPage() {
             language="typescript"
             copyable
             code={`type Annotation = {
-  // Required
+  // Core fields
   id: string;
+  x: number;
+  y: number;
   comment: string;
+  element: string;
   elementPath: string;
   timestamp: number;
-  x: number;            // % of viewport width (0-100)
-  y: number;            // px from document top (or viewport if isFixed)
-  element: string;      // Tag name ("button", "div")
 
-  // Recommended
-  url?: string;
-  boundingBox?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-
-  // Optional context
-  reactComponents?: string;
-  cssClasses?: string;
-  computedStyles?: string;
-  accessibility?: string;
-  nearbyText?: string;
+  // Optional element metadata
   selectedText?: string;
+  boundingBox?: { x: number; y: number; width: number; height: number };
+  nearbyText?: string;
+  cssClasses?: string;
+  nearbyElements?: string;
+  computedStyles?: string;
+  fullPath?: string;
+  accessibility?: string;
+  isMultiSelect?: boolean;
+  isFixed?: boolean;
+  reactComponents?: string;
+  sourceFile?: string;
+  elementBoundingBoxes?: Array<{ x: number; y: number; width: number; height: number }>;
 
-  // Browser component fields
-  isFixed?: boolean;       // Element has fixed/sticky positioning
-  isMultiSelect?: boolean; // Created via drag selection
-  fullPath?: string;       // Full DOM path
-  nearbyElements?: string; // Info about nearby elements
-
-  // Feedback classification
+  // Server-backed fields
+  sessionId?: string;
+  url?: string;
   intent?: "fix" | "change" | "question" | "approve";
   severity?: "blocking" | "important" | "suggestion";
-
-  // Lifecycle
   status?: "pending" | "acknowledged" | "resolved" | "dismissed";
+  thread?: ThreadMessage[];
+  createdAt?: string;
+  updatedAt?: string;
   resolvedAt?: string;
   resolvedBy?: "human" | "agent";
-  thread?: ThreadMessage[];
+  authorId?: string;
 };
 
 type ThreadMessage = {
@@ -236,11 +237,18 @@ type ThreadMessage = {
   sessionId: string;
   sequence: number;      // Monotonic for ordering/replay
   payload: Annotation | Session | ThreadMessage | ActionRequest;
+};
+
+type ActionRequest = {
+  sessionId: string;
+  annotations: Annotation[];
+  output: string;
+  timestamp: string;
 };`}
           />
           <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)", marginTop: "0.5rem" }}>
             The <code>sequence</code> number enables clients to detect missed events and request replay.
-            See <a href="/server">MCP</a> for SSE streaming details.
+            See <a href="/server">the server docs</a> for SSE streaming details.
           </p>
         </section>
 
@@ -264,8 +272,9 @@ type ThreadMessage = {
     "elementPath": { "type": "string" },
     "timestamp": { "type": "number" },
     "x": { "type": "number", "description": "% of viewport width (0-100)" },
-    "y": { "type": "number", "description": "px from document top" },
+    "y": { "type": "number", "description": "px from document top or viewport for fixed elements" },
     "element": { "type": "string" },
+    "sessionId": { "type": "string" },
     "url": { "type": "string", "format": "uri" },
     "boundingBox": {
       "type": "object",
@@ -278,13 +287,37 @@ type ThreadMessage = {
       "required": ["x", "y", "width", "height"]
     },
     "reactComponents": { "type": "string" },
+    "sourceFile": { "type": "string" },
+    "cssClasses": { "type": "string" },
+    "computedStyles": { "type": "string" },
+    "accessibility": { "type": "string" },
+    "nearbyText": { "type": "string" },
+    "selectedText": { "type": "string" },
     "isFixed": { "type": "boolean" },
     "isMultiSelect": { "type": "boolean" },
     "fullPath": { "type": "string" },
     "nearbyElements": { "type": "string" },
+    "elementBoundingBoxes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "width": { "type": "number" },
+          "height": { "type": "number" }
+        },
+        "required": ["x", "y", "width", "height"]
+      }
+    },
     "intent": { "enum": ["fix", "change", "question", "approve"] },
     "severity": { "enum": ["blocking", "important", "suggestion"] },
-    "status": { "enum": ["pending", "acknowledged", "resolved", "dismissed"] }
+    "status": { "enum": ["pending", "acknowledged", "resolved", "dismissed"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "resolvedAt": { "type": "string", "format": "date-time" },
+    "resolvedBy": { "enum": ["human", "agent"] },
+    "authorId": { "type": "string" }
   }
 }`}
           />
@@ -351,10 +384,10 @@ type ThreadMessage = {
               </tr>
               <tr>
                 <td style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontWeight: 500 }}>
-                  Agentation MCP Server
+                  Agentation CLI / HTTP server
                 </td>
                 <td style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.55)", textAlign: "right" }}>
-                  Exposes annotations to Claude Code and other MCP clients
+                  Exposes annotations over HTTP, SSE, and CLI workflows for coding agents
                 </td>
               </tr>
             </tbody>
@@ -370,10 +403,10 @@ type ThreadMessage = {
             <li>Capture the required fields: <code>id</code>, <code>comment</code>, <code>elementPath</code>, <code>timestamp</code>, <code>x</code>, <code>y</code>, <code>element</code></li>
             <li>Add recommended fields for better agent accuracy: <code>url</code>, <code>boundingBox</code></li>
             <li>For React apps, traverse the fiber tree to get <code>reactComponents</code></li>
-            <li>Output as JSON for MCP/API consumption, or markdown for chat pasting</li>
+            <li>Output as JSON for HTTP API / CLI consumption, or markdown for chat pasting</li>
           </ol>
           <p style={{ marginTop: "0.75rem" }}>
-            See the <a href="https://github.com/benjitaylor/agentation">Agentation source</a> for
+            See the <a href="https://github.com/alexgorbatchev/agentation">Agentation source</a> for
             reference implementations of element detection and React component traversal.
           </p>
         </section>

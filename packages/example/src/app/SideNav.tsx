@@ -519,7 +519,7 @@ export function SideNav() {
         )}
         <span className="nav-dot">·</span>
         <a
-          href="https://github.com/benjitaylor/agentation"
+          href="https://github.com/alexgorbatchev/agentation"
           target="_blank"
           rel="noopener noreferrer"
           className="nav-github"
