@@ -12,10 +12,10 @@ A floating toolbar for annotating web pages and collecting structured feedback f
 ## Development
 
 ```bash
-pnpm install    # Install all workspace dependencies
-pnpm dev        # Run both package watch + website dev server
-pnpm build      # Build all packages
-pnpm test       # Run all tests
+bun install     # Install all workspace dependencies
+bun run dev     # Run both package watch + website dev server
+bun run build   # Build all packages
+bun run test    # Run all tests
 ```
 
 ## Important

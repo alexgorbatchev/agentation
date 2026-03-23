@@ -128,24 +128,26 @@ Compared with the original upstream project, this repository includes:
 ## Development
 
 ```bash
-pnpm install
-pnpm build
-pnpm test
+bun install
+bun run build
+bun run test
 ```
 
 Coverage workflow:
 
 ```bash
 # Stable package coverage run (unit project)
-pnpm --filter @alexgorbatchev/agentation exec vitest run --coverage
+cd packages/agentation
+bunx vitest run --coverage
 
 # Explicit unit-only coverage
-pnpm --filter @alexgorbatchev/agentation exec vitest run --project unit --coverage
+cd packages/agentation
+bunx vitest run --project unit --coverage
 ```
 
 Notes:
 
-- `pnpm test` remains the full suite entry point (including browser/storybook tests).
+- `bun run test` remains the full suite entry point (including browser/storybook tests).
 - Coverage runs are aligned to the supported Vitest coverage path above.
 
 ## License

@@ -33,12 +33,12 @@
   "scripts": {
     "build": "tsup",
     "watch": "tsup --watch",
-    "dev": "pnpm build && pnpm watch",
+    "dev": "bun run build && bun run watch",
     "typecheck": "tsc --noEmit",
-    "pretest": "pnpm run typecheck",
+    "pretest": "bun run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "pnpm build",
+    "prepublishOnly": "bun run build",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

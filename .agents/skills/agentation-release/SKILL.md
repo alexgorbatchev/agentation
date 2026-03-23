@@ -38,8 +38,8 @@ Read `references/troubleshooting.md` if the release workflow fails.
 Run these commands from the repo root:
 
 ```bash
-pnpm --filter @alexgorbatchev/agentation build
-pnpm --filter feedback-tool-example build
+bun run build:agentation
+bun run --filter ./packages/example build
 ```
 
 Run additional targeted tests when the change touches runtime behavior.

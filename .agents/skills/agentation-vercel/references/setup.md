@@ -12,7 +12,7 @@
 
 `packages/example/package.json` must keep this sequence:
 
-1. `prebuild`: `pnpm --filter @alexgorbatchev/agentation build`
+1. `prebuild`: `cd ../.. && bun run --filter ./packages/agentation build`
 2. `build`: `next build`
 
 That prebuild is required because the docs app imports the workspace package and the package exports from `packages/agentation/dist/*`.
@@ -23,7 +23,7 @@ Use this exact clean-build check when diagnosing Vercel:
 
 ```bash
 rm -rf packages/agentation/dist
-pnpm --filter feedback-tool-example build
+bun run --filter ./packages/example build
 ```
 
 If this fails, Vercel will fail too.
@@ -32,7 +32,7 @@ If this fails, Vercel will fail too.
 
 - Do not add a repo-root `vercel.json` while the Vercel project root remains `packages/example`.
 - Do not reintroduce `packages/agentation/vercel.json`; it is stale for this monorepo.
-- Keep `package.json#packageManager` aligned with the pnpm version expected by CI and Vercel.
+- Keep `package.json#packageManager` aligned with the Bun version expected by CI and Vercel.
 
 ## Expected warnings
 

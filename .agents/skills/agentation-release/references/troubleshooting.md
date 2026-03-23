@@ -9,16 +9,16 @@
 
 ## Known failure modes
 
-### `pnpm/action-setup` version conflict
+### `oven-sh/setup-bun` version drift
 
 Symptom:
 
-- The workflow complains that pnpm is specified both in the action and in `package.json#packageManager`.
+- CI or release behaves differently locally vs GitHub Actions because Bun versions do not match.
 
 Fix:
 
-- Let `pnpm/action-setup` read the version from `package.json#packageManager`.
-- Do not add a separate `version:` field in `.github/workflows/release.yml` unless you also remove the package-manager pin.
+- Keep `.github/workflows/release.yml` and `package.json#packageManager` pinned to the same Bun version.
+- Regenerate `bun.lock` with that Bun version when dependency metadata changes.
 
 ### npm provenance `E422` repository mismatch
 

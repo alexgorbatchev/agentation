@@ -3,7 +3,7 @@ import { setProjectAnnotations } from "@storybook/react";
 import { Channel } from "storybook/internal/channels";
 import * as previewAnnotations from "./preview";
 
-// Replicate @storybook/addon-vitest setup-file (avoids pnpm deep path issues)
+// Replicate @storybook/addon-vitest setup-file locally so browser mode does not depend on an internal node_modules path
 const transport = { setHandler: vi.fn(), send: vi.fn() };
 globalThis.__STORYBOOK_ADDONS_CHANNEL__ ??= new Channel({ transport });
 

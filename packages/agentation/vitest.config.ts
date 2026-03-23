@@ -6,9 +6,9 @@ import path from "node:path";
 import type { Plugin } from "vite";
 
 /**
- * Rewrites the storybook addon-vitest setup file path from the deep pnpm
- * store path to a local wrapper, working around pnpm + vitest browser mode
- * incompatibility where the browser can't fetch files from .pnpm paths.
+ * Rewrites the storybook addon-vitest setup file path to a local wrapper so
+ * vitest browser mode never tries to fetch a setup module from an internal
+ * package-manager-managed install path inside node_modules.
  */
 function rewriteStorybookSetupFile(): Plugin {
   const localSetup = path.resolve(__dirname, ".storybook/vitest.setup.ts");

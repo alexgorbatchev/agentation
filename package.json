@@ -2,25 +2,26 @@
   "name": "agentation-monorepo",
   "version": "0.0.1",
   "private": true,
-  "packageManager": "pnpm@10.32.0",
+  "packageManager": "bun@1.3.10",
   "scripts": {
-    "dev": "pnpm --filter @alexgorbatchev/agentation watch & pnpm --filter feedback-tool-example dev",
-    "storybook": "pnpm --filter @alexgorbatchev/agentation storybook",
-    "typecheck": "pnpm -r --if-present run typecheck",
-    "pretest": "pnpm typecheck",
-    "test": "pnpm -r run test",
-    "test:watch": "pnpm -r run test:watch",
-    "build": "pnpm -r run build",
-    "build:agentation": "pnpm --filter @alexgorbatchev/agentation build",
-    "build:storybook": "pnpm --filter @alexgorbatchev/agentation build-storybook",
-    "pack": "pnpm build && pnpm --filter @alexgorbatchev/agentation pack",
-    "publish:agentation": "pnpm --filter @alexgorbatchev/agentation publish --access public",
-    "publish:all": "pnpm publish:agentation"
+    "dev": "bun run --filter ./packages/agentation watch & bun run --filter ./packages/example dev",
+    "storybook": "bun run --filter ./packages/agentation storybook",
+    "typecheck": "bun run --if-present --workspaces typecheck",
+    "pretest": "bun run typecheck",
+    "test": "bun run --if-present --workspaces test",
+    "test:watch": "bun run --if-present --workspaces test:watch",
+    "build": "bun run --if-present --workspaces build",
+    "build:agentation": "bun run --filter ./packages/agentation build",
+    "build:storybook": "bun run --filter ./packages/agentation build-storybook",
+    "pack": "bun run build && cd packages/agentation && npm pack",
+    "publish:agentation": "cd packages/agentation && npm publish --access public",
+    "publish:all": "bun run publish:agentation"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild"
-    ]
-  }
+  "workspaces": [
+    "packages/*"
+  ],
+  "trustedDependencies": [
+    "better-sqlite3",
+    "esbuild"
+  ]
 }

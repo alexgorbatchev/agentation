@@ -32,7 +32,7 @@ Run the docs build from a clean package-output state before touching Vercel:
 
 ```bash
 rm -rf packages/agentation/dist
-pnpm --filter feedback-tool-example build
+bun run --filter ./packages/example build
 ```
 
 If the local clean build fails, fix that first.
@@ -59,7 +59,7 @@ Prefer `vercel inspect <deployment-url> --logs` for build failures.
 
 - `Module not found: Can't resolve '@alexgorbatchev/agentation'`
   - The workspace package was not built before `next build`.
-  - Preserve the `prebuild` hook in `packages/example/package.json`.
+  - Preserve the `prebuild` hook in `packages/example/package.json`, keep it Bun-based, and make sure it hops to the repo root before filtering workspaces.
 
 - `The vercel.json file should be inside of the provided root directory.`
   - The config file is in the wrong directory for this project.
