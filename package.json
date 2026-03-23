@@ -10,7 +10,7 @@
     "pretest": "bun run typecheck",
     "test": "bun run --if-present --workspaces test",
     "test:watch": "bun run --if-present --workspaces test:watch",
-    "build": "bun run --if-present --workspaces build",
+    "build": "bun run build:agentation && bun run --filter ./packages/example build",
     "build:agentation": "bun run --filter ./packages/agentation build",
     "build:storybook": "bun run --filter ./packages/agentation build-storybook",
     "pack": "bun run build && cd packages/agentation && npm pack",
