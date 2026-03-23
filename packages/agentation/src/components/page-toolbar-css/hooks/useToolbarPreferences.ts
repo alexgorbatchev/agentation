@@ -73,10 +73,11 @@ export function useToolbarPreferences({
   useEffect(() => {
     setMounted(true);
 
+    let entranceTimer: number | null = null;
     if (!hasPlayedEntranceAnimation) {
       setShowEntranceAnimation(true);
       hasPlayedEntranceAnimation = true;
-      originalSetTimeout(() => {
+      entranceTimer = originalSetTimeout(() => {
         setShowEntranceAnimation(false);
       }, 750);
     }
@@ -89,6 +90,12 @@ export function useToolbarPreferences({
 
     const savedPosition = getLocalStorageItem(TOOLBAR_POSITION_STORAGE_KEY);
     setToolbarPosition(parseToolbarPosition(savedPosition));
+
+    return () => {
+      if (entranceTimer !== null) {
+        window.clearTimeout(entranceTimer);
+      }
+    };
   }, [pathname]);
 
   useEffect(() => {

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "[ -d ../agentation/dist ] || (cd ../.. && bun run --filter ./packages/agentation build)",
+    "prebuild": "[ \"$AGENTATION_SKIP_PREBUILD\" = \"1\" ] || (cd ../.. && bun run --filter ./packages/agentation build)",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"

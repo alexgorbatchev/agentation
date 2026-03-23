@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { Annotation } from "../../../types";
@@ -61,6 +61,34 @@ export function useAnnotationActions({
 }: UseAnnotationActionsParams): UseAnnotationActionsResult {
   const [copied, setCopied] = useState(false);
   const [sendState, setSendState] = useState<SendState>("idle");
+  const isMountedRef = useRef(true);
+  const timeoutIdsRef = useRef<number[]>([]);
+
+  const scheduleTimeout = useCallback((callback: () => void, delayMs: number) => {
+    const timeoutId = originalSetTimeout(() => {
+      timeoutIdsRef.current = timeoutIdsRef.current.filter(
+        (entry) => entry !== timeoutId,
+      );
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      callback();
+    }, delayMs);
+
+    timeoutIdsRef.current.push(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      for (const timeoutId of timeoutIdsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutIdsRef.current = [];
+    };
+  }, []);
 
   const fireWebhook = useCallback(
     async (
@@ -118,7 +146,7 @@ export function useAnnotationActions({
     setIsClearing(true);
 
     const totalAnimationTime = count * 30 + 200;
-    originalSetTimeout(() => {
+    scheduleTimeout(() => {
       setAnnotations([]);
       setAnimatedMarkers(new Set());
       removeLocalStorageItem(getStorageKey(pathname));
@@ -135,6 +163,7 @@ export function useAnnotationActions({
     setAnnotations,
     setAnimatedMarkers,
     removeLocalStorageItem,
+    scheduleTimeout,
   ]);
 
   const copyOutput = useCallback(async (): Promise<void> => {
@@ -165,12 +194,12 @@ export function useAnnotationActions({
     onCopy?.(output);
 
     setCopied(true);
-    originalSetTimeout(() => {
+    scheduleTimeout(() => {
       setCopied(false);
     }, 2000);
 
     if (settings.autoClearAfterCopy) {
-      originalSetTimeout(() => {
+      scheduleTimeout(() => {
         clearAll();
       }, 500);
     }
@@ -183,6 +212,7 @@ export function useAnnotationActions({
     clearAll,
     copyToClipboard,
     onCopy,
+    scheduleTimeout,
   ]);
 
   const sendToWebhook = useCallback(async (): Promise<void> => {
@@ -210,13 +240,17 @@ export function useAnnotationActions({
     });
 
     const success = await fireWebhook("submit", { output, annotations }, true);
+    if (!isMountedRef.current) {
+      return;
+    }
+
     setSendState(success ? "sent" : "failed");
-    originalSetTimeout(() => {
+    scheduleTimeout(() => {
       setSendState("idle");
     }, 2500);
 
     if (success && settings.autoClearAfterCopy) {
-      originalSetTimeout(() => {
+      scheduleTimeout(() => {
         clearAll();
       }, 500);
     }
@@ -229,6 +263,7 @@ export function useAnnotationActions({
     effectiveReactMode,
     settings.autoClearAfterCopy,
     clearAll,
+    scheduleTimeout,
   ]);
 
   return {

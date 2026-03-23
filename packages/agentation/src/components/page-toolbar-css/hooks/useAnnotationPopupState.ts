@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { Annotation } from "../../../types";
@@ -58,14 +58,17 @@ type UseAnnotationPopupStateResult = {
   cancelEditAnnotation: () => void;
 };
 
+type ScheduleTimeout = (callback: () => void, delayMs: number) => void;
+
 function closeEditPopup(
   setEditExiting: Dispatch<SetStateAction<boolean>>,
   setEditingAnnotation: Dispatch<SetStateAction<Annotation | null>>,
   setEditingTargetElement: Dispatch<SetStateAction<HTMLElement | null>>,
   setEditingTargetElements: Dispatch<SetStateAction<HTMLElement[]>>,
+  scheduleTimeout: ScheduleTimeout,
 ): void {
   setEditExiting(true);
-  originalSetTimeout(() => {
+  scheduleTimeout(() => {
     setEditingAnnotation(null);
     setEditingTargetElement(null);
     setEditingTargetElements([]);
@@ -102,6 +105,28 @@ export function useAnnotationPopupState({
   onAnnotationDelete,
   onAnnotationUpdate,
 }: UseAnnotationPopupStateParams): UseAnnotationPopupStateResult {
+  const timeoutIdsRef = useRef<number[]>([]);
+
+  const scheduleTimeout = useCallback((callback: () => void, delayMs: number) => {
+    const timeoutId = originalSetTimeout(() => {
+      timeoutIdsRef.current = timeoutIdsRef.current.filter(
+        (entry) => entry !== timeoutId,
+      );
+      callback();
+    }, delayMs);
+
+    timeoutIdsRef.current.push(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of timeoutIdsRef.current) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutIdsRef.current = [];
+    };
+  }, []);
+
   useEffect(() => {
     if (!editingAnnotation) {
       return;
@@ -168,10 +193,10 @@ export function useAnnotationPopupState({
 
       setAnnotations((prev) => [...prev, newAnnotation]);
       recentlyAddedIdRef.current = newAnnotation.id;
-      originalSetTimeout(() => {
+      scheduleTimeout(() => {
         recentlyAddedIdRef.current = null;
       }, 300);
-      originalSetTimeout(() => {
+      scheduleTimeout(() => {
         setAnimatedMarkers((prev) => new Set(prev).add(newAnnotation.id));
       }, 250);
 
@@ -179,7 +204,7 @@ export function useAnnotationPopupState({
       void fireWebhook("annotation.add", { annotation: newAnnotation });
 
       setPendingExiting(true);
-      originalSetTimeout(() => {
+      scheduleTimeout(() => {
         setPendingAnnotation(null);
         setPendingExiting(false);
       }, 150);
@@ -218,6 +243,7 @@ export function useAnnotationPopupState({
       projectId,
       recentlyAddedIdRef,
       resolvedEndpoint,
+      scheduleTimeout,
       setAnimatedMarkers,
       setAnnotations,
       setPendingAnnotation,
@@ -227,11 +253,11 @@ export function useAnnotationPopupState({
 
   const cancelAnnotation = useCallback(() => {
     setPendingExiting(true);
-    originalSetTimeout(() => {
+    scheduleTimeout(() => {
       setPendingAnnotation(null);
       setPendingExiting(false);
     }, 150);
-  }, [setPendingAnnotation, setPendingExiting]);
+  }, [scheduleTimeout, setPendingAnnotation, setPendingExiting]);
 
   const deleteAnnotation = useCallback(
     (id: string) => {
@@ -244,6 +270,7 @@ export function useAnnotationPopupState({
           setEditingAnnotation,
           setEditingTargetElement,
           setEditingTargetElements,
+          scheduleTimeout,
         );
       }
 
@@ -264,7 +291,7 @@ export function useAnnotationPopupState({
         });
       }
 
-      originalSetTimeout(() => {
+      scheduleTimeout(() => {
         setAnnotations((prev) => prev.filter((annotation) => annotation.id !== id));
         setExitingMarkers((prev) => {
           const next = new Set(prev);
@@ -275,7 +302,7 @@ export function useAnnotationPopupState({
 
         if (deletedIndex < annotations.length - 1) {
           setRenumberFrom(deletedIndex);
-          originalSetTimeout(() => setRenumberFrom(null), 200);
+          scheduleTimeout(() => setRenumberFrom(null), 200);
         }
       }, 150);
     },
@@ -287,6 +314,7 @@ export function useAnnotationPopupState({
       projectId,
       resolvedEndpoint,
       setAnnotations,
+      scheduleTimeout,
       setDeletingMarkerId,
       setEditExiting,
       setEditingAnnotation,
@@ -462,6 +490,7 @@ export function useAnnotationPopupState({
         setEditingAnnotation,
         setEditingTargetElement,
         setEditingTargetElements,
+        scheduleTimeout,
       );
     },
     [
@@ -470,6 +499,7 @@ export function useAnnotationPopupState({
       onAnnotationUpdate,
       projectId,
       resolvedEndpoint,
+      scheduleTimeout,
       setAnnotations,
       setEditExiting,
       setEditingAnnotation,
@@ -526,8 +556,10 @@ export function useAnnotationPopupState({
       setEditingAnnotation,
       setEditingTargetElement,
       setEditingTargetElements,
+      scheduleTimeout,
     );
   }, [
+    scheduleTimeout,
     setEditExiting,
     setEditingAnnotation,
     setEditingTargetElement,
