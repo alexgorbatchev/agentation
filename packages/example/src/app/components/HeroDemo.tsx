@@ -5,7 +5,31 @@ import { useState, useEffect, useRef } from "react";
 // Animated demo showing the agentation workflow
 // This is purely for documentation - uses visual copies of the real UI
 
-export function HeroDemo() {
+type HeroComponentMenuItem = {
+  name: string;
+  props: string[];
+  source: string;
+};
+
+const HERO_COMPONENT_MENU_ITEMS: HeroComponentMenuItem[] = [
+  {
+    name: "ActionButton",
+    props: ["label", "tone"],
+    source: "src/components/toolbar/ActionButton.tsx:18",
+  },
+  {
+    name: "ActionRow",
+    props: ["ctaLabel"],
+    source: "src/components/toolbar/ActionRow.tsx:44",
+  },
+  {
+    name: "ProfileCard",
+    props: ["title", "subtitle"],
+    source: "src/components/ProfileCard.tsx:72",
+  },
+];
+
+export function HeroDemo(): JSX.Element {
   const [typedText, setTypedText] = useState("");
   const [cursorPos, setCursorPos] = useState({ x: 280, y: 180 });
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
@@ -37,6 +61,10 @@ export function HeroDemo() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [selectedSidebarIcons, setSelectedSidebarIcons] = useState<number[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<number[]>([]);
+  const [showComponentMenu, setShowComponentMenu] = useState(false);
+  const [componentMenuPos, setComponentMenuPos] = useState({ x: 0, y: 0 });
+  const [hoveredComponentMenuIndex, setHoveredComponentMenuIndex] = useState<number | null>(null);
+  const [showAltShortcut, setShowAltShortcut] = useState(false);
 
   const btnRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLSpanElement>(null);
@@ -52,7 +80,7 @@ export function HeroDemo() {
   const sidebarIconsPosRef = useRef({ x: 10, y: 40, width: 24, height: 70 });
 
   // Measure element positions
-  const measure = () => {
+  const measure = (): void => {
     if (btnRef.current && contentRef.current) {
       const btnRect = btnRef.current.getBoundingClientRect();
       const contentRect = contentRef.current.getBoundingClientRect();
@@ -122,7 +150,7 @@ export function HeroDemo() {
   const feedbackText3 = "Make this more prominent";
 
   // Different terminal output for mobile (metrics instead of sidebar)
-  const getTerminalOutput = (mobile: boolean) => mobile ? `## Page Feedback
+  const getTerminalOutput = (mobile: boolean): string => mobile ? `## Page Feedback
 
 ### 1. button.export-btn
 Change to primary style
@@ -141,6 +169,9 @@ Add hover states
 
 ### 3. "${headerText}"
 Make this more prominent`;
+
+  const annotationCount: number =
+    2 + Number(showNewMarker) + Number(showGreenMarker) + Number(showOrangeMarker);
 
   // Animation sequence
   useEffect(() => {
@@ -173,6 +204,10 @@ Make this more prominent`;
       setIsMobileView(window.innerWidth <= 640);
       setSelectedSidebarIcons([]);
       setSelectedMetrics([]);
+      setShowComponentMenu(false);
+      setComponentMenuPos({ x: 0, y: 0 });
+      setHoveredComponentMenuIndex(null);
+      setShowAltShortcut(false);
     };
 
     const runAnimation = async () => {
@@ -255,6 +290,44 @@ Make this more prominent`;
       if (cancelled) return;
       setShowNewMarker(true);
       await delay(600);
+      if (cancelled) return;
+
+      // === ALT + RIGHT-CLICK COMPONENT SOURCE MENU ===
+      const componentTargetX = pos.x + pos.width / 2;
+      const componentTargetY = pos.y + pos.height / 2;
+      const menuContainerWidth = contentRef.current?.offsetWidth || 300;
+      const menuX = Math.max(12, Math.min(componentTargetX + 24, menuContainerWidth - 228));
+      const menuY = Math.max(18, pos.y - 8);
+      const componentMenuItemIndex = 1;
+      const menuItemX = menuX + 96;
+      const menuItemY = menuY + 144;
+
+      setIsCrosshair(false);
+      setCursorPos({ x: componentTargetX, y: componentTargetY });
+      setShowAltShortcut(true);
+      setShowHighlight(true);
+      await delay(450);
+      if (cancelled) return;
+
+      setComponentMenuPos({ x: menuX, y: menuY });
+      setShowComponentMenu(true);
+      await delay(300);
+      if (cancelled) return;
+
+      setCursorPos({ x: menuItemX, y: menuItemY });
+      await delay(220);
+      if (cancelled) return;
+
+      setHoveredComponentMenuIndex(componentMenuItemIndex);
+      await delay(2000);
+      if (cancelled) return;
+
+      setShowComponentMenu(false);
+      setHoveredComponentMenuIndex(null);
+      setShowHighlight(false);
+      setShowAltShortcut(false);
+      setIsCrosshair(true);
+      await delay(220);
       if (cancelled) return;
 
       // === DRAG SELECTION ===
@@ -478,10 +551,8 @@ Make this more prominent`;
       setOrangeMarkerPos({ x: textEndX + 2, y: timePos.y + timePos.height / 2 });
       setShowOrangeMarker(true);
       setTextSelection({ visible: false, x: 0, y: 0, width: 0 });
-      // Switch from I-beam back to crosshair
       setIsIBeam(false);
-      setIsCrosshair(true);
-      await delay(400);
+      await delay(300);
       if (cancelled) return;
 
       // === COPY OUTPUT ===
@@ -550,7 +621,7 @@ Make this more prominent`;
       cancelled = false;
       runAnimation();
       // Slightly shorter interval on mobile (faster animations, shorter text)
-      const loopInterval = window.innerWidth <= 640 ? 14000 : 16000;
+      const loopInterval = window.innerWidth <= 640 ? 17800 : 20000;
       interval = setInterval(runAnimation, loopInterval);
     };
 
@@ -665,6 +736,9 @@ Make this more prominent`;
                 <path d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
               </svg>
             </div>
+            {annotationCount > 0 && !isToolbarExpanded && (
+              <span className="hero-demo-toolbar-badge">{annotationCount}</span>
+            )}
 
             {/* Expanded buttons - exact order from real toolbar */}
             <div className="hero-demo-toolbar-buttons">
@@ -686,7 +760,8 @@ Make this more prominent`;
               <div ref={copyBtnRef} className={`hero-demo-toolbar-btn ${copyClicked ? "active" : ""} ${copyHovered ? "hovered" : ""}`}>
                 {copyClicked ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12L10 17L19 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 20C7.58172 20 4 16.4182 4 12C4 7.58172 7.58172 4 12 4C16.4182 4 20 7.58172 20 12C20 16.4182 16.4182 20 12 20Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M15 10L11 14.25L9.25 12.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 ) : (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -694,6 +769,13 @@ Make this more prominent`;
                     <path d="M17.25 14.25H17.75C18.5784 14.25 19.25 13.5784 19.25 12.75V6.25C19.25 5.42157 18.5784 4.75 17.75 4.75H11.25C10.4216 4.75 9.75 5.42157 9.75 6.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                 )}
+              </div>
+              {/* Send */}
+              <div className="hero-demo-toolbar-btn hero-demo-toolbar-btn-with-badge">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M9.875 14.125L12.3506 19.6951C12.7184 20.5227 13.9091 20.4741 14.2083 19.6193L18.8139 6.46032C19.0907 5.6695 18.3305 4.90933 17.5397 5.18611L4.38072 9.79174C3.52589 10.0909 3.47731 11.2816 4.30494 11.6494L9.875 14.125ZM9.875 14.125L13.375 10.625" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="hero-demo-toolbar-btn-badge">{annotationCount}</span>
               </div>
               {/* Trash */}
               <div className="hero-demo-toolbar-btn">
@@ -705,12 +787,20 @@ Make this more prominent`;
                   <path d="M6.75 7.75L7.11691 16.189C7.16369 17.2649 7.18708 17.8028 7.41136 18.2118C7.60875 18.5717 7.91211 18.8621 8.28026 19.0437C8.69854 19.25 9.23699 19.25 10.3139 19.25H13.6861C14.763 19.25 15.3015 19.25 15.7197 19.0437C16.0879 18.8621 16.3912 18.5717 16.5886 18.2118C16.8129 17.8028 16.8363 17.2649 16.8831 16.189L17.25 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
               </div>
+              {/* Review queue */}
+              <div className="hero-demo-toolbar-btn disabled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 20C7.58172 20 4 16.4182 4 12C4 7.58172 7.58172 4 12 4C16.4182 4 20 7.58172 20 12C20 16.4182 16.4182 20 12 20Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M15 10L11 14.25L9.25 12.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
               {/* Gear */}
-              <div className="hero-demo-toolbar-btn">
+              <div className="hero-demo-toolbar-btn hero-demo-toolbar-btn-with-status">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path d="M10.6504 5.81117C10.9939 4.39628 13.0061 4.39628 13.3496 5.81117C13.5715 6.72517 14.6187 7.15891 15.4219 6.66952C16.6652 5.91193 18.0881 7.33479 17.3305 8.57815C16.8411 9.38134 17.2748 10.4285 18.1888 10.6504C19.6037 10.9939 19.6037 13.0061 18.1888 13.3496C17.2748 13.5715 16.8411 14.6187 17.3305 15.4219C18.0881 16.6652 16.6652 18.0881 15.4219 17.3305C14.6187 16.8411 13.5715 17.2748 13.3496 18.1888C13.0061 19.6037 10.9939 19.6037 10.6504 18.1888C10.4285 17.2748 9.38135 16.8411 8.57815 17.3305C7.33479 18.0881 5.91193 16.6652 6.66952 15.4219C7.15891 14.6187 6.72517 13.5715 5.81117 13.3496C4.39628 13.0061 4.39628 10.9939 5.81117 10.6504C6.72517 10.4285 7.15891 9.38134 6.66952 8.57815C5.91193 7.33479 7.33479 5.91192 8.57815 6.66952C9.38135 7.15891 10.4285 6.72517 10.6504 5.81117Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
                 </svg>
+                <span className="hero-demo-toolbar-status connected" />
               </div>
 
               <div className="hero-demo-toolbar-divider" />
@@ -776,7 +866,39 @@ Make this more prominent`;
 
           {/* Orange marker for text selection */}
           <div className={`hero-demo-marker orange ${showOrangeMarker ? "visible" : ""}`} style={{ top: orangeMarkerPos.y, left: orangeMarkerPos.x }}>
-            {isMobileView ? 3 : 5}
+            5
+          </div>
+
+          {/* Alt + right-click shortcut hint */}
+          <div
+            className={`hero-demo-shortcut-pill ${showAltShortcut ? "visible" : ""}`}
+            style={{ left: cursorPos.x + 18, top: cursorPos.y - 20 }}
+          >
+            Alt + Right click
+          </div>
+
+          {/* Component source menu */}
+          <div
+            className={`hero-demo-component-menu ${showComponentMenu ? "visible" : ""}`}
+            style={{ left: componentMenuPos.x, top: componentMenuPos.y }}
+          >
+            <div className="hero-demo-component-menu-title">Component source</div>
+            {HERO_COMPONENT_MENU_ITEMS.map((item, index) => (
+              <div
+                key={`${item.name}-${item.source}`}
+                className={`hero-demo-component-menu-item ${hoveredComponentMenuIndex === index ? "active" : ""}`}
+              >
+                <div className="hero-demo-component-menu-name">{`<${item.name}>`}</div>
+                <div className="hero-demo-component-menu-props">
+                  {item.props.map((propName) => (
+                    <span key={`${item.name}-${propName}`} className="hero-demo-component-menu-prop">
+                      {propName}
+                    </span>
+                  ))}
+                </div>
+                <div className="hero-demo-component-menu-source">{item.source}</div>
+              </div>
+            ))}
           </div>
 
           {/* Popup */}
