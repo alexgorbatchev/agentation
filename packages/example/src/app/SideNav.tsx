@@ -237,7 +237,7 @@ function ForensicBunny({ isForensic }: { isForensic: boolean }) {
 let hasPlayedEntranceAnimation = false;
 
 function TypedLogo({ isForensic, isOverview }: { isForensic: boolean; isOverview: boolean }) {
-  const text = "/agentation";
+  const text = "/agentation-fork";
   const [showBunny, setShowBunny] = useState(hasPlayedEntranceAnimation);
   const [skipAnimation, setSkipAnimation] = useState(hasPlayedEntranceAnimation);
 
@@ -253,6 +253,11 @@ function TypedLogo({ isForensic, isOverview }: { isForensic: boolean; isOverview
     1.14,   // i
     1.22,   // o
     1.3,    // n
+    1.55,   // - (pause before suffix)
+    1.63,   // f
+    1.71,   // o
+    1.79,   // r
+    1.87,   // k
   ];
 
   const totalTypingTime = delays[delays.length - 1] + 0.2;

@@ -228,6 +228,12 @@ export default function AgentationDocs() {
             <h1 style={{ fontSize: "2rem", lineHeight: 1.15, marginBottom: "0.5rem" }}><span className="sketchy-underline">Point at bugs.</span><br />Let AI <span className="pen-underline">fix them.</span></h1>
             <InstallSnippet />
           </div>
+          <p className="fork-note">
+            <strong>
+              This is a fork of the wonderful original Agentation by <a href="https://x.com/benjitaylor" target="_blank" rel="noopener noreferrer">Benji Taylor</a> — see <a href="https://github.com/benjitaylor/agentation" target="_blank" rel="noopener noreferrer">the original project</a>.
+              While the original Agentation is still maintained, this project has taken a somewhat different direction by replacing MCP with a CLI and adding a few more features.
+            </strong>
+          </p>
           <p className="tagline">Agentation turns UI annotations into structured context that AI coding agents can understand and act on. Click any element, add a note, and paste the output into Claude Code, Cursor, or any AI tool.</p>
         </header>
 

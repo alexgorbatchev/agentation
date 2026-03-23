@@ -239,7 +239,7 @@ function MobileForensicBunny({ isForensic }: { isForensic: boolean }) {
 }
 
 function MobileTypedLogo({ isForensic }: { isForensic: boolean }) {
-  const text = "/agentation";
+  const text = "/agentation-fork";
   const [showBunny, setShowBunny] = useState(false);
   const [showText, setShowText] = useState(false);
 
@@ -259,7 +259,12 @@ function MobileTypedLogo({ isForensic }: { isForensic: boolean }) {
     1.14,   // i
     1.22,   // o
     1.3,    // n
-  ].map(d => d + bunnyEntranceTime);
+    1.55,   // - (pause before suffix)
+    1.63,   // f
+    1.71,   // o
+    1.79,   // r
+    1.87,   // k
+  ].map((delay) => delay + bunnyEntranceTime);
 
   useEffect(() => {
     // Show bunny immediately
