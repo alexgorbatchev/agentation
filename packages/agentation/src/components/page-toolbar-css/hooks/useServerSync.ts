@@ -22,6 +22,46 @@ const NEOVIM_HEARTBEAT_INTERVAL_MS = 5000;
 const NEOVIM_CONNECTION_TIMEOUT_MS = 15000;
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected";
+type AnnotationEventPayload = Partial<Annotation> & Pick<Annotation, "id">;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isAnnotationEventPayload(
+  value: unknown,
+): value is AnnotationEventPayload {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.id === "string" && value.id.trim() !== "";
+}
+
+function mergeServerAnnotation(
+  currentAnnotation: Annotation,
+  eventPayload: AnnotationEventPayload,
+): Annotation {
+  return {
+    ...currentAnnotation,
+    ...eventPayload,
+    _reviewedAt: currentAnnotation._reviewedAt,
+    _syncedTo: currentAnnotation._syncedTo,
+  };
+}
+
+function applyServerAnnotationUpdate(
+  annotations: Annotation[],
+  eventPayload: AnnotationEventPayload,
+): Annotation[] {
+  return annotations.map((annotation) => {
+    if (annotation.id !== eventPayload.id) {
+      return annotation;
+    }
+
+    return mergeServerAnnotation(annotation, eventPayload);
+  });
+}
 
 type UseServerSyncParams = {
   resolvedEndpoint: string;
@@ -297,29 +337,15 @@ export function useServerSync({
       buildProjectScopedUrl(`${resolvedEndpoint}/sessions/${currentSessionId}/events`, projectId),
     );
 
-    const removedStatuses = ["resolved", "dismissed"];
-
     const annotationUpdatedHandler = (eventMessage: MessageEvent): void => {
       try {
         const event = JSON.parse(eventMessage.data);
-        if (!removedStatuses.includes(event.payload?.status)) {
+        const eventPayload = isRecord(event) ? event.payload : undefined;
+        if (!isAnnotationEventPayload(eventPayload)) {
           return;
         }
 
-        const { id, status, thread, resolvedAt, resolvedBy } = event.payload;
-        setAnnotations((prev) =>
-          prev.map((annotation) =>
-            annotation.id === id
-              ? {
-                  ...annotation,
-                  status,
-                  thread: thread ?? annotation.thread,
-                  resolvedAt,
-                  resolvedBy,
-                }
-              : annotation,
-          ),
-        );
+        setAnnotations((prev) => applyServerAnnotationUpdate(prev, eventPayload));
       } catch {
         // Ignore parse errors.
       }
@@ -328,18 +354,12 @@ export function useServerSync({
     const threadHandler = (eventMessage: MessageEvent): void => {
       try {
         const event = JSON.parse(eventMessage.data);
-        const updated = event.payload as Annotation;
-        if (!updated?.id || !updated?.thread) {
+        const eventPayload = isRecord(event) ? event.payload : undefined;
+        if (!isAnnotationEventPayload(eventPayload) || eventPayload.thread === undefined) {
           return;
         }
 
-        setAnnotations((prev) =>
-          prev.map((annotation) =>
-            annotation.id === updated.id
-              ? { ...annotation, thread: updated.thread }
-              : annotation,
-          ),
-        );
+        setAnnotations((prev) => applyServerAnnotationUpdate(prev, eventPayload));
       } catch {
         // Ignore parse errors.
       }
@@ -405,37 +425,41 @@ export function useServerSync({
           (annotation) => !serverIds.has(annotation.id),
         );
 
-        if (unsyncedLocal.length > 0) {
-          const results = await Promise.allSettled(
-            unsyncedLocal.map((annotation) =>
-              syncAnnotation(
-                resolvedEndpoint,
-                sessionId!,
-                {
-                  ...annotation,
-                  sessionId: sessionId!,
-                  url: pageUrl,
-                },
-                projectId,
-              ),
-            ),
-          );
-
-          const syncedAnnotations = results.map((result, index) => {
-            if (result.status === "fulfilled") {
-              return result.value;
-            }
-            console.warn(
-              "[Agentation] Failed to sync annotation on reconnect:",
-              result.reason,
-            );
-            return unsyncedLocal[index];
-          });
-
-          const allAnnotations = [...serverAnnotations, ...syncedAnnotations];
-          setAnnotations(allAnnotations);
-          saveAnnotationsWithSyncMarker(pathname, allAnnotations, sessionId!);
+        if (unsyncedLocal.length === 0) {
+          setAnnotations(serverAnnotations);
+          saveAnnotationsWithSyncMarker(pathname, serverAnnotations, sessionId);
+          return;
         }
+
+        const results = await Promise.allSettled(
+          unsyncedLocal.map((annotation) =>
+            syncAnnotation(
+              resolvedEndpoint,
+              sessionId,
+              {
+                ...annotation,
+                sessionId,
+                url: pageUrl,
+              },
+              projectId,
+            ),
+          ),
+        );
+
+        const syncedAnnotations = results.map((result, index) => {
+          if (result.status === "fulfilled") {
+            return result.value;
+          }
+          console.warn(
+            "[Agentation] Failed to sync annotation on reconnect:",
+            result.reason,
+          );
+          return unsyncedLocal[index];
+        });
+
+        const allAnnotations = [...serverAnnotations, ...syncedAnnotations];
+        setAnnotations(allAnnotations);
+        saveAnnotationsWithSyncMarker(pathname, allAnnotations, sessionId);
       } catch (error) {
         console.warn("[Agentation] Failed to sync on reconnect:", error);
       }

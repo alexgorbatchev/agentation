@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, fireEvent, userEvent, waitFor } from "storybook/test";
+import { expect, fn, fireEvent, userEvent, waitFor, within } from "storybook/test";
 import { PageFeedbackToolbarCSS } from "./index";
 import type { Annotation } from "../../types";
 
@@ -16,12 +16,147 @@ function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
   };
 }
 
-function getStorageKey() {
+const STORYBOOK_ACK_ENDPOINT = "http://localhost:4747";
+const STORYBOOK_ACK_SESSION_ID = "storybook-ack-session";
+const STORYBOOK_ACK_ANNOTATION_ID = "storybook-ack-annotation";
+const STORYBOOK_ACK_COMMENT = "Button spacing needs fixing";
+
+const originalFetch = globalThis.fetch;
+const originalEventSource = globalThis.EventSource;
+
+type EventSourceListener = (event: MessageEvent) => void;
+type StoryEventSourceState = {
+  instance: {
+    listenersByType: Map<string, EventSourceListener[]>;
+    url: string;
+  } | null;
+};
+
+const storyEventSourceState: StoryEventSourceState = {
+  instance: null,
+};
+
+function getStorageKey(): string {
   return `feedback-annotations-${window.location.pathname}`;
 }
 
-function seedAnnotations(annotations: Annotation[]) {
+function seedAnnotations(annotations: Annotation[]): void {
   localStorage.setItem(getStorageKey(), JSON.stringify(annotations));
+}
+
+function restoreStoryGlobals(): void {
+  globalThis.fetch = originalFetch;
+  globalThis.EventSource = originalEventSource;
+  storyEventSourceState.instance = null;
+}
+
+function makeAcknowledgementAnnotation(): Annotation {
+  return makeAnnotation({
+    id: STORYBOOK_ACK_ANNOTATION_ID,
+    comment: STORYBOOK_ACK_COMMENT,
+    element: "Primary button",
+  });
+}
+
+function installAcknowledgementStoryMocks(): void {
+  const pendingAnnotation = makeAcknowledgementAnnotation();
+
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === "string" ? input : input.toString();
+    const method = init?.method ?? "GET";
+
+    if (url === `${STORYBOOK_ACK_ENDPOINT}/health` && method === "GET") {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (
+      url === `${STORYBOOK_ACK_ENDPOINT}/sessions/${STORYBOOK_ACK_SESSION_ID}` &&
+      method === "GET"
+    ) {
+      return new Response(
+        JSON.stringify({
+          annotations: [pendingAnnotation],
+          createdAt: new Date().toISOString(),
+          id: STORYBOOK_ACK_SESSION_ID,
+          status: "active",
+          url: "http://localhost:6006/iframe.html",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    return new Response(JSON.stringify({ error: "Not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  class StoryEventSource {
+    static readonly CLOSED = 2;
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+
+    listenersByType = new Map<string, EventSourceListener[]>();
+    url: string;
+
+    constructor(url: string) {
+      this.url = url;
+      storyEventSourceState.instance = {
+        listenersByType: this.listenersByType,
+        url,
+      };
+    }
+
+    addEventListener(type: string, listener: EventSourceListener): void {
+      const listeners = this.listenersByType.get(type) ?? [];
+      this.listenersByType.set(type, [...listeners, listener]);
+    }
+
+    removeEventListener(type: string, listener: EventSourceListener): void {
+      const listeners = this.listenersByType.get(type) ?? [];
+      this.listenersByType.set(
+        type,
+        listeners.filter((candidate) => candidate !== listener),
+      );
+    }
+
+    close(): void {
+      storyEventSourceState.instance = null;
+    }
+  }
+
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    value: StoryEventSource,
+    writable: true,
+  });
+}
+
+function emitAcknowledgementEvent(): void {
+  const eventSourceInstance = storyEventSourceState.instance;
+  if (eventSourceInstance === null) {
+    throw new Error("Expected EventSource instance to exist before emitting acknowledgement event.");
+  }
+
+  const listeners = eventSourceInstance.listenersByType.get("annotation.updated") ?? [];
+  const eventMessage = new MessageEvent("message", {
+    data: JSON.stringify({
+      payload: {
+        id: STORYBOOK_ACK_ANNOTATION_ID,
+        status: "acknowledged",
+      },
+    }),
+  });
+
+  for (const listener of listeners) {
+    listener(eventMessage);
+  }
 }
 
 function findButtonByTooltip(tooltipText: string): HTMLButtonElement | null {
@@ -67,6 +202,7 @@ const meta: Meta<typeof PageFeedbackToolbarCSS> = {
     neovimBridgeUrl: "http://127.0.0.1:8787",
   },
   beforeEach: () => {
+    restoreStoryGlobals();
     localStorage.clear();
     sessionStorage.clear();
   },
@@ -191,6 +327,47 @@ export const AnnotationCount: Story = {
       const bodyText = document.body.textContent || "";
       expect(bodyText).toContain("3");
     });
+  },
+};
+
+export const AcknowledgementNotification: Story = {
+  args: {
+    endpoint: STORYBOOK_ACK_ENDPOINT,
+    sessionId: STORYBOOK_ACK_SESSION_ID,
+  },
+  beforeEach: () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    installAcknowledgementStoryMocks();
+  },
+  play: async () => {
+    await clickToolbar();
+
+    await waitFor(() => {
+      const pendingMarker = document.querySelector(
+        '[data-annotation-status="pending"]',
+      );
+      expect(pendingMarker).toBeTruthy();
+    });
+
+    await waitFor(() => {
+      expect(storyEventSourceState.instance).toBeTruthy();
+    });
+
+    emitAcknowledgementEvent();
+
+    const body = within(document.body);
+    await waitFor(() => {
+      expect(body.getByText("Agent started work")).toBeTruthy();
+      expect(body.getByText(STORYBOOK_ACK_COMMENT)).toBeTruthy();
+    });
+
+    const acknowledgedMarker = document.querySelector(
+      '[data-annotation-status="acknowledged"]',
+    );
+    await expect(acknowledgedMarker?.getAttribute("title")).toBe(
+      "Agent is working on this feedback",
+    );
   },
 };
 

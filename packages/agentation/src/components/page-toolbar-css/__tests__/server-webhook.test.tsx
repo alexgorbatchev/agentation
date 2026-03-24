@@ -1,10 +1,11 @@
 /** @vitest-environment jsdom */
 import assert from "node:assert";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, fireEvent, waitFor, act, screen } from "@testing-library/react";
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import {
+  PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY,
   activateToolbar,
   createEventSourceHarness,
   findButtonByTooltip,
@@ -15,6 +16,7 @@ import {
 } from "./pageToolbarTestUtils";
 import {
   mockCreateSessionResponse,
+  mockGetSessionResponse,
   mockNetworkError,
   mockPendingResponse,
   setupPageToolbarServerMock,
@@ -497,7 +499,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       expect(getLastEventSource()).toBeNull();
     });
 
-    it("ignores SSE events with non-removal statuses", async () => {
+    it("updates local state and shows a notification when SSE acknowledges an annotation", async () => {
       const annotation = makeAnnotation({
         id: "sse-ack-1",
         comment: "Ack me",
@@ -518,7 +520,6 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
       });
 
-      // Emit an "acknowledged" event - should NOT remove the annotation
       act(() => {
         eventSourceHarness.emit("annotation.updated", {
           id: "sse-ack-1",
@@ -526,14 +527,28 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         });
       });
 
-      // Wait a bit and verify annotation still exists (not removed)
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+      await waitFor(() => {
+        expect(screen.getByText("Agent started work")).toBeTruthy();
+        expect(screen.getByText("Ack me")).toBeTruthy();
       });
 
-      // The toolbar should still be rendered and the annotation should still exist in state
-      const toolbar = document.querySelector("[data-feedback-toolbar]");
-      expect(toolbar).toBeTruthy();
+      const acknowledgedMarker = document.querySelector(
+        '[data-annotation-status="acknowledged"]',
+      );
+      assert(acknowledgedMarker instanceof HTMLElement);
+      expect(acknowledgedMarker.getAttribute("title")).toBe(
+        "Agent is working on this feedback",
+      );
+
+      const storedAnnotations = JSON.parse(
+        localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY) ?? "[]",
+      );
+      expect(storedAnnotations).toMatchObject([
+        {
+          id: "sse-ack-1",
+          status: "acknowledged",
+        },
+      ]);
     });
 
     it("handles malformed SSE event data gracefully", async () => {
@@ -806,6 +821,71 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         );
         expect(syncCalls.length).toBeGreaterThanOrEqual(1);
       });
+    });
+
+    it("replaces stale local pending status with acknowledged server state after reconnect", async () => {
+      vi.useFakeTimers();
+
+      try {
+        const pendingAnnotation = makeAnnotation({
+          id: "reconnect-ack-1",
+          comment: "Reconnect ack",
+        });
+        const acknowledgedAnnotation: Annotation = {
+          ...pendingAnnotation,
+          status: "acknowledged",
+        };
+        let getSessionCount = 0;
+
+        seedAnnotations([pendingAnnotation]);
+
+        setupBasicServerMocks("session-reconnect-ack", [pendingAnnotation], {
+          healthResponses: [false, true],
+          onGetSessionRequest: () => {
+            getSessionCount += 1;
+            if (getSessionCount === 1) {
+              return mockGetSessionResponse("session-reconnect-ack", [pendingAnnotation]);
+            }
+
+            return mockGetSessionResponse("session-reconnect-ack", [acknowledgedAnnotation]);
+          },
+        });
+
+        render(
+          <PageFeedbackToolbarCSS
+            endpoint="http://localhost:4747"
+            sessionId="session-reconnect-ack"
+          />,
+        );
+
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10000);
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        expect(screen.getByText("Agent started work")).toBeTruthy();
+        expect(screen.getByText("Reconnect ack")).toBeTruthy();
+
+        const storedAnnotations = JSON.parse(
+          localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY) ?? "[]",
+        );
+        expect(storedAnnotations).toMatchObject([
+          {
+            id: "reconnect-ack-1",
+            status: "acknowledged",
+          },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("creates new session on reconnect if existing session is expired", async () => {

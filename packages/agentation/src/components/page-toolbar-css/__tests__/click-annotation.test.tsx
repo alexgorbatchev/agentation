@@ -1373,6 +1373,13 @@ describe("Click-to-annotate flow", () => {
         const markers = document.querySelectorAll("[data-annotation-marker]");
         expect(markers.length).toBe(3);
       });
+
+      const acknowledgedMarker = document.querySelector(
+        '[data-annotation-status="acknowledged"]',
+      );
+      expect(acknowledgedMarker?.getAttribute("title")).toBe(
+        "Agent is working on this feedback",
+      );
     });
   });
 

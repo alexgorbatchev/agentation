@@ -12,6 +12,7 @@ import {
 } from "../../utils/freeze-animations";
 
 import { COLOR_OPTIONS, OUTPUT_DETAIL_OPTIONS, OUTPUT_TO_REACT_MODE } from "./constants";
+import { AgentationNotificationToast } from "./components/AgentationNotificationToast";
 import { InteractionOverlay } from "./components/InteractionOverlay";
 import { MarkersLayer } from "./components/MarkersLayer";
 import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
@@ -21,6 +22,7 @@ import { ToolbarShell } from "./components/ToolbarShell";
 import { useAnnotationActions } from "./hooks/useAnnotationActions";
 import { useAnnotationPersistence } from "./hooks/useAnnotationPersistence";
 import { useAnnotationPopupState } from "./hooks/useAnnotationPopupState";
+import { useAcknowledgementNotification } from "./hooks/useAcknowledgementNotification";
 import { useAnnotationState } from "./hooks/useAnnotationState";
 import { useAnnotationViewModel } from "./hooks/useAnnotationViewModel";
 import { useComponentSourceNavigation } from "./hooks/useComponentSourceNavigation";
@@ -503,6 +505,10 @@ export function PageFeedbackToolbarCSS({
     exitingMarkers,
   });
 
+  const { activeNotification } = useAcknowledgementNotification({
+    annotations,
+  });
+
   const interactionOverlayModel = useInteractionOverlayModel({
     isActive,
     pendingAnnotation,
@@ -654,6 +660,11 @@ export function PageFeedbackToolbarCSS({
           />
         </div>
       </ToolbarShell>
+
+      <AgentationNotificationToast
+        notification={activeNotification}
+        isDarkMode={isDarkMode}
+      />
 
       <MarkersLayer
         markersVisible={markersVisible}

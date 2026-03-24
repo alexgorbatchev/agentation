@@ -29,6 +29,22 @@ type MarkersLayerProps = {
   startEditAnnotation: (annotation: Annotation) => void;
 };
 
+function getMarkerStatus(annotation: Annotation): string {
+  return annotation.status ?? "pending";
+}
+
+function getMarkerStatusClassName(annotation: Annotation): string {
+  return annotation.status === "acknowledged" ? styles.acknowledged : "";
+}
+
+function getMarkerStatusTitle(annotation: Annotation): string | undefined {
+  if (annotation.status !== "acknowledged") {
+    return undefined;
+  }
+
+  return "Agent is working on this feedback";
+}
+
 export function MarkersLayer({
   markersVisible,
   markersExiting,
@@ -82,8 +98,10 @@ export function MarkersLayer({
               return (
                 <div
                   key={annotation.id}
-                  className={`${styles.marker} ${isMulti ? styles.multiSelect : ""} ${animationClass} ${showDeleteHover ? styles.hovered : ""}`}
+                  className={`${styles.marker} ${getMarkerStatusClassName(annotation)} ${isMulti ? styles.multiSelect : ""} ${animationClass} ${showDeleteHover ? styles.hovered : ""}`}
                   data-annotation-marker
+                  data-annotation-status={getMarkerStatus(annotation)}
+                  title={getMarkerStatusTitle(annotation)}
                   style={{
                     left: `${annotation.x}%`,
                     top: annotation.y,
@@ -168,6 +186,8 @@ export function MarkersLayer({
                 key={annotation.id}
                 className={`${styles.marker} ${styles.resolved} ${annotation._reviewedAt ? styles.reviewed : ""} ${annotation.isMultiSelect ? styles.multiSelect : ""}`}
                 data-annotation-marker
+                data-annotation-status={getMarkerStatus(annotation)}
+                title={getMarkerStatusTitle(annotation)}
                 style={{
                   left: `${annotation.x}%`,
                   top: annotation.y,
@@ -192,6 +212,8 @@ export function MarkersLayer({
                   key={annotation.id}
                   className={`${styles.marker} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
                   data-annotation-marker
+                  data-annotation-status={getMarkerStatus(annotation)}
+                  title={getMarkerStatusTitle(annotation)}
                   style={{
                     left: `${annotation.x}%`,
                     top: annotation.y,
@@ -235,8 +257,10 @@ export function MarkersLayer({
               return (
                 <div
                   key={annotation.id}
-                  className={`${styles.marker} ${styles.fixed} ${isMulti ? styles.multiSelect : ""} ${animationClass} ${showDeleteHover ? styles.hovered : ""}`}
+                  className={`${styles.marker} ${styles.fixed} ${getMarkerStatusClassName(annotation)} ${isMulti ? styles.multiSelect : ""} ${animationClass} ${showDeleteHover ? styles.hovered : ""}`}
                   data-annotation-marker
+                  data-annotation-status={getMarkerStatus(annotation)}
+                  title={getMarkerStatusTitle(annotation)}
                   style={{
                     left: `${annotation.x}%`,
                     top: annotation.y,
@@ -321,6 +345,8 @@ export function MarkersLayer({
                 key={annotation.id}
                 className={`${styles.marker} ${styles.fixed} ${styles.resolved} ${annotation._reviewedAt ? styles.reviewed : ""} ${annotation.isMultiSelect ? styles.multiSelect : ""}`}
                 data-annotation-marker
+                data-annotation-status={getMarkerStatus(annotation)}
+                title={getMarkerStatusTitle(annotation)}
                 style={{
                   left: `${annotation.x}%`,
                   top: annotation.y,
@@ -345,6 +371,8 @@ export function MarkersLayer({
                   key={annotation.id}
                   className={`${styles.marker} ${styles.fixed} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
                   data-annotation-marker
+                  data-annotation-status={getMarkerStatus(annotation)}
+                  title={getMarkerStatusTitle(annotation)}
                   style={{
                     left: `${annotation.x}%`,
                     top: annotation.y,

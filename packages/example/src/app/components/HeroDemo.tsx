@@ -1,31 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ComponentSourceMenuPreview, type ComponentSourceMenuPreviewItem } from "../../../../agentation/src/components/page-toolbar-css/components/ComponentSourceMenuPreview";
+import { PageFeedbackToolbarPreview } from "../../../../agentation/src/components/page-toolbar-css/components/PageFeedbackToolbarPreview";
 
 // Animated demo showing the agentation workflow
 // This is purely for documentation - uses visual copies of the real UI
 
-type HeroComponentMenuItem = {
-  name: string;
-  props: string[];
-  source: string;
-};
-
-const HERO_COMPONENT_MENU_ITEMS: HeroComponentMenuItem[] = [
+const HERO_COMPONENT_MENU_ITEMS: ComponentSourceMenuPreviewItem[] = [
   {
-    name: "ActionButton",
+    displayName: "ActionButton",
     props: ["label", "tone"],
-    source: "src/components/toolbar/ActionButton.tsx:18",
+    sourceLabel: "src/components/toolbar/ActionButton.tsx:18",
   },
   {
-    name: "ActionRow",
+    displayName: "ActionRow",
     props: ["ctaLabel"],
-    source: "src/components/toolbar/ActionRow.tsx:44",
+    sourceLabel: "src/components/toolbar/ActionRow.tsx:44",
   },
   {
-    name: "ProfileCard",
+    displayName: "ProfileCard",
     props: ["title", "subtitle"],
-    source: "src/components/ProfileCard.tsx:72",
+    sourceLabel: "src/components/ProfileCard.tsx:72",
   },
 ];
 
@@ -70,14 +66,33 @@ export function HeroDemo(): JSX.Element {
   const timeRef = useRef<HTMLSpanElement>(null);
   const timePosRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const contentRef = useRef<HTMLDivElement>(null);
-  const copyBtnRef = useRef<HTMLDivElement>(null);
+  const copyButtonRef = useRef<HTMLButtonElement>(null);
   const metricsRef = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  const toolbarContainerRef = useRef<HTMLDivElement>(null);
   const sidebarIconsRef = useRef<HTMLDivElement>(null);
+  const componentMenuItemRefs = [
+    useRef<HTMLButtonElement>(null),
+    useRef<HTMLButtonElement>(null),
+    useRef<HTMLButtonElement>(null),
+  ];
   const btnPosRef = useRef({ x: 20, y: 82, width: 68, height: 33 });
   const metricsPosRef = useRef({ x: 0, y: 26, width: 175, height: 58 });
   const toolbarPosRef = useRef({ x: 280, y: 210 });
   const sidebarIconsPosRef = useRef({ x: 10, y: 40, width: 24, height: 70 });
+
+  const getRelativeCenter = (element: HTMLElement | null): { x: number; y: number } | null => {
+    if (!element || !contentRef.current) {
+      return null;
+    }
+
+    const elementRect = element.getBoundingClientRect();
+    const contentRect = contentRef.current.getBoundingClientRect();
+
+    return {
+      x: elementRect.left - contentRect.left + elementRect.width / 2,
+      y: elementRect.top - contentRect.top + elementRect.height / 2,
+    };
+  };
 
   // Measure element positions
   const measure = (): void => {
@@ -105,8 +120,8 @@ export function HeroDemo(): JSX.Element {
         height: metricsRect.height,
       };
     }
-    if (toolbarRef.current && contentRef.current) {
-      const toolbarRect = toolbarRef.current.getBoundingClientRect();
+    if (toolbarContainerRef.current && contentRef.current) {
+      const toolbarRect = toolbarContainerRef.current.getBoundingClientRect();
       const contentRect = contentRef.current.getBoundingClientRect();
       toolbarPosRef.current = {
         x: toolbarRect.left - contentRect.left + toolbarRect.width / 2,
@@ -144,6 +159,14 @@ export function HeroDemo(): JSX.Element {
       window.removeEventListener('resize', measure);
     };
   }, []);
+
+  useEffect(() => {
+    if (!copyButtonRef.current || copyClicked) {
+      return;
+    }
+
+    copyButtonRef.current.style.background = copyHovered ? "rgba(255, 255, 255, 0.1)" : "transparent";
+  }, [copyClicked, copyHovered]);
 
   const feedbackText1 = "Change to primary style";
   const feedbackText2 = "Add hover states";
@@ -299,8 +322,6 @@ Make this more prominent`;
       const menuX = Math.max(12, Math.min(componentTargetX + 24, menuContainerWidth - 228));
       const menuY = Math.max(18, pos.y - 8);
       const componentMenuItemIndex = 1;
-      const menuItemX = menuX + 96;
-      const menuItemY = menuY + 144;
 
       setIsCrosshair(false);
       setCursorPos({ x: componentTargetX, y: componentTargetY });
@@ -314,7 +335,12 @@ Make this more prominent`;
       await delay(300);
       if (cancelled) return;
 
-      setCursorPos({ x: menuItemX, y: menuItemY });
+      const componentMenuItemCenter = getRelativeCenter(
+        componentMenuItemRefs[componentMenuItemIndex]?.current,
+      );
+      setCursorPos(
+        componentMenuItemCenter || { x: componentTargetX + 72, y: componentTargetY + 80 },
+      );
       await delay(220);
       if (cancelled) return;
 
@@ -558,16 +584,10 @@ Make this more prominent`;
       // === COPY OUTPUT ===
 
       // Measure copy button position now that toolbar is expanded
-      let copyX = 400, copyY = 222; // fallback
-      if (copyBtnRef.current && contentRef.current) {
-        const copyRect = copyBtnRef.current.getBoundingClientRect();
-        const contentRect = contentRef.current.getBoundingClientRect();
-        copyX = copyRect.left - contentRect.left + copyRect.width / 2;
-        copyY = copyRect.top - contentRect.top + copyRect.height / 2;
-      }
+      const copyButtonCenter = getRelativeCenter(copyButtonRef.current);
 
       // Move cursor to copy button
-      setCursorPos({ x: copyX, y: copyY });
+      setCursorPos(copyButtonCenter || { x: 400, y: 222 });
       await delay(350);
       if (cancelled) return;
 
@@ -725,95 +745,21 @@ Make this more prominent`;
               </div>
             </div>
 
-          {/* Toolbar - using exact real icons */}
-          <div ref={toolbarRef} className={`hero-demo-toolbar ${isToolbarExpanded ? "expanded" : ""} ${isToolbarHovered ? "hovered" : ""} ${isToolbarClicking ? "clicking" : ""}`}>
-            {/* Collapsed icon - IconListSparkle */}
-            <div className="hero-demo-toolbar-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M11.5 12L5.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M18.5 6.75L5.5 6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M9.25 17.25L5.5 17.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            {annotationCount > 0 && !isToolbarExpanded && (
-              <span className="hero-demo-toolbar-badge">{annotationCount}</span>
-            )}
-
-            {/* Expanded buttons - exact order from real toolbar */}
-            <div className="hero-demo-toolbar-buttons">
-              {/* Pause */}
-              <div className="hero-demo-toolbar-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M8 6L8 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M16 18L16 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              {/* Eye */}
-              <div className="hero-demo-toolbar-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M3.91752 12.7539C3.65127 12.2996 3.65037 11.7515 3.9149 11.2962C4.9042 9.59346 7.72688 5.49994 12 5.49994C16.2731 5.49994 19.0958 9.59346 20.0851 11.2962C20.3496 11.7515 20.3487 12.2996 20.0825 12.7539C19.0908 14.4459 16.2694 18.4999 12 18.4999C7.73064 18.4999 4.90918 14.4459 3.91752 12.7539Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 14.8261C13.5608 14.8261 14.8261 13.5608 14.8261 12C14.8261 10.4392 13.5608 9.17392 12 9.17392C10.4392 9.17392 9.17391 10.4392 9.17391 12C9.17391 13.5608 10.4392 14.8261 12 14.8261Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              {/* Copy - shows checkmark when clicked */}
-              <div ref={copyBtnRef} className={`hero-demo-toolbar-btn ${copyClicked ? "active" : ""} ${copyHovered ? "hovered" : ""}`}>
-                {copyClicked ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 20C7.58172 20 4 16.4182 4 12C4 7.58172 7.58172 4 12 4C16.4182 4 20 7.58172 20 12C20 16.4182 16.4182 20 12 20Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M15 10L11 14.25L9.25 12.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M4.75 11.25C4.75 10.4216 5.42157 9.75 6.25 9.75H12.75C13.5784 9.75 14.25 10.4216 14.25 11.25V17.75C14.25 18.5784 13.5784 19.25 12.75 19.25H6.25C5.42157 19.25 4.75 18.5784 4.75 17.75V11.25Z" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M17.25 14.25H17.75C18.5784 14.25 19.25 13.5784 19.25 12.75V6.25C19.25 5.42157 18.5784 4.75 17.75 4.75H11.25C10.4216 4.75 9.75 5.42157 9.75 6.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                )}
-              </div>
-              {/* Send */}
-              <div className="hero-demo-toolbar-btn hero-demo-toolbar-btn-with-badge">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M9.875 14.125L12.3506 19.6951C12.7184 20.5227 13.9091 20.4741 14.2083 19.6193L18.8139 6.46032C19.0907 5.6695 18.3305 4.90933 17.5397 5.18611L4.38072 9.79174C3.52589 10.0909 3.47731 11.2816 4.30494 11.6494L9.875 14.125ZM9.875 14.125L13.375 10.625" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="hero-demo-toolbar-btn-badge">{annotationCount}</span>
-              </div>
-              {/* Trash */}
-              <div className="hero-demo-toolbar-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M10 11.5L10.125 15.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M14 11.5L13.87 15.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M9 7.5V6.25C9 5.42157 9.67157 4.75 10.5 4.75H13.5C14.3284 4.75 15 5.42157 15 6.25V7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M5.5 7.75H18.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M6.75 7.75L7.11691 16.189C7.16369 17.2649 7.18708 17.8028 7.41136 18.2118C7.60875 18.5717 7.91211 18.8621 8.28026 19.0437C8.69854 19.25 9.23699 19.25 10.3139 19.25H13.6861C14.763 19.25 15.3015 19.25 15.7197 19.0437C16.0879 18.8621 16.3912 18.5717 16.5886 18.2118C16.8129 17.8028 16.8363 17.2649 16.8831 16.189L17.25 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              {/* Review queue */}
-              <div className="hero-demo-toolbar-btn disabled">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 20C7.58172 20 4 16.4182 4 12C4 7.58172 7.58172 4 12 4C16.4182 4 20 7.58172 20 12C20 16.4182 16.4182 20 12 20Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M15 10L11 14.25L9.25 12.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              {/* Gear */}
-              <div className="hero-demo-toolbar-btn hero-demo-toolbar-btn-with-status">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M10.6504 5.81117C10.9939 4.39628 13.0061 4.39628 13.3496 5.81117C13.5715 6.72517 14.6187 7.15891 15.4219 6.66952C16.6652 5.91193 18.0881 7.33479 17.3305 8.57815C16.8411 9.38134 17.2748 10.4285 18.1888 10.6504C19.6037 10.9939 19.6037 13.0061 18.1888 13.3496C17.2748 13.5715 16.8411 14.6187 17.3305 15.4219C18.0881 16.6652 16.6652 18.0881 15.4219 17.3305C14.6187 16.8411 13.5715 17.2748 13.3496 18.1888C13.0061 19.6037 10.9939 19.6037 10.6504 18.1888C10.4285 17.2748 9.38135 16.8411 8.57815 17.3305C7.33479 18.0881 5.91193 16.6652 6.66952 15.4219C7.15891 14.6187 6.72517 13.5715 5.81117 13.3496C4.39628 13.0061 4.39628 10.9939 5.81117 10.6504C6.72517 10.4285 7.15891 9.38134 6.66952 8.57815C5.91193 7.33479 7.33479 5.91192 8.57815 6.66952C9.38135 7.15891 10.4285 6.72517 10.6504 5.81117Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
-                </svg>
-                <span className="hero-demo-toolbar-status connected" />
-              </div>
-
-              <div className="hero-demo-toolbar-divider" />
-
-              {/* X */}
-              <div className="hero-demo-toolbar-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M16.25 16.25L7.75 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M7.75 16.25L16.25 7.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-            </div>
-          </div>
+            <PageFeedbackToolbarPreview
+              className="hero-demo-toolbar-shell"
+              containerClassName={`hero-demo-toolbar ${isToolbarExpanded ? "expanded" : "collapsed"} ${
+                isToolbarHovered ? "hovered" : ""
+              } ${isToolbarClicking ? "clicking" : ""}`}
+              containerRef={toolbarContainerRef}
+              isActive={isToolbarExpanded}
+              annotationCount={annotationCount}
+              copied={copyClicked}
+              hasSendButton={true}
+              hasResolvedAnnotations={false}
+              resolvedEndpoint="http://127.0.0.1:4747"
+              connectionStatus="connected"
+              buttonRefs={{ copy: copyButtonRef }}
+            />
           </div>
 
           {/* Overlays - positioned relative to hero-demo-content */}
@@ -878,28 +824,16 @@ Make this more prominent`;
           </div>
 
           {/* Component source menu */}
-          <div
-            className={`hero-demo-component-menu ${showComponentMenu ? "visible" : ""}`}
-            style={{ left: componentMenuPos.x, top: componentMenuPos.y }}
-          >
-            <div className="hero-demo-component-menu-title">Component source</div>
-            {HERO_COMPONENT_MENU_ITEMS.map((item, index) => (
-              <div
-                key={`${item.name}-${item.source}`}
-                className={`hero-demo-component-menu-item ${hoveredComponentMenuIndex === index ? "active" : ""}`}
-              >
-                <div className="hero-demo-component-menu-name">{`<${item.name}>`}</div>
-                <div className="hero-demo-component-menu-props">
-                  {item.props.map((propName) => (
-                    <span key={`${item.name}-${propName}`} className="hero-demo-component-menu-prop">
-                      {propName}
-                    </span>
-                  ))}
-                </div>
-                <div className="hero-demo-component-menu-source">{item.source}</div>
-              </div>
-            ))}
-          </div>
+          {showComponentMenu && (
+            <ComponentSourceMenuPreview
+              items={HERO_COMPONENT_MENU_ITEMS}
+              position={componentMenuPos}
+              hoveredComponentMenuIndex={hoveredComponentMenuIndex}
+              setHoveredComponentMenuIndex={setHoveredComponentMenuIndex}
+              className="hero-demo-component-menu"
+              itemRefs={componentMenuItemRefs}
+            />
+          )}
 
           {/* Popup */}
           <div className={`hero-demo-popup ${showPopup ? "visible" : ""}`} style={{ left: popupPos.x, top: popupPos.y }}>
