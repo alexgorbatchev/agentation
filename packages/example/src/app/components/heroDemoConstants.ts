@@ -8,6 +8,13 @@ export const HERO_FEEDBACK_TEXTS = {
   tertiary: "Make this more prominent",
 } as const;
 
+export const HERO_COMPONENT_MENU_SCALE = {
+  desktop: 0.8,
+  mobile: 0.64,
+} as const;
+
+export const HERO_COMPONENT_MENU_MAX_WIDTH = 460;
+
 export const HERO_COMPONENT_MENU_ITEMS: ComponentSourceMenuPreviewItem[] = [
   {
     displayName: "ActionButton",

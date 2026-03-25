@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { HERO_FEEDBACK_TEXTS, HERO_HEADER_TEXT } from "./heroDemoConstants";
+import {
+  HERO_COMPONENT_MENU_MAX_WIDTH,
+  HERO_COMPONENT_MENU_SCALE,
+  HERO_FEEDBACK_TEXTS,
+  HERO_HEADER_TEXT,
+} from "./heroDemoConstants";
 
 type Point = {
   x: number;
@@ -299,7 +304,10 @@ export function useHeroDemoTimeline(): HeroDemoTimelineResult {
     };
 
     const resetState = (): void => {
-      setState(createInitialState(window.innerWidth <= 640));
+      setState({
+        ...createInitialState(window.innerWidth <= 640),
+        btnPos: btnPosRef.current,
+      });
     };
 
     const openToolbarSequence = async (): Promise<Bounds | null> => {
@@ -386,13 +394,20 @@ export function useHeroDemoTimeline(): HeroDemoTimelineResult {
       return wait(600);
     };
 
-    const inspectComponentSequence = async (buttonPos: Bounds): Promise<boolean> => {
+    const inspectComponentSequence = async (
+      buttonPos: Bounds,
+      isMobileView: boolean,
+    ): Promise<boolean> => {
       const componentTarget = {
         x: buttonPos.x + buttonPos.width / 2,
         y: buttonPos.y + buttonPos.height / 2,
       };
       const menuContainerWidth = contentRef.current?.offsetWidth || 300;
-      const menuX = Math.max(12, Math.min(componentTarget.x + 24, menuContainerWidth - 228));
+      const componentMenuScale = isMobileView
+        ? HERO_COMPONENT_MENU_SCALE.mobile
+        : HERO_COMPONENT_MENU_SCALE.desktop;
+      const menuPreviewWidth = Math.ceil(HERO_COMPONENT_MENU_MAX_WIDTH * componentMenuScale);
+      const menuX = Math.max(12, Math.min(componentTarget.x + 24, menuContainerWidth - menuPreviewWidth));
       const menuY = Math.max(18, buttonPos.y - 8);
       const componentMenuItemIndex = 1;
 
@@ -787,7 +802,7 @@ export function useHeroDemoTimeline(): HeroDemoTimelineResult {
       if (!(await annotatePrimaryButtonSequence(buttonPos))) {
         return;
       }
-      if (!(await inspectComponentSequence(buttonPos))) {
+      if (!(await inspectComponentSequence(buttonPos, isMobileView))) {
         return;
       }
       if (!(await (isMobileView ? runMobileDragSequence() : runDesktopDragSequence()))) {

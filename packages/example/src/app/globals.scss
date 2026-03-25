@@ -1519,8 +1519,6 @@ button {
         }
 
         .hero-demo-component-menu {
-          transform: scale(0.48);
-          transform-origin: top left;
           pointer-events: none;
           z-index: 52 !important;
         }
@@ -1823,10 +1821,6 @@ button {
           .hero-demo-shortcut-pill {
             font-size: 9px;
             padding: 3px 6px;
-          }
-
-          .hero-demo-component-menu {
-            transform: scale(0.38);
           }
 
           .hero-demo-popup {

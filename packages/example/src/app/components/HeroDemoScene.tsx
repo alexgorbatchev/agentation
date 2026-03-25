@@ -1,7 +1,11 @@
 import { ComponentSourceMenuPreview } from "./hero-demo/ComponentSourceMenuPreview";
 import { PageFeedbackToolbarPreview } from "./hero-demo/PageFeedbackToolbarPreview";
 
-import { HERO_COMPONENT_MENU_ITEMS, HERO_HEADER_TEXT } from "./heroDemoConstants";
+import {
+  HERO_COMPONENT_MENU_ITEMS,
+  HERO_COMPONENT_MENU_SCALE,
+  HERO_HEADER_TEXT,
+} from "./heroDemoConstants";
 import type { HeroDemoSceneRefs, HeroDemoSceneState } from "./useHeroDemoTimeline";
 
 type HeroDemoSceneProps = {
@@ -10,6 +14,10 @@ type HeroDemoSceneProps = {
 };
 
 export function HeroDemoScene({ state, refs }: HeroDemoSceneProps): JSX.Element {
+  const componentMenuScale = state.isMobileView
+    ? HERO_COMPONENT_MENU_SCALE.mobile
+    : HERO_COMPONENT_MENU_SCALE.desktop;
+
   return (
     <div className="hero-demo-container">
       <div className={`hero-demo-browser ${state.showTerminal ? "faded" : ""}`}>
@@ -143,7 +151,7 @@ export function HeroDemoScene({ state, refs }: HeroDemoSceneProps): JSX.Element 
 
           <div
             className={`hero-demo-marker ${state.showNewMarker ? "visible" : ""}`}
-            style={{ top: state.btnPos.y + state.btnPos.height / 2, left: state.btnPos.x + state.btnPos.width / 2 }}
+            style={{ top: state.btnPos.y, left: state.btnPos.x + state.btnPos.width }}
           >
             3
           </div>
@@ -187,6 +195,7 @@ export function HeroDemoScene({ state, refs }: HeroDemoSceneProps): JSX.Element 
               hoveredComponentMenuIndex={state.hoveredComponentMenuIndex}
               setHoveredComponentMenuIndex={(): void => undefined}
               className="hero-demo-component-menu"
+              style={{ transform: `scale(${componentMenuScale})`, transformOrigin: "top left" }}
               itemRefs={refs.componentMenuItemRefs}
               interactive={false}
             />
