@@ -385,7 +385,7 @@ export function SideNav() {
 
   const links: ({ href: string; label: string; badge?: string; items?: { id: string; text: string }[] } | { section: string })[] = [
     { href: "/", label: "Overview" },
-    { href: "/install", label: "Install" },
+    { href: "/install", label: "Getting Started" },
     {
       href: "/features",
       label: "Features",

@@ -998,20 +998,49 @@ button {
 }
 
 // =============================================================================
+// Getting Started page
+// =============================================================================
+
+.getting-started-article {
+  section {
+    h2 {
+      display: block;
+      width: 100%;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.01rem;
+      color: rgba(0, 0, 0, 0.9);
+      border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+      box-sizing: border-box;
+
+      &::after {
+        display: none;
+      }
+    }
+  }
+}
+
+// =============================================================================
 // Install Snippet (header)
 // =============================================================================
 
 .install-snippet {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
+  max-width: 100%;
   position: relative;
   background: none;
   border: none;
   cursor: pointer;
   font-family: "SF Mono", SFMono-Regular, ui-monospace, Consolas, monospace;
   font-size: 0.6875rem;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: left;
   color: rgba(0, 0, 0, 0.4);
   transition: color 0.15s ease;
 

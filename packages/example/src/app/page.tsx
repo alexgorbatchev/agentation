@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { Footer } from "./Footer";
 import { HeroDemo } from "./components/HeroDemo";
+import { gettingStarted } from "./gettingStarted";
 
 // Animated copy/checkmark icon
 const IconCopyAnimated = ({ size = 24, copied = false }: { size?: number; copied?: boolean }) => (
@@ -160,9 +161,9 @@ function ShadowModal({ isOpen, isExiting, onClose }: { isOpen: boolean; isExitin
   );
 }
 
-function InstallSnippet() {
+function GettingStartedSnippet() {
   const [copied, setCopied] = useState(false);
-  const command = "npm install @alexgorbatchev/agentation -D";
+  const command = gettingStarted.installCommand;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(command);
@@ -174,7 +175,7 @@ function InstallSnippet() {
     <button
       onClick={handleCopy}
       className="install-snippet"
-      title="Copy to clipboard"
+      title="Copy getting started command"
     >
       <code>{command}</code>
       <IconCopyAnimated size={14} copied={copied} />
@@ -226,7 +227,7 @@ export default function AgentationDocs() {
         <header>
           <div className="heading-container">
             <h1 style={{ fontSize: "2rem", lineHeight: 1.15, marginBottom: "0.5rem" }}><span className="sketchy-underline">Point at bugs.</span><br />Let AI <span className="pen-underline">fix them.</span></h1>
-            <InstallSnippet />
+            <GettingStartedSnippet />
           </div>
           <p className="fork-note">
             <strong>

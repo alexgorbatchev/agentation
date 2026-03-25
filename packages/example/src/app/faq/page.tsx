@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+
 import { Footer } from "../Footer";
+import { gettingStarted } from "../gettingStarted";
 
 interface FAQItem {
   question: string;
@@ -27,11 +29,13 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "How do I install it?",
-        answer: "Install the package with <code>npm install @alexgorbatchev/agentation -D</code>, install the local CLI with <code>npm install -g @alexgorbatchev/agentation-cli</code>, then mount <code>&lt;Agentation /&gt;</code> in your app. React 18+ is required; Next.js is just one supported host."
+        answer:
+          `Install the happy-path packages with <code>${gettingStarted.installCommand}</code>, mount <code>&lt;Agentation projectId=&quot;my-project&quot; /&gt;</code> behind a <code>NODE_ENV</code> check, then run <code>${gettingStarted.startCommand}</code>, <code>${gettingStarted.devCommand}</code>, and <code>${gettingStarted.piCommand}</code>. Only <code>projectId</code> is required on <code>&lt;Agentation /&gt;</code>; the rest of the props are optional for the standard local workflow.`
       },
       {
         question: "Is there a Claude Code integration?",
-        answer: "Not as a maintained one-command setup in this fork. The supported automation today is the Pi fix-loop skill: <code>npx skills add alexgorbatchev/agentation-skills --skill agentation-fix-loop --agent pi</code>. For Claude Code and other agents, install Agentation manually and drive the workflow through <code>agentation pending</code>, <code>watch</code>, <code>ack</code>, <code>reply</code>, and <code>resolve</code>."
+        answer:
+          `There is no maintained Claude Code-specific one-command setup in this fork. The happy path for automation is Pi: install <code>@alexgorbatchev/pi-agentation</code> alongside Agentation, then run <code>${gettingStarted.piCommand}</code>. It bundles the Agentation Pi skill. Other agents can still consume the same queue through the CLI commands directly.`
       },
     ]
   },
@@ -68,7 +72,8 @@ const faqCategories: FAQCategory[] = [
       },
       {
         question: "What is Agent Sync?",
-        answer: "Agent Sync is the standard Agentation workflow: the browser toolbar talks to the local Agentation server, and your coding agent consumes that shared state through CLI commands. Start the stack with <code>agentation start</code>, then use commands like <code>agentation pending</code>, <code>agentation watch</code>, and <code>agentation resolve</code> in your agent workflow."
+        answer:
+          `Agent Sync is the standard local workflow: the browser toolbar talks to the local Agentation server, and your coding agent consumes that shared state from the same project. Start the stack with <code>${gettingStarted.startCommand}</code>; if you are using Pi, the happy path is then <code>${gettingStarted.piCommand}</code> so Pi can watch the queue and react to new annotations automatically.`
       },
     ]
   },

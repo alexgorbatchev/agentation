@@ -130,7 +130,7 @@ export default function Agentation2Page() {
             Agentation is still new. The vision is a world where UI feedback loops shrink from hours to seconds. Point at something, say what&rsquo;s wrong, and watch it get fixed in real time.
           </p>
           <p>
-            If you haven&rsquo;t tried Agentation yet, <Link href="/install">install it</Link> and see how it changes the way you work with AI agents. If you&rsquo;re already using it, update to 2.0 and let us know what you think.
+            If you haven&rsquo;t tried Agentation yet, open the <Link href="/install">getting started guide</Link> and see how it changes the way you work with AI agents. If you&rsquo;re already using it, update to 2.0 and let us know what you think.
           </p>
         </section>
       </article>
