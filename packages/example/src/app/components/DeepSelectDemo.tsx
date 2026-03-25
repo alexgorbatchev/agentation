@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useRef, useState } from "react";
+
+import { useDemoAnimationLoop } from "./features-demo/useDemoAnimationLoop";
+import { useMeasureOnResize } from "./features-demo/useMeasureOnResize";
 import "./FeaturesDemo.css";
 import "./DeepSelectDemo.css";
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /* ─────────────────────────────────────────────────────────
  * ANIMATION STORYBOARD
@@ -86,42 +85,37 @@ export function DeepSelectDemo() {
     };
   };
 
-  useEffect(() => {
-    const timer = setTimeout(measure, 100);
-    window.addEventListener("resize", measure);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
+  useMeasureOnResize({ measure });
 
-  useEffect(() => {
-    let cancelled = false;
-    const feedbackText = "Add loading state";
+  const feedbackText = "Add loading state";
 
-    const run = async () => {
-      // Reset
-      setCursorPos({ x: 280, y: 40 });
-      setHighlight({ visible: false, mode: "normal", rect: { x: 0, y: 0, w: 0, h: 0 } });
-      setTooltip({ visible: false, text: "", type: "wrong", x: 0, y: 0 });
-      setShowPopup(false);
-      setTypedText("");
-      setShowMarker(false);
-      setOverlayFlash(false);
-      setActiveCaption("idle");
+  const resetDemo = (): void => {
+    setCursorPos({ x: 280, y: 40 });
+    setHighlight({ visible: false, mode: "normal", rect: { x: 0, y: 0, w: 0, h: 0 } });
+    setTooltip({ visible: false, text: "", type: "wrong", x: 0, y: 0 });
+    setShowPopup(false);
+    setTypedText("");
+    setShowMarker(false);
+    setOverlayFlash(false);
+    setActiveCaption("idle");
+  };
 
-      await delay(600);
-      if (cancelled) return;
+  useDemoAnimationLoop(
+    async ({ isCancelled, wait }) => {
+      resetDemo();
 
-      // Re-measure before using positions (layout may have shifted)
+      if (!(await wait(600))) {
+        return;
+      }
+
       measure();
       const card = cardPosRef.current;
       const btn = btnPosRef.current;
       setCursorPos({ x: btn.x + btn.w / 2, y: btn.y + btn.h / 2 });
-      await delay(400);
-      if (cancelled) return;
+      if (!(await wait(400))) {
+        return;
+      }
 
-      // Normal hover — highlights the whole card (the overlay intercepts)
       setOverlayFlash(true);
       setHighlight({
         visible: true,
@@ -135,22 +129,22 @@ export function DeepSelectDemo() {
         x: card.x + card.w / 2,
         y: card.y - 10,
       });
-      await delay(1600);
-      if (cancelled) return;
+      if (!(await wait(1600))) {
+        return;
+      }
 
-      // Fade highlight + tooltip + overlay flash
-      setHighlight((h) => ({ ...h, visible: false }));
-      setTooltip((t) => ({ ...t, visible: false }));
+      setHighlight((currentHighlight) => ({ ...currentHighlight, visible: false }));
+      setTooltip((currentTooltip) => ({ ...currentTooltip, visible: false }));
       setOverlayFlash(false);
-      await delay(400);
-      if (cancelled) return;
+      if (!(await wait(400))) {
+        return;
+      }
 
-      // ⌘ beat — caption explains the feature
       setActiveCaption("cmd");
-      await delay(2000);
-      if (cancelled) return;
+      if (!(await wait(2000))) {
+        return;
+      }
 
-      // Pierce hover — highlights just the button
       setActiveCaption("correct");
       setHighlight({
         visible: true,
@@ -164,61 +158,46 @@ export function DeepSelectDemo() {
         x: btn.x + btn.w / 2,
         y: btn.y - 10,
       });
-      await delay(1400);
-      if (cancelled) return;
-
-      // Click — show popup
-      setShowPopup(true);
-      await delay(300);
-      if (cancelled) return;
-
-      // Type feedback
-      for (let i = 0; i <= feedbackText.length; i++) {
-        if (cancelled) return;
-        setTypedText(feedbackText.slice(0, i));
-        await delay(30);
+      if (!(await wait(1400))) {
+        return;
       }
-      await delay(400);
-      if (cancelled) return;
 
-      // Close popup, show marker
+      setShowPopup(true);
+      if (!(await wait(300))) {
+        return;
+      }
+
+      for (let i = 0; i <= feedbackText.length; i++) {
+        if (isCancelled()) {
+          return;
+        }
+
+        setTypedText(feedbackText.slice(0, i));
+        if (!(await wait(30))) {
+          return;
+        }
+      }
+      if (!(await wait(400))) {
+        return;
+      }
+
       setShowPopup(false);
-      setHighlight((h) => ({ ...h, visible: false }));
-      setTooltip((t) => ({ ...t, visible: false }));
-      await delay(200);
-      if (cancelled) return;
+      setHighlight((currentHighlight) => ({ ...currentHighlight, visible: false }));
+      setTooltip((currentTooltip) => ({ ...currentTooltip, visible: false }));
+      if (!(await wait(200))) {
+        return;
+      }
       setShowMarker(true);
 
-      await delay(2200);
-      if (cancelled) return;
-
-      // Clean up for next loop
-      setShowMarker(false);
-      await delay(300);
-    };
-
-    run();
-    let interval = setInterval(run, LOOP_INTERVAL);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        cancelled = true;
-        clearInterval(interval);
-        setTimeout(() => {
-          cancelled = false;
-          run();
-          interval = setInterval(run, LOOP_INTERVAL);
-        }, 100);
+      if (!(await wait(2200))) {
+        return;
       }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
 
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, []);
+      setShowMarker(false);
+      await wait(300);
+    },
+    { intervalMs: LOOP_INTERVAL, onVisibilityRestart: resetDemo },
+  );
 
   return (
     <div className="fd-container">

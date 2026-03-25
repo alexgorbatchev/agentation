@@ -524,6 +524,75 @@
   border-radius: 6px;
 }
 
+.ard-plan-card {
+  position: relative;
+}
+
+.ard-action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ard-secondary-button {
+  width: 70px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+}
+
+.ard-export-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 118px;
+  height: 32px;
+  padding: 0 14px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.94);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-family: system-ui, sans-serif;
+}
+
+.ard-shortcut-pill {
+  position: absolute;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  color: rgba(255,255,255,0.92);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transform: translateY(4px) scale(0.95);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 48;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+  white-space: nowrap;
+}
+
+.ard-shortcut-pill.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.ard-component-menu {
+  pointer-events: none;
+  z-index: 52 !important;
+}
+
+.ard-toolbar-shell {
+  z-index: 45 !important;
+}
+
+.ard-toolbar-container {
+  transition: transform 0.15s ease !important;
+}
+
 /* Multi-Select Demo specific */
 .msd-faux-title {
   width: 40px;

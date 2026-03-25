@@ -1,8 +1,16 @@
 "use client";
 
 import { Footer } from "../Footer";
-import { FeaturesDemo, SettingsDemo, SmartIdentificationDemo, MarkerKeyDemo, ComputedStylesDemo, ReactDetectionDemo, AgentChatDemo } from "../components/FeaturesDemo";
+import { FeaturesDemo } from "../components/FeaturesDemo";
 import { DeepSelectDemo } from "../components/DeepSelectDemo";
+import {
+  AgentChatDemo,
+  ComputedStylesDemo,
+  MarkerKeyDemo,
+  ReactDetectionDemo,
+  SettingsDemo,
+  SmartIdentificationDemo,
+} from "../components/features-demo";
 
 export default function FeaturesPage() {
   return (
@@ -14,9 +22,9 @@ export default function FeaturesPage() {
       </header>
 
       <section>
-        <h2 id="annotation-modes">Annotation modes</h2>
+        <h2 id="annotation-modes">Interaction modes</h2>
         <p>
-          Click the tabs below to see examples of each annotation mode:
+          Click the tabs below to see examples of each annotation and inspection mode:
         </p>
         <FeaturesDemo />
       </section>
@@ -119,6 +127,14 @@ export default function FeaturesPage() {
             <tr>
               <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}><code>X</code></td>
               <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)', color: 'rgba(0,0,0,0.5)', textAlign: 'right' }}>Clear all annotations</td>
+            </tr>
+            <tr>
+              <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}><code>Hold Alt</code></td>
+              <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)', color: 'rgba(0,0,0,0.5)', textAlign: 'right' }}>Temporarily enter feedback mode and click a DOM element without opening the toolbar first</td>
+            </tr>
+            <tr>
+              <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}><code>Alt</code> + right-click</td>
+              <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)', color: 'rgba(0,0,0,0.5)', textAlign: 'right' }}>Open component source menu</td>
             </tr>
             <tr>
               <td style={{ padding: '0.5rem 0' }}><code>⌘</code> / <code>Ctrl</code> + hover</td>

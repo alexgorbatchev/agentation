@@ -390,7 +390,7 @@ export function SideNav() {
       href: "/features",
       label: "Features",
       items: [
-        { id: 'annotation-modes', text: 'Annotation Modes' },
+        { id: 'annotation-modes', text: 'Interaction Modes' },
         { id: 'toolbar-controls', text: 'Toolbar Controls' },
         { id: 'marker-types', text: 'Marker Types' },
         { id: 'smart-identification', text: 'Smart Identification' },
