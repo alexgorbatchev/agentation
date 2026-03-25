@@ -23,6 +23,7 @@ type ComponentSourceMenuViewProps = {
   className?: string;
   style?: CSSProperties;
   itemRefs?: Array<Ref<HTMLButtonElement> | undefined>;
+  interactive?: boolean;
 };
 
 export function ComponentSourceMenuView({
@@ -36,6 +37,7 @@ export function ComponentSourceMenuView({
   className,
   style,
   itemRefs,
+  interactive = true,
 }: ComponentSourceMenuViewProps): JSX.Element | null {
   if (items.length === 0) {
     return null;
@@ -54,6 +56,7 @@ export function ComponentSourceMenuView({
     <div
       data-component-source-menu
       className={className}
+      aria-hidden={interactive ? undefined : true}
       style={{
         position: positionMode,
         left,
@@ -79,6 +82,7 @@ export function ComponentSourceMenuView({
           key={item.key}
           ref={itemRefs?.[index]}
           type="button"
+          tabIndex={interactive ? 0 : -1}
           onClick={() => {
             onItemClick(index);
           }}

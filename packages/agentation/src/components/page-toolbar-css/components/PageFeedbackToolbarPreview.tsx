@@ -33,6 +33,7 @@ export type PageFeedbackToolbarPreviewProps = {
   resolvedEndpoint?: string;
   connectionStatus?: ConnectionStatus;
   buttonRefs?: ToolbarButtonRefs;
+  interactive?: boolean;
   onActivate?: () => void;
   onDeactivate?: () => void;
 };
@@ -58,6 +59,7 @@ export function PageFeedbackToolbarPreview({
   resolvedEndpoint = "",
   connectionStatus = "connected",
   buttonRefs,
+  interactive = false,
   onActivate,
   onDeactivate,
 }: PageFeedbackToolbarPreviewProps): JSX.Element {
@@ -71,20 +73,22 @@ export function PageFeedbackToolbarPreview({
   return (
     <div
       className={`${styles.toolbar}${className ? ` ${className}` : ""}`}
+      aria-hidden={interactive ? undefined : true}
       style={{
         position: "absolute",
         width: "auto",
         zIndex: "auto",
+        pointerEvents: interactive ? undefined : "none",
         ...style,
       }}
     >
       <div
         ref={containerRef}
         className={toolbarContainerClassName}
-        onClick={!isActive ? onActivate : undefined}
-        role={!isActive ? "button" : undefined}
-        tabIndex={!isActive ? 0 : -1}
-        title={!isActive ? "Start feedback mode" : undefined}
+        onClick={!isActive && interactive ? onActivate : undefined}
+        role={!isActive && interactive ? "button" : undefined}
+        tabIndex={!isActive && interactive ? 0 : -1}
+        title={!isActive && interactive ? "Start feedback mode" : undefined}
       >
         <ToolbarControlsView
           isActive={isActive}
@@ -120,6 +124,7 @@ export function PageFeedbackToolbarPreview({
           onToggleSettings={noop}
           onDeactivate={onDeactivate ?? noop}
           buttonRefs={buttonRefs}
+          buttonsInteractive={interactive}
         />
       </div>
     </div>

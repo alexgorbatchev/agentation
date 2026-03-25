@@ -23,6 +23,7 @@ export type ComponentSourceMenuPreviewProps = {
   className?: string;
   style?: CSSProperties;
   itemRefs?: Array<Ref<HTMLButtonElement> | undefined>;
+  interactive?: boolean;
 };
 
 export function ComponentSourceMenuPreview({
@@ -34,6 +35,7 @@ export function ComponentSourceMenuPreview({
   className,
   style,
   itemRefs,
+  interactive = false,
 }: ComponentSourceMenuPreviewProps): JSX.Element | null {
   const viewItems: ComponentSourceMenuViewItem[] = items.map((item, index) => ({
     key: item.key ?? `${item.displayName}-${item.sourceLabel}-${index}`,
@@ -52,8 +54,12 @@ export function ComponentSourceMenuPreview({
       position={position}
       positionMode="absolute"
       className={className}
-      style={style}
+      style={{
+        pointerEvents: interactive ? undefined : "none",
+        ...style,
+      }}
       itemRefs={itemRefs}
+      interactive={interactive}
     />
   );
 }

@@ -65,6 +65,7 @@ type ToolbarControlsViewProps = {
   onToggleSettings: () => void;
   onDeactivate: () => void;
   buttonRefs?: ToolbarButtonRefs;
+  buttonsInteractive?: boolean;
 };
 
 export function ToolbarControlsView({
@@ -102,8 +103,10 @@ export function ToolbarControlsView({
   onToggleSettings,
   onDeactivate,
   buttonRefs,
+  buttonsInteractive = true,
 }: ToolbarControlsViewProps): JSX.Element {
   const hasWebhookUrl = isValidUrl(settingsWebhookUrl) || isValidUrl(webhookUrl || "");
+  const inactiveTabIndex = buttonsInteractive ? undefined : -1;
 
   return (
     <>
@@ -133,6 +136,8 @@ export function ToolbarControlsView({
         >
           <button
             ref={buttonRefs?.pause}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -152,6 +157,8 @@ export function ToolbarControlsView({
         <div className={styles.buttonWrapper}>
           <button
             ref={buttonRefs?.markers}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -171,6 +178,8 @@ export function ToolbarControlsView({
         <div className={styles.buttonWrapper}>
           <button
             ref={buttonRefs?.copy}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${copied ? styles.statusShowing : ""}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -193,6 +202,8 @@ export function ToolbarControlsView({
         >
           <button
             ref={buttonRefs?.send}
+            type="button"
+            tabIndex={buttonsInteractive && hasWebhookUrl ? 0 : -1}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -201,7 +212,6 @@ export function ToolbarControlsView({
             }}
             disabled={!hasAnnotations || !hasWebhookUrl || sendState === "sending"}
             data-no-hover={sendState === "sent" || sendState === "failed"}
-            tabIndex={hasWebhookUrl ? 0 : -1}
           >
             <IconSendArrow size={24} state={sendState} />
             {annotationCount > 0 && sendState === "idle" && (
@@ -222,6 +232,8 @@ export function ToolbarControlsView({
         <div className={styles.buttonWrapper}>
           <button
             ref={buttonRefs?.clear}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -242,6 +254,8 @@ export function ToolbarControlsView({
         <div className={`${styles.buttonWrapper} ${styles.reviewQueueButtonWrapper}`}>
           <button
             ref={buttonRefs?.review}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
             disabled={resolvedAnnotationsCount === 0}
             onClick={(event) => {
@@ -267,6 +281,8 @@ export function ToolbarControlsView({
         <div className={styles.buttonWrapper}>
           <button
             ref={buttonRefs?.settings}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -302,6 +318,8 @@ export function ToolbarControlsView({
         >
           <button
             ref={buttonRefs?.close}
+            type="button"
+            tabIndex={inactiveTabIndex}
             className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
             onClick={(event) => {
               event.stopPropagation();
