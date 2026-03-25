@@ -13,6 +13,7 @@
     "build": "bun run build:agentation && AGENTATION_SKIP_PREBUILD=1 bun run --filter ./packages/example build",
     "build:agentation": "bun run --filter ./packages/agentation build",
     "build:storybook": "bun run --filter ./packages/agentation build-storybook",
+    "clean:node_modules": "bun run ./scripts/cleanNodeModules.ts",
     "pack": "bun run build && cd packages/agentation && npm pack",
     "publish:agentation": "cd packages/agentation && npm publish --access public",
     "publish:all": "bun run publish:agentation"
