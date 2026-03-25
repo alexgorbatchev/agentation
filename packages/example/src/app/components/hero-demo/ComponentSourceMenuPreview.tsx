@@ -3,7 +3,7 @@ import type { CSSProperties, Ref } from "react";
 import {
   ComponentSourceMenuView,
   type ComponentSourceMenuViewItem,
-} from "./ComponentSourceMenuView";
+} from "../../../../../agentation/src/components/page-toolbar-css/components/ComponentSourceMenuView";
 
 const noop = (): void => {};
 

@@ -5,10 +5,15 @@ import {
   type ConnectionStatus,
   type SendState,
   type ToolbarButtonRefs,
-} from "./ToolbarControlsView";
-import styles from "../styles.module.scss";
+} from "../../../../../agentation/src/components/page-toolbar-css/components/ToolbarControlsView";
+import styles from "../../../../../agentation/src/components/page-toolbar-css/styles.module.scss";
 
-export type { ConnectionStatus, SendState, ToolbarButtonId, ToolbarButtonRefs } from "./ToolbarControlsView";
+export type {
+  ConnectionStatus,
+  SendState,
+  ToolbarButtonId,
+  ToolbarButtonRefs,
+} from "../../../../../agentation/src/components/page-toolbar-css/components/ToolbarControlsView";
 
 const noop = (): void => {};
 

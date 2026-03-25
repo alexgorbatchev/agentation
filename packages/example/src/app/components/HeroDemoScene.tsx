@@ -1,5 +1,5 @@
-import { ComponentSourceMenuPreview } from "../../../../agentation/src/components/page-toolbar-css/components/ComponentSourceMenuPreview";
-import { PageFeedbackToolbarPreview } from "../../../../agentation/src/components/page-toolbar-css/components/PageFeedbackToolbarPreview";
+import { ComponentSourceMenuPreview } from "./hero-demo/ComponentSourceMenuPreview";
+import { PageFeedbackToolbarPreview } from "./hero-demo/PageFeedbackToolbarPreview";
 
 import { HERO_COMPONENT_MENU_ITEMS, HERO_HEADER_TEXT } from "./heroDemoConstants";
 import type { HeroDemoSceneRefs, HeroDemoSceneState } from "./useHeroDemoTimeline";

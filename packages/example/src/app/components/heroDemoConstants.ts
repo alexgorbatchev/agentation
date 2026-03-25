@@ -1,4 +1,4 @@
-import type { ComponentSourceMenuPreviewItem } from "../../../../agentation/src/components/page-toolbar-css/components/ComponentSourceMenuPreview";
+import type { ComponentSourceMenuPreviewItem } from "./hero-demo/ComponentSourceMenuPreview";
 
 export const HERO_HEADER_TEXT = "Benji's Dashboard";
 
