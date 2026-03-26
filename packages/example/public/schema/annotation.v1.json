@@ -128,19 +128,16 @@
       "description": "Annotation lifecycle status"
     },
     "createdAt": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO timestamp when created"
+      "type": "number",
+      "description": "Unix timestamp in milliseconds when created"
     },
     "updatedAt": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO timestamp when last updated"
+      "type": "number",
+      "description": "Unix timestamp in milliseconds when last updated"
     },
     "resolvedAt": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO timestamp when resolved"
+      "type": "number",
+      "description": "Unix timestamp in milliseconds when resolved"
     },
     "resolvedBy": {
       "type": "string",

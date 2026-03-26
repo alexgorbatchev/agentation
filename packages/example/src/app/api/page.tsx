@@ -253,9 +253,9 @@ function App() {
   severity?: "blocking" | "important" | "suggestion";
   status?: "pending" | "acknowledged" | "resolved" | "dismissed";
   thread?: ThreadMessage[];
-  createdAt?: string;
-  updatedAt?: string;
-  resolvedAt?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  resolvedAt?: number;
   resolvedBy?: "human" | "agent";
   authorId?: string;
 };`}

@@ -36,9 +36,9 @@ export type Annotation = {
   severity?: AnnotationSeverity;
   status?: AnnotationStatus;
   thread?: ThreadMessage[];
-  createdAt?: string;
-  updatedAt?: string;
-  resolvedAt?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  resolvedAt?: number;
   resolvedBy?: "human" | "agent";
   authorId?: string;
 
@@ -63,8 +63,8 @@ export type Session = {
   id: string;
   url: string;
   status: SessionStatus;
-  createdAt: string;
-  updatedAt?: string;
+  createdAt: number;
+  updatedAt?: number;
   projectId?: string;
   metadata?: Record<string, unknown>;
 };

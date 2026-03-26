@@ -79,7 +79,7 @@ function installAcknowledgementStoryMocks(): void {
       return new Response(
         JSON.stringify({
           annotations: [pendingAnnotation],
-          createdAt: new Date().toISOString(),
+          createdAt: Date.now(),
           id: STORYBOOK_ACK_SESSION_ID,
           status: "active",
           url: "http://localhost:6006/iframe.html",
@@ -358,7 +358,7 @@ export const AcknowledgementNotification: Story = {
 
     const body = within(document.body);
     await waitFor(() => {
-      expect(body.getByText("Agent started work")).toBeTruthy();
+      expect(body.getByText("agentation ack")).toBeTruthy();
       expect(body.getByText(STORYBOOK_ACK_COMMENT)).toBeTruthy();
     });
 

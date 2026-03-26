@@ -144,9 +144,9 @@ export default function SchemaPage(): JSX.Element {
   sessionId: string;        // Server session this annotation belongs to
   status: "pending" | "acknowledged" | "resolved" | "dismissed";
   thread: ThreadMessage[];  // Back-and-forth conversation
-  createdAt: string;        // ISO timestamp
-  updatedAt: string;        // ISO timestamp
-  resolvedAt: string;       // ISO timestamp
+  createdAt: number;        // Unix timestamp (ms)
+  updatedAt: number;        // Unix timestamp (ms)
+  resolvedAt: number;       // Unix timestamp (ms)
   resolvedBy: "human" | "agent";
   authorId: string;         // Optional actor identity
 }`}
@@ -205,9 +205,9 @@ export default function SchemaPage(): JSX.Element {
   severity?: "blocking" | "important" | "suggestion";
   status?: "pending" | "acknowledged" | "resolved" | "dismissed";
   thread?: ThreadMessage[];
-  createdAt?: string;
-  updatedAt?: string;
-  resolvedAt?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  resolvedAt?: number;
   resolvedBy?: "human" | "agent";
   authorId?: string;
 };
@@ -233,9 +233,9 @@ type ThreadMessage = {
   type: "annotation.created" | "annotation.updated" | "annotation.deleted"
       | "session.created" | "session.updated" | "session.closed"
       | "thread.message" | "action.requested";
-  timestamp: string;     // ISO 8601
+  timestamp: number;     // Unix milliseconds
   sessionId: string;
-  sequence: number;      // Monotonic for ordering/replay
+  sequence: number;      // Monotonic for persisted ordering/replay; bootstrap sync snapshots may use 0
   payload: Annotation | Session | ThreadMessage | ActionRequest;
 };
 
@@ -243,12 +243,12 @@ type ActionRequest = {
   sessionId: string;
   annotations: Annotation[];
   output: string;
-  timestamp: string;
+  timestamp: number;
 };`}
           />
           <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)", marginTop: "0.5rem" }}>
-            The <code>sequence</code> number enables clients to detect missed events and request replay.
-            See <a href="/server">the server docs</a> for SSE streaming details.
+            The <code>sequence</code> number enables clients to detect missed persisted events and request replay.
+            Bootstrap sync snapshots may use <code>0</code> before live events begin. See <a href="/server">the server docs</a> for SSE streaming details.
           </p>
         </section>
 
@@ -313,9 +313,9 @@ type ActionRequest = {
     "intent": { "enum": ["fix", "change", "question", "approve"] },
     "severity": { "enum": ["blocking", "important", "suggestion"] },
     "status": { "enum": ["pending", "acknowledged", "resolved", "dismissed"] },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" },
-    "resolvedAt": { "type": "string", "format": "date-time" },
+    "createdAt": { "type": "number" },
+    "updatedAt": { "type": "number" },
+    "resolvedAt": { "type": "number" },
     "resolvedBy": { "enum": ["human", "agent"] },
     "authorId": { "type": "string" }
   }

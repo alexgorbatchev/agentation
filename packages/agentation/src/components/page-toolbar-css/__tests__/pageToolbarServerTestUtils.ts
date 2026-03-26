@@ -85,7 +85,7 @@ type SessionPayload = {
   id: string;
   url: string;
   status: "active";
-  createdAt: string;
+  createdAt: number;
   annotations: Annotation[];
 };
 
@@ -120,7 +120,7 @@ function buildSessionPayload(sessionId: string, annotations: Annotation[] = []):
     id: sessionId,
     url: "http://localhost:3000/",
     status: "active",
-    createdAt: new Date().toISOString(),
+    createdAt: Date.now(),
     annotations,
   };
 }

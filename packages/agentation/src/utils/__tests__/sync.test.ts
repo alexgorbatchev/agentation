@@ -51,7 +51,7 @@ afterEach(() => {
 
 describe("listSessions", () => {
   it("calls GET /sessions and returns parsed array", async () => {
-    const sessions = [{ id: "s1", url: "/", status: "active", createdAt: "2024-01-01" }];
+    const sessions = [{ id: "s1", url: "/", status: "active", createdAt: 1704067200000 }];
     mockFetchResponse(sessions);
     const result = await listSessions(ENDPOINT);
     expect(fetchSpy).toHaveBeenCalledWith(`${ENDPOINT}/sessions`);
@@ -78,7 +78,7 @@ describe("listSessions", () => {
 
 describe("createSession", () => {
   it("sends POST with url in body and returns session", async () => {
-    const session = { id: "s1", url: "/page", status: "active", createdAt: "2024-01-01" };
+    const session = { id: "s1", url: "/page", status: "active", createdAt: 1704067200000 };
     mockFetchResponse(session);
     const result = await createSession(ENDPOINT, "/page");
 
@@ -95,7 +95,7 @@ describe("createSession", () => {
       id: "s1",
       url: "/page",
       status: "active",
-      createdAt: "2024-01-01",
+      createdAt: 1704067200000,
       projectId: "project-alpha",
     };
     mockFetchResponse(session);
@@ -125,7 +125,7 @@ describe("getSession", () => {
       id: "s1",
       url: "/",
       status: "active",
-      createdAt: "2024-01-01",
+      createdAt: 1704067200000,
       annotations: [],
     };
     mockFetchResponse(sessionWithAnnotations);
