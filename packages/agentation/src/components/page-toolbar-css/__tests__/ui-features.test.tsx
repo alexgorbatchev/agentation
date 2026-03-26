@@ -842,6 +842,35 @@ describe("PageFeedbackToolbarCSS – UI Features", () => {
       ).toBeTruthy();
     });
 
+    it("keeps the expanded disconnected toolbar inset from the left viewport edge", async () => {
+      Object.defineProperty(window, "innerWidth", {
+        value: 1000,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(window, "innerHeight", {
+        value: 800,
+        writable: true,
+        configurable: true,
+      });
+
+      localStorage.setItem(
+        "feedback-toolbar-position",
+        JSON.stringify({ x: -1000, y: 100 }),
+      );
+
+      render(<PageFeedbackToolbarCSS />);
+      await activateToolbar();
+
+      await waitFor(() => {
+        const toolbar = document.querySelector(
+          "[data-feedback-toolbar]",
+        ) as HTMLElement;
+        expect(toolbar.style.left).toBe("-20px");
+        expect(toolbar.style.top).toBe("100px");
+      });
+    });
+
     it("constrains toolbar position to viewport on resize", async () => {
       // Set an initial toolbar position via localStorage
       localStorage.setItem(

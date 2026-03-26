@@ -305,6 +305,46 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       });
     });
 
+    it("keeps the expanded connected toolbar inset from the left viewport edge", async () => {
+      Object.defineProperty(window, "innerWidth", {
+        value: 1000,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(window, "innerHeight", {
+        value: 800,
+        writable: true,
+        configurable: true,
+      });
+
+      localStorage.setItem(
+        "feedback-toolbar-position",
+        JSON.stringify({ x: -1000, y: 100 }),
+      );
+      setupBasicServerMocks("session-health-clamp");
+
+      render(
+        <PageFeedbackToolbarCSS
+          endpoint="http://localhost:4747"
+          sessionId="session-health-clamp"
+        />
+      );
+      await activateToolbar();
+
+      await waitFor(() => {
+        const indicator = document.querySelector('[title="Server Connected"]');
+        expect(indicator).toBeTruthy();
+      });
+
+      await waitFor(() => {
+        const toolbar = document.querySelector(
+          "[data-feedback-toolbar]",
+        ) as HTMLElement;
+        expect(toolbar.style.left).toBe("20px");
+        expect(toolbar.style.top).toBe("100px");
+      });
+    });
+
     it("sets connection status to disconnected on health check failure", async () => {
       setupBasicServerMocks("session-health-fail", [], {
         healthOk: false,

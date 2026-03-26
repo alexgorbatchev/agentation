@@ -31,6 +31,13 @@ type DragStartPosition = {
   toolbarY: number;
 };
 
+const TOOLBAR_VIEWPORT_PADDING_PX = 20;
+const TOOLBAR_WRAPPER_WIDTH_PX = 331;
+const TOOLBAR_ACTIVE_WIDTH_PX = 291;
+const TOOLBAR_CONNECTED_WIDTH_PX = 331;
+const TOOLBAR_COLLAPSED_WIDTH_PX = 44;
+const TOOLBAR_HEIGHT_PX = 44;
+
 function setLocalStorageItem(key: string, value: string): void {
   if (typeof window === "undefined") {
     return;
@@ -43,30 +50,40 @@ function setLocalStorageItem(key: string, value: string): void {
   }
 }
 
+function getToolbarContentWidth(
+  isActive: boolean,
+  connectionStatus: ConnectionStatus,
+): number {
+  if (!isActive) {
+    return TOOLBAR_COLLAPSED_WIDTH_PX;
+  }
+
+  if (connectionStatus === "connected") {
+    return TOOLBAR_CONNECTED_WIDTH_PX;
+  }
+
+  return TOOLBAR_ACTIVE_WIDTH_PX;
+}
+
 function constrainToolbarPosition(
   currentX: number,
   currentY: number,
   isActive: boolean,
   connectionStatus: ConnectionStatus,
 ): { x: number; y: number } {
-  const padding = 20;
-  const wrapperWidth = 297;
-  const toolbarHeight = 44;
-
-  const contentWidth = isActive
-    ? connectionStatus === "connected"
-      ? 297
-      : 257
-    : 44;
-
-  const contentOffset = wrapperWidth - contentWidth;
-  const minX = padding - contentOffset;
-  const maxX = window.innerWidth - padding - wrapperWidth;
+  const contentWidth = getToolbarContentWidth(isActive, connectionStatus);
+  const contentOffset = TOOLBAR_WRAPPER_WIDTH_PX - contentWidth;
+  const minX = TOOLBAR_VIEWPORT_PADDING_PX - contentOffset;
+  const maxX =
+    window.innerWidth - TOOLBAR_VIEWPORT_PADDING_PX - TOOLBAR_WRAPPER_WIDTH_PX;
 
   const x = Math.max(minX, Math.min(maxX, currentX));
   const y = Math.max(
-    padding,
-    Math.min(window.innerHeight - toolbarHeight - padding, currentY),
+    TOOLBAR_VIEWPORT_PADDING_PX,
+    Math.min(
+      window.innerHeight - TOOLBAR_HEIGHT_PX - TOOLBAR_VIEWPORT_PADDING_PX,
+      currentY,
+    ),
   );
 
   return { x, y };
