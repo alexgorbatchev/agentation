@@ -235,7 +235,7 @@ export default function AgentationDocs() {
               While the original Agentation is still maintained, this project has taken a somewhat different direction by replacing MCP with a CLI and adding a few more features.
             </strong>
           </p>
-          <p className="tagline">Agentation turns UI annotations into structured context that AI coding agents can understand and act on. Click any element, add a note, and paste the output into Claude Code, Cursor, or any AI tool.</p>
+          <p className="tagline hero-tagline">Agentation turns UI annotations into structured context that AI coding agents can understand and act on. Click any element, add a note, and paste the output into Claude Code, Cursor, or any AI tool.</p>
         </header>
 
         {/* Animated demo */}
