@@ -58,7 +58,7 @@ agentation stop`}
 agentation pending my-project --json
 
 # watch for new feedback
-agentation watch my-project --timeout 300 --batch-window 10 --json
+agentation watch my-project --timeout 300 --json
 
 # resolve loop actions
 agentation ack <annotation-id>
