@@ -88,29 +88,29 @@ const releases: Release[] = [
     version: "2.1.1",
     date: "February 5, 2026",
     changes: [
-      { type: "fixed", text: "Unstyled \"Learn more\" link in MCP Connection settings when no endpoint is configured" },
+      { type: "fixed", text: "Unstyled \"Learn more\" link in server connection settings when no endpoint is configured" },
     ],
   },
   {
     version: "2.1.0",
     date: "February 5, 2026",
     changes: [
-      { type: "added", text: <><a href="/server#hands-free-mode" className="styled-link">Hands-free mode</a> — <code>watch_annotations</code> tool blocks until new annotations appear, then returns a batch for the agent to process in a loop</> },
+      { type: "added", text: <><a href="/server#project-scoped-agent-loops" className="styled-link">Project-scoped agent loops</a> — the blocking watch flow waits for new annotations, then returns the next batch for the agent to process</> },
       { type: "added", text: <>Keyboard shortcut <code>Cmd+Shift+F</code> / <code>Ctrl+Shift+F</code> to toggle feedback mode</> },
       { type: "added", text: "Resolved annotations now animate out of the browser UI in real time via Server-Sent Events" },
       { type: "fixed", text: "Production builds no longer health-check localhost:4747 on every page load" },
-      { type: "fixed", text: "MCP tools no longer hang indefinitely if the SSE connection drops" },
-      { type: "removed", text: <><code>wait_for_action</code> MCP tool — unused and superseded by <code>watch_annotations</code></> },
+      { type: "fixed", text: "Agent watch loops no longer hang indefinitely if the SSE connection drops" },
+      { type: "removed", text: <>Legacy wait-for-action loop — superseded by the blocking watch flow</> },
     ],
   },
   {
     version: "2.0.0",
     date: "February 5, 2026",
-    summary: "The shift from \"annotate, copy, paste\" to \"annotate and collaborate.\" Agents now see your annotations directly. This update adds MCP server integration, webhooks, React component detection, Shadow DOM support, and much more.",
+    summary: "The shift from \"annotate, copy, paste\" to \"annotate and collaborate.\" Agents now see your annotations directly. This update adds the local CLI/server workflow, webhooks, React component detection, Shadow DOM support, and much more.",
     changes: [
-      { type: "added", text: <><a href="/server" className="styled-link">MCP server</a> for direct agent integration — agents can fetch, acknowledge, resolve, and dismiss annotations</> },
+      { type: "added", text: <><a href="/server" className="styled-link">Local CLI/server workflow</a> for direct agent integration — agents can fetch, acknowledge, resolve, dismiss, and reply to annotations</> },
       { type: "added", text: "HTTP API and Server-Sent Events for real-time updates" },
-      { type: "added", text: <>Per-page <a href="/server#sessions" className="styled-link">sessions</a> with rich annotation metadata (timestamps, status, resolver info)</> },
+      { type: "added", text: <>Per-page sessions with rich annotation metadata (timestamps, status, resolver info)</> },
       { type: "added", text: "Status transitions: pending → acknowledged → resolved/dismissed, all timestamped" },
       { type: "added", text: <><a href="/schema" className="styled-link">Annotation Format Schema</a> with intent and severity fields for prioritization</> },
       { type: "added", text: "JSON Schema and TypeScript definitions for the annotation format" },
@@ -195,8 +195,8 @@ export default function ChangelogPage() {
         </header>
 
         <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.5)", marginTop: "0.75rem" }}>
-          Older entries preserve historical terminology from the upstream project (for example <em>MCP</em> or the old Claude Code setup flow).
-          The current fork standardizes on the local Agentation CLI/server workflow documented elsewhere on this site.
+          Older entries may compress historical terminology from the upstream project, but the links below now point to
+          the current maintained CLI/server workflow documented elsewhere on this site.
         </p>
 
         {releases.map((release, i) => (

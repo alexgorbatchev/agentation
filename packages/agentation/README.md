@@ -9,21 +9,26 @@ This npm package is maintained in the [`alexgorbatchev/agentation`](https://gith
 
 ## Install
 
-Install both the frontend package and the CLI companion:
+Install the frontend package and the CLI companion as project-local development dependencies:
 
 ```bash
-npm install @alexgorbatchev/agentation -D
-npm install -g @alexgorbatchev/agentation-cli
+npm install -D @alexgorbatchev/agentation @alexgorbatchev/agentation-cli
 ```
 
-If you prefer, you can install the CLI from source or another package manager via [`@alexgorbatchev/agentation-cli`](https://github.com/alexgorbatchev/agentation-cli).
+If you want the Pi happy path as well, add:
+
+```bash
+npm install -D @alexgorbatchev/pi-agentation
+```
+
+If you prefer a global install, Go install, or another package manager for the CLI, see [`@alexgorbatchev/agentation-cli`](https://github.com/alexgorbatchev/agentation-cli).
 
 ## Usage
 
 Start the local Agentation stack first:
 
 ```bash
-agentation start
+npx agentation start
 ```
 
 Then add the component to your app:

@@ -9,28 +9,40 @@ export default function APIPage(): JSX.Element {
       <article className="article">
         <header>
           <h1>API</h1>
-          <p className="tagline">Programmatic access for developers</p>
+          <p className="tagline">Public React props, local HTTP API, and CLI integration surface</p>
         </header>
 
         <section>
           <h2 id="overview">Overview</h2>
           <p>
-            Agentation exposes callbacks that let you integrate annotations into
-            your own workflows — send to a backend, pipe to terminal, trigger
-            automations, or build custom AI integrations.
+            Agentation exposes a small public React API for the browser toolbar and a local CLI/server API for
+            project-scoped agent automation. The browser component is what you ship in your app; the local CLI/server is
+            what powers synced sessions, pending queues, watch loops, and editor routing.
+          </p>
+          <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            This page covers the public component props and the core CLI/server surface. For the exhaustive npm package,
+            install, environment-variable, and release reference, see the{" "}
+            <a
+              href="https://github.com/alexgorbatchev/agentation-cli/blob/main/README.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              agentation-cli README
+            </a>
+            .
           </p>
           <ul>
-            <li>Sync annotations to a database or backend service</li>
-            <li>Build analytics dashboards tracking feedback patterns</li>
-            <li>Create custom AI integrations (CLI loops, agent tools)</li>
+            <li>Mount the browser toolbar with a required <code>projectId</code></li>
+            <li>Use CLI commands such as <code>pending</code>, <code>watch</code>, <code>reply</code>, and <code>resolve</code></li>
+            <li>Use the local HTTP API directly if you need custom tooling around sessions or annotations</li>
           </ul>
         </section>
 
         <section>
           <h2 id="props">Props</h2>
           <p>
-            <code>{"<Agentation />"}</code> is a thin public wrapper around the CSS toolbar component. These are the current public props exported by
-            <code> @alexgorbatchev/agentation</code>.
+            <code>{"<Agentation />"}</code> is a thin public wrapper around the CSS toolbar component. These are the
+            current public props exported by <code>@alexgorbatchev/agentation</code>.
           </p>
 
           <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Required</h3>
@@ -40,7 +52,36 @@ export default function APIPage(): JSX.Element {
                 <code className="prop-name">projectId</code>
                 <span className="prop-type">string</span>
               </div>
-              <p className="prop-desc">Required project scope used by the local CLI/server for pending queues, session reuse, and watch flows.</p>
+              <p className="prop-desc">
+                Required project scope used by the local CLI/server for session reuse, pending queues, and watch flows.
+              </p>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: "1.25rem", marginBottom: "0.5rem" }}>Demo mode</h3>
+          <div className="props-list">
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">demoAnnotations</code>
+                <span className="prop-type">DemoAnnotation[]</span>
+              </div>
+              <p className="prop-desc">Optional scripted demo annotations rendered when demo mode is enabled.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">demoDelay</code>
+                <span className="prop-type">number</span>
+                <span className="prop-default">default: 1000</span>
+              </div>
+              <p className="prop-desc">Delay in milliseconds between demo annotation steps.</p>
+            </div>
+            <div className="prop-item">
+              <div className="prop-header">
+                <code className="prop-name">enableDemoMode</code>
+                <span className="prop-type">boolean</span>
+                <span className="prop-default">default: false</span>
+              </div>
+              <p className="prop-desc">Enable the built-in demo flow instead of normal live annotation capture.</p>
             </div>
           </div>
 
@@ -104,7 +145,10 @@ export default function APIPage(): JSX.Element {
                 <code className="prop-name">endpoint</code>
                 <span className="prop-type">string</span>
               </div>
-              <p className="prop-desc">Optional server URL. If omitted, Agentation probes <code>http://127.0.0.1:4747</code> once and otherwise stays local-only.</p>
+              <p className="prop-desc">
+                Optional server URL. If omitted, Agentation probes <code>http://127.0.0.1:4747</code> once and
+                otherwise stays local-only.
+              </p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
@@ -118,7 +162,10 @@ export default function APIPage(): JSX.Element {
                 <code className="prop-name">webhookUrl</code>
                 <span className="prop-type">string</span>
               </div>
-              <p className="prop-desc">Default webhook target. Auto-send is controlled by toolbar settings, and the manual send action can still target this URL.</p>
+              <p className="prop-desc">
+                Default webhook target. Auto-send is controlled by toolbar settings, and the manual send action can still
+                target this URL.
+              </p>
             </div>
           </div>
 
@@ -130,7 +177,9 @@ export default function APIPage(): JSX.Element {
                 <span className="prop-type">boolean</span>
                 <span className="prop-default">default: true</span>
               </div>
-              <p className="prop-desc">Disable clipboard writes if you want to handle copied output yourself via <code>onCopy</code>.</p>
+              <p className="prop-desc">
+                Disable clipboard writes if you want to handle copied output yourself via <code>onCopy</code>.
+              </p>
             </div>
             <div className="prop-item">
               <div className="prop-header">
@@ -194,9 +243,7 @@ export default function APIPage(): JSX.Element {
 
         <section>
           <h2 id="basic-usage">Basic usage</h2>
-          <p>
-            Receive annotation data directly in your code:
-          </p>
+          <p>Receive annotation data directly in your code:</p>
           <CodeBlock
             code={`import { Agentation, type Annotation } from "@alexgorbatchev/agentation";
 
@@ -218,14 +265,15 @@ function App() {
         <section>
           <h2 id="annotation-type">Annotation type</h2>
           <p>
-            The <code>Annotation</code> object passed to callbacks. See <a href="/schema">Agentation Format</a> for the full schema.
+            The <code>Annotation</code> object passed to callbacks. See <a href="/schema">Agentation Format</a> for the
+            wire schema and server-backed fields.
           </p>
           <CodeBlock
             code={`type Annotation = {
   // Core fields
   id: string;
-  x: number;                // % of viewport width
-  y: number;                // px from top of document (or viewport if isFixed)
+  x: number;
+  y: number;
   comment: string;
   element: string;
   elementPath: string;
@@ -243,7 +291,7 @@ function App() {
   isMultiSelect?: boolean;
   isFixed?: boolean;
   reactComponents?: string;
-  sourceFile?: string;      // e.g. "src/components/Button.tsx:42"
+  sourceFile?: string;
   elementBoundingBoxes?: Array<{ x: number; y: number; width: number; height: number }>;
 
   // Server-backed metadata
@@ -258,14 +306,54 @@ function App() {
   resolvedAt?: number;
   resolvedBy?: "human" | "agent";
   authorId?: string;
+
+  // Local-only sync tracking
+  _syncedTo?: string;
+  _reviewedAt?: number;
+};
+
+type ThreadMessage = {
+  id: string;
+  role: "human" | "agent";
+  content: string;
+  timestamp: number;
 };`}
+          />
+        </section>
+
+        <section>
+          <h2 id="cli-command-surface">CLI command surface</h2>
+          <p>
+            The supported automation path is the project-scoped CLI. Add <code>--json</code> when you want
+            machine-readable output.
+          </p>
+          <CodeBlock
+            language="bash"
+            code={`# lifecycle
+agentation start
+agentation status
+agentation stop
+
+# project discovery + queue inspection
+agentation projects --json
+agentation project my-project --json
+agentation pending my-project --json
+agentation watch my-project --timeout 300 --json
+
+# annotation actions
+agentation ack <annotation-id>
+agentation reply <annotation-id> --message "Working on it"
+agentation resolve <annotation-id> --summary "Updated spacing in Hero.tsx"
+agentation dismiss <annotation-id> --reason "Out of scope for this change"`}
           />
         </section>
 
         <section>
           <h2 id="http-api">HTTP API</h2>
           <p>
-            The local Agentation server (started with <code>agentation start</code>) provides a REST API for programmatic access:
+            The local Agentation server (started with <code>agentation start</code>) provides a REST API for programmatic
+            access. For agent automation, prefer project-scoped CLI commands or include <code>?projectId=...</code> on
+            the corresponding HTTP requests.
           </p>
 
           <h3 style={{ marginTop: "1.25rem" }}>Sessions</h3>
@@ -279,12 +367,17 @@ function App() {
               <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>/sessions</td>
-                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>List all sessions</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>List sessions (optionally filter with <code>?projectId=...</code>)</td>
               </tr>
               <tr>
-                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
-                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>/sessions/:id</td>
-                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Get session with annotations</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>/sessions/:id</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Get session with annotations</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>POST</td>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>/sessions/:id/action</td>
+                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Request agent action for a session</td>
               </tr>
             </tbody>
           </table>
@@ -305,7 +398,7 @@ function App() {
               <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>PATCH</td>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>/annotations/:id</td>
-                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Update annotation</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Update annotation status or metadata</td>
               </tr>
               <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>DELETE</td>
@@ -320,12 +413,12 @@ function App() {
               <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>/sessions/:id/pending</td>
-                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Get pending annotations</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Get pending annotations for one session</td>
               </tr>
               <tr>
                 <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
                 <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>/pending</td>
-                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Get all pending annotations</td>
+                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Get pending annotations across all projects, or filter with <code>?projectId=...</code></td>
               </tr>
             </tbody>
           </table>
@@ -336,12 +429,12 @@ function App() {
               <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem", width: "5rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>/sessions/:id/events</td>
-                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Session event stream</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Session event stream (optionally add <code>?agent=true</code>)</td>
               </tr>
               <tr>
                 <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem", color: "rgba(0,0,0,0.4)" }}>GET</td>
                 <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>/events</td>
-                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Global event stream (optionally filter with <code>?domain=...</code>)</td>
+                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.5)", textAlign: "right" }}>Global event stream (supports <code>?projectId=...</code>, <code>?domain=...</code>, and <code>?agent=true</code>)</td>
               </tr>
             </tbody>
           </table>
@@ -361,23 +454,27 @@ function App() {
               </tr>
             </tbody>
           </table>
+
+          <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            <code>POST /sessions/:id/action</code> accepts a JSON body shaped like <code>{'{ "output": "..." }'}</code>
+            and emits an <code>action.requested</code> event containing the session, current annotations, and request
+            timestamp.
+          </p>
         </section>
 
         <section>
           <h2 id="real-time-events">Real-Time Events</h2>
-          <p>
-            Subscribe to real-time events via Server-Sent Events:
-          </p>
+          <p>Subscribe to real-time events via Server-Sent Events:</p>
           <CodeBlock
             language="bash"
             code={`# Session-level: events for a single page
 curl -N http://127.0.0.1:4747/sessions/:id/events
 
-# Global: events across ALL sessions
-curl -N http://127.0.0.1:4747/events
+# Project-scoped: events across all sessions for one project
+curl -N "http://127.0.0.1:4747/events?projectId=my-project"
 
-# Filtered by domain: events for pages on a specific domain
-curl -N "http://127.0.0.1:4747/events?domain=localhost:3001"
+# Agent watch flow: only the stream shape used by CLI watch
+curl -N "http://127.0.0.1:4747/events?agent=true&projectId=my-project"
 
 # Reconnect after disconnect (replay missed events)
 curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
@@ -395,7 +492,6 @@ curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
           </ul>
         </section>
 
-
         <section>
           <h2 id="environment-variables">Environment Variables</h2>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem", marginTop: "1rem" }}>
@@ -409,7 +505,7 @@ curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
             <tbody>
               <tr>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_BASE_URL</td>
-                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Default base URL for CLI data commands such as <code>pending</code>, <code>watch</code>, and <code>resolve</code></td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Default base URL for CLI data commands such as <code>pending</code>, <code>watch</code>, <code>reply</code>, and <code>resolve</code></td>
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>http://localhost:4747</td>
               </tr>
               <tr>
@@ -433,12 +529,48 @@ curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
                 <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>127.0.0.1:4747</td>
               </tr>
               <tr>
-                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_ROUTER_ADDR</td>
-                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.6)" }}>Default address for the optional router; set to <code>0</code> to disable it</td>
-                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>127.0.0.1:8787</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_ROUTER_ADDR</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Default address for the optional router; set to <code>0</code> to disable it</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>127.0.0.1:8787</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_PID_FILE</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Override the single PID file used for stack lifecycle isolation</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>platform-specific runtime path</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_LOG_FILE</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Override the stack supervisor log file for background mode</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>derived runtime path</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_SERVER_LOG_FILE</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Override the server log file</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>derived runtime path</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_ROUTER_LOG_FILE</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Override the router log file</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>derived runtime path</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>AGENTATION_ROUTER_TOKEN</td>
+                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.6)" }}>Optional auth token for router mutation endpoints such as <code>/register</code>, <code>/unregister</code>, and <code>/open</code></td>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>unset</td>
               </tr>
             </tbody>
           </table>
+          <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Lower-level router tuning variables and npm install fallback variables are documented in the{" "}
+            <a
+              href="https://github.com/alexgorbatchev/agentation-cli/blob/main/README.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              CLI README
+            </a>
+            .
+          </p>
         </section>
 
         <section>
@@ -447,11 +579,7 @@ curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
             By default, data is persisted to SQLite at <code>$XDG_DATA_HOME/agentation/store.db</code> if <code>XDG_DATA_HOME</code> is set,
             otherwise <code>~/.local/share/agentation/store.db</code>. To use in-memory storage:
           </p>
-          <CodeBlock
-            language="bash"
-            copyable
-            code={`AGENTATION_STORE=memory agentation start --foreground`}
-          />
+          <CodeBlock language="bash" copyable code={`AGENTATION_STORE=memory agentation start --foreground`} />
         </section>
 
         <section>
@@ -461,14 +589,18 @@ curl -N -H "Last-Event-ID: 42" http://127.0.0.1:4747/sessions/:id/events`}
             code={`# Start local stack (server + router)
 agentation start
 
-# Or start in foreground while debugging
-agentation start --foreground
+# Disable the router for a server-only workflow
+AGENTATION_ROUTER_ADDR=0 agentation start
 
 # Target a non-default API endpoint
-AGENTATION_BASE_URL=http://127.0.0.1:5757 agentation pending my-project --json`}
+AGENTATION_BASE_URL=http://127.0.0.1:5757 agentation pending my-project --json
+
+# Watch + reply from a custom agent loop
+AGENTATION_BASE_URL=http://127.0.0.1:5757 agentation watch my-project --json
+AGENTATION_BASE_URL=http://127.0.0.1:5757 agentation reply <annotation-id> --message "On it"`}
           />
           <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem" }}>
-            See <a href="/server">Agentation Server (CLI)</a> for lifecycle and agent-integration workflows.
+            See <a href="/server">Agentation Server (CLI)</a> for the guided local workflow and lifecycle notes.
           </p>
         </section>
       </article>
