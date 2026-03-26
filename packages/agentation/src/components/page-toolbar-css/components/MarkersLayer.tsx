@@ -100,6 +100,7 @@ export function MarkersLayer({
                   key={annotation.id}
                   className={`${styles.marker} ${getMarkerStatusClassName(annotation)} ${isMulti ? styles.multiSelect : ""} ${animationClass} ${showDeleteHover ? styles.hovered : ""}`}
                   data-annotation-marker
+                  data-annotation-id={annotation.id}
                   data-annotation-status={getMarkerStatus(annotation)}
                   title={getMarkerStatusTitle(annotation)}
                   style={{
@@ -212,6 +213,7 @@ export function MarkersLayer({
                   key={annotation.id}
                   className={`${styles.marker} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
                   data-annotation-marker
+                  data-annotation-id={annotation.id}
                   data-annotation-status={getMarkerStatus(annotation)}
                   title={getMarkerStatusTitle(annotation)}
                   style={{
@@ -259,6 +261,7 @@ export function MarkersLayer({
                   key={annotation.id}
                   className={`${styles.marker} ${styles.fixed} ${getMarkerStatusClassName(annotation)} ${isMulti ? styles.multiSelect : ""} ${animationClass} ${showDeleteHover ? styles.hovered : ""}`}
                   data-annotation-marker
+                  data-annotation-id={annotation.id}
                   data-annotation-status={getMarkerStatus(annotation)}
                   title={getMarkerStatusTitle(annotation)}
                   style={{
@@ -371,6 +374,7 @@ export function MarkersLayer({
                   key={annotation.id}
                   className={`${styles.marker} ${styles.fixed} ${styles.hovered} ${isMulti ? styles.multiSelect : ""} ${styles.exit}`}
                   data-annotation-marker
+                  data-annotation-id={annotation.id}
                   data-annotation-status={getMarkerStatus(annotation)}
                   title={getMarkerStatusTitle(annotation)}
                   style={{

@@ -379,7 +379,12 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
             <div className={styles.actions}>
               {onDelete && (
                 <div className={styles.deleteWrapper}>
-                  <button className={styles.deleteButton} onClick={onDelete} type="button">
+                  <button
+                    aria-label="Delete annotation"
+                    className={styles.deleteButton}
+                    onClick={onDelete}
+                    type="button"
+                  >
                     <IconTrash size={22} />
                   </button>
                 </div>

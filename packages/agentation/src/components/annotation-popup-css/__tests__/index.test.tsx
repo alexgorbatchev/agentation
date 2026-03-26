@@ -103,11 +103,12 @@ describe("rendering", () => {
 describe("delete button", () => {
   it("shows delete button when onDelete is provided", () => {
     const onDelete = vi.fn();
-    const { container } = renderPopup({ onDelete });
-    // The delete button contains an SVG icon, find it by role or container
-    const deleteButtons = container.querySelectorAll("button");
-    // Should have 3 buttons: delete, cancel, submit
-    expect(deleteButtons.length).toBe(3);
+    renderPopup({ onDelete });
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete annotation",
+    });
+    expect(deleteButton).toBeDefined();
   });
 
   it("does not show delete button when onDelete is not provided", () => {
@@ -119,10 +120,12 @@ describe("delete button", () => {
 
   it("calls onDelete when delete button is clicked", () => {
     const onDelete = vi.fn();
-    const { container } = renderPopup({ onDelete });
-    // Delete button is the first button (before Cancel and Submit)
-    const buttons = container.querySelectorAll("button");
-    fireEvent.click(buttons[0]);
+    renderPopup({ onDelete });
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete annotation",
+    });
+    fireEvent.click(deleteButton);
     expect(onDelete).toHaveBeenCalledOnce();
   });
 });

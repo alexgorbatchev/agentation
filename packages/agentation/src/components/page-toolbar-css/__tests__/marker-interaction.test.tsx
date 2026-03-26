@@ -116,6 +116,23 @@ describe("Marker interactions and JSX render paths", () => {
       // React converts numeric top values to px strings
       expect(marker.style.top).toBe("150px");
     });
+
+    it("adds data-annotation-id to rendered markers", async () => {
+      const annotation = makeAnnotation({
+        id: "marker-data-id",
+        comment: "Marker id contract",
+      });
+      seedAnnotations([annotation]);
+
+      render(<PageFeedbackToolbarCSS />);
+      await activateToolbar();
+      await waitForMarkers(1);
+
+      const marker = document.querySelector(
+        '[data-annotation-marker][data-annotation-id="marker-data-id"]',
+      );
+      expect(marker).toBeTruthy();
+    });
   });
 
   // ===========================================================================
