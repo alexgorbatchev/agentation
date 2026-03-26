@@ -130,7 +130,7 @@ export default function FeaturesPage() {
             </tr>
             <tr>
               <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}><code>Hold Alt</code></td>
-              <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)', color: 'rgba(0,0,0,0.5)', textAlign: 'right' }}>Temporarily enter feedback mode and click a DOM element without opening the toolbar first</td>
+              <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)', color: 'rgba(0,0,0,0.5)', textAlign: 'right' }}>Automatically enter feedback mode while held and click a DOM element without opening the toolbar UI first</td>
             </tr>
             <tr>
               <td style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}><code>Alt</code> + right-click</td>
