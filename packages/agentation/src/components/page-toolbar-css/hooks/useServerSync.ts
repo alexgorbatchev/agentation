@@ -20,6 +20,7 @@ import type { ComponentEditor } from "../../../utils/component-inspector";
 
 const NEOVIM_HEARTBEAT_INTERVAL_MS = 5000;
 const NEOVIM_CONNECTION_TIMEOUT_MS = 15000;
+const SESSION_RETRY_INTERVAL_MS = 30000;
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected";
 type AnnotationEventPayload = Partial<Annotation> & Pick<Annotation, "id">;
@@ -101,6 +102,7 @@ export function useServerSync({
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     "disconnected",
   );
+  const [sessionInitRetryToken, setSessionInitRetryToken] = useState(0);
   const [neovimConnectionStatus, setNeovimConnectionStatus] =
     useState<ConnectionStatus>(
       componentEditor === "neovim" ? "connecting" : "disconnected",
@@ -125,7 +127,6 @@ export function useServerSync({
           try {
             const session = await getSession(resolvedEndpoint, sessionIdToJoin, projectId);
             setCurrentSessionId(session.id);
-            setConnectionStatus("connected");
             saveSessionId(pathname, session.id);
             sessionEstablished = true;
 
@@ -197,7 +198,6 @@ export function useServerSync({
           );
 
           setCurrentSessionId(session.id);
-          setConnectionStatus("connected");
           saveSessionId(pathname, session.id);
           onSessionCreated?.(session.id);
 
@@ -297,31 +297,29 @@ export function useServerSync({
     pathname,
     projectId,
     resolvedEndpoint,
+    sessionInitRetryToken,
     setAnnotations,
   ]);
 
   useEffect(() => {
-    if (!resolvedEndpoint || !mounted) {
+    if (
+      !resolvedEndpoint ||
+      !mounted ||
+      currentSessionId ||
+      connectionStatus !== "disconnected"
+    ) {
       return;
     }
 
-    const checkHealth = async (): Promise<void> => {
-      try {
-        const response = await fetch(buildProjectScopedUrl(`${resolvedEndpoint}/health`, projectId));
-        setConnectionStatus(response.ok ? "connected" : "disconnected");
-      } catch {
-        setConnectionStatus("disconnected");
-      }
-    };
+    const retryTimeout = window.setTimeout(() => {
+      sessionInitializedRef.current = false;
+      setSessionInitRetryToken((currentToken) => currentToken + 1);
+    }, SESSION_RETRY_INTERVAL_MS);
 
-    void checkHealth();
-    const interval = window.setInterval(() => {
-      void checkHealth();
-    }, 10000);
     return () => {
-      window.clearInterval(interval);
+      window.clearTimeout(retryTimeout);
     };
-  }, [mounted, projectId, resolvedEndpoint]);
+  }, [connectionStatus, currentSessionId, mounted, resolvedEndpoint]);
 
   useEffect(() => {
     if (
@@ -333,9 +331,18 @@ export function useServerSync({
       return;
     }
 
+    setConnectionStatus("connecting");
     const eventSource = new EventSource(
       buildProjectScopedUrl(`${resolvedEndpoint}/sessions/${currentSessionId}/events`, projectId),
     );
+
+    const openHandler = (): void => {
+      setConnectionStatus("connected");
+    };
+
+    const errorHandler = (): void => {
+      setConnectionStatus("disconnected");
+    };
 
     const annotationUpdatedHandler = (eventMessage: MessageEvent): void => {
       try {
@@ -365,10 +372,14 @@ export function useServerSync({
       }
     };
 
+    eventSource.addEventListener("open", openHandler);
+    eventSource.addEventListener("error", errorHandler);
     eventSource.addEventListener("annotation.updated", annotationUpdatedHandler);
     eventSource.addEventListener("thread.message", threadHandler);
 
     return () => {
+      eventSource.removeEventListener("open", openHandler);
+      eventSource.removeEventListener("error", errorHandler);
       eventSource.removeEventListener(
         "annotation.updated",
         annotationUpdatedHandler,

@@ -15,7 +15,8 @@ type MockTargetOptions = {
 };
 
 type EventSourceConstructor = new (url: string) => unknown;
-type EventSourceListener = (event: MessageEvent) => void;
+type EventSourceEvent = Event | MessageEvent;
+type EventSourceListener = (event: EventSourceEvent) => void;
 type EventSourceListenerMap = Record<string, EventSourceListener[]>;
 
 type InstallPageToolbarTestGlobalsOptions = {
@@ -40,14 +41,42 @@ type EventSourceHarness = {
   getListeners: (type: string) => EventSourceListener[];
   dispatch: (type: string, data: string) => void;
   emit: (type: string, payload: unknown) => void;
+  open: () => void;
+  error: () => void;
 };
 
-export class MockEventSource {
-  addEventListener: (type?: string, listener?: EventListenerOrEventListenerObject | null) => void = vi.fn();
-  removeEventListener: (type?: string, listener?: EventListenerOrEventListenerObject | null) => void = vi.fn();
-  close: () => void = vi.fn();
+function dispatchEventSourceListeners(
+  listeners: EventSourceListenerMap,
+  type: string,
+  event: EventSourceEvent,
+): void {
+  for (const listener of listeners[type] ?? []) {
+    listener(event);
+  }
+}
 
-  constructor(_url: string) {}
+export class MockEventSource {
+  url: string;
+  listeners: EventSourceListenerMap = {};
+  close: () => void;
+
+  constructor(url: string) {
+    this.url = url;
+    this.close = vi.fn();
+    queueMicrotask(() => {
+      dispatchEventSourceListeners(this.listeners, "open", new Event("open"));
+    });
+  }
+
+  addEventListener(type: string, listener: EventSourceListener): void {
+    const listeners = this.listeners[type] ?? [];
+    this.listeners[type] = [...listeners, listener];
+  }
+
+  removeEventListener(type: string, listener: EventSourceListener): void {
+    const listeners = this.listeners[type] ?? [];
+    this.listeners[type] = listeners.filter((candidate) => candidate !== listener);
+  }
 }
 
 export function createEventSourceHarness(): EventSourceHarness {
@@ -56,11 +85,17 @@ export function createEventSourceHarness(): EventSourceHarness {
   class CapturingEventSource {
     url: string;
     listeners: EventSourceListenerMap = {};
-    close: () => void = vi.fn();
+    close: () => void;
 
     constructor(url: string) {
       this.url = url;
+      this.close = vi.fn();
       lastInstance = this;
+      queueMicrotask(() => {
+        if (lastInstance === this) {
+          dispatchEventSourceListeners(this.listeners, "open", new Event("open"));
+        }
+      });
     }
 
     addEventListener(type: string, listener: EventSourceListener): void {
@@ -80,13 +115,19 @@ export function createEventSourceHarness(): EventSourceHarness {
 
   function dispatch(type: string, data: string): void {
     const event = new MessageEvent("message", { data });
-    for (const listener of getListeners(type)) {
-      listener(event);
-    }
+    dispatchEventSourceListeners(lastInstance?.listeners ?? {}, type, event);
   }
 
   function emit(type: string, payload: unknown): void {
     dispatch(type, JSON.stringify({ payload }));
+  }
+
+  function open(): void {
+    dispatchEventSourceListeners(lastInstance?.listeners ?? {}, "open", new Event("open"));
+  }
+
+  function error(): void {
+    dispatchEventSourceListeners(lastInstance?.listeners ?? {}, "error", new Event("error"));
   }
 
   return {
@@ -98,6 +139,8 @@ export function createEventSourceHarness(): EventSourceHarness {
     getListeners,
     dispatch,
     emit,
+    open,
+    error,
   };
 }
 

@@ -80,9 +80,9 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 /**
- * Set up fetch mock to handle session creation + health check.
- * The component issues both on mount when endpoint is provided.
- * Session init calls createSession (POST /sessions), and health check calls GET /health.
+ * Set up fetch mock to handle Agentation server requests.
+ * Session init calls createSession (POST /sessions), and endpoint discovery may
+ * probe GET /health when endpoint is omitted.
  */
 function setupBasicServerMocks(
   sessionId = "session-123",
@@ -220,7 +220,6 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
     it("falls back to local storage mode on network error", async () => {
       setupBasicServerMocks("session-network-error", [], {
-        onHealthRequest: () => mockNetworkError(),
         onCreateSessionRequest: () => mockNetworkError(),
       });
 
@@ -275,30 +274,35 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
   });
 
   // ===========================================================================
-  // 2. Health Check
+  // 2. Connection bootstrap
   // ===========================================================================
 
-  describe("Health check", () => {
-    it("fetches health endpoint immediately on mount", async () => {
+  describe("Connection bootstrap", () => {
+    it("does not poll the health endpoint when an explicit endpoint is provided", async () => {
       setupBasicServerMocks();
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
 
       await waitFor(() => {
-        const healthCalls = mockFetch.mock.calls.filter(
-          ([url]) => url === "http://localhost:4747/health"
+        const sessionCalls = mockFetch.mock.calls.filter(
+          ([url, opts]: [string, RequestInit?]) =>
+            url === "http://localhost:4747/sessions" && opts?.method === "POST"
         );
-        expect(healthCalls.length).toBeGreaterThanOrEqual(1);
+        expect(sessionCalls.length).toBeGreaterThanOrEqual(1);
       });
+
+      const healthCalls = mockFetch.mock.calls.filter(
+        ([url]) => url === "http://localhost:4747/health"
+      );
+      expect(healthCalls).toHaveLength(0);
     });
 
-    it("sets connection status to connected on successful health check", async () => {
+    it("sets connection status to connected when the session stream opens", async () => {
       setupBasicServerMocks("session-health-ok");
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
-      // When connected, should show server indicator with "Server Connected" title
       await waitFor(() => {
         const indicator = document.querySelector('[title="Server Connected"]');
         expect(indicator).toBeTruthy();
@@ -345,35 +349,62 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       });
     });
 
-    it("sets connection status to disconnected on health check failure", async () => {
-      setupBasicServerMocks("session-health-fail", [], {
-        healthOk: false,
+    it("sets connection status to disconnected when session initialization fails", async () => {
+      setupBasicServerMocks("session-health-throws", [], {
         onCreateSessionRequest: () => mockNetworkError(),
       });
 
       render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
       await activateToolbar();
 
-      // The connected server indicator should not appear
       await waitFor(() => {
         const connected = document.querySelector('[title="Server Connected"]');
         expect(connected).toBeNull();
       });
     });
 
-    it("sets connection status to disconnected when health check throws", async () => {
-      setupBasicServerMocks("session-health-throws", [], {
-        onHealthRequest: () => mockNetworkError(),
-        onCreateSessionRequest: () => mockNetworkError(),
-      });
+    it("retries session initialization without polling the health endpoint", async () => {
+      vi.useFakeTimers();
 
-      render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
-      await activateToolbar();
+      try {
+        let createSessionAttempts = 0;
+        setupBasicServerMocks("session-retry", [], {
+          onCreateSessionRequest: () => {
+            createSessionAttempts += 1;
+            if (createSessionAttempts === 1) {
+              return mockNetworkError();
+            }
 
-      await waitFor(() => {
-        const connected = document.querySelector('[title="Server Connected"]');
-        expect(connected).toBeNull();
-      });
+            return mockCreateSessionResponse("session-retry");
+          },
+        });
+
+        render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
+
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        expect(createSessionAttempts).toBe(1);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30000);
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        expect(createSessionAttempts).toBe(2);
+
+        const healthCalls = mockFetch.mock.calls.filter(
+          ([url]) => url === "http://localhost:4747/health"
+        );
+        expect(healthCalls).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -937,142 +968,128 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
     });
 
     it("replaces stale local pending status with acknowledged server state after reconnect", async () => {
-      vi.useFakeTimers();
+      const pendingAnnotation = makeAnnotation({
+        id: "reconnect-ack-1",
+        comment: "Reconnect ack",
+      });
+      const acknowledgedAnnotation: Annotation = {
+        ...pendingAnnotation,
+        status: "acknowledged",
+      };
+      let getSessionCount = 0;
 
-      try {
-        const pendingAnnotation = makeAnnotation({
+      seedAnnotations([pendingAnnotation]);
+
+      setupBasicServerMocks("session-reconnect-ack", [pendingAnnotation], {
+        onGetSessionRequest: () => {
+          getSessionCount += 1;
+          if (getSessionCount === 1) {
+            return mockGetSessionResponse("session-reconnect-ack", [pendingAnnotation]);
+          }
+
+          return mockGetSessionResponse("session-reconnect-ack", [acknowledgedAnnotation]);
+        },
+      });
+
+      render(
+        <PageFeedbackToolbarCSS
+          endpoint="http://localhost:4747"
+          sessionId="session-reconnect-ack"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(getLastEventSource()).not.toBeNull();
+      });
+
+      await act(async () => {
+        eventSourceHarness.error();
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        eventSourceHarness.open();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("agentation ack")).toBeTruthy();
+      expect(screen.getByText("Reconnect ack")).toBeTruthy();
+
+      const storedAnnotations = JSON.parse(
+        localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY) ?? "[]",
+      );
+      expect(storedAnnotations).toMatchObject([
+        {
           id: "reconnect-ack-1",
-          comment: "Reconnect ack",
-        });
-        const acknowledgedAnnotation: Annotation = {
-          ...pendingAnnotation,
           status: "acknowledged",
-        };
-        let getSessionCount = 0;
-
-        seedAnnotations([pendingAnnotation]);
-
-        setupBasicServerMocks("session-reconnect-ack", [pendingAnnotation], {
-          healthResponses: [false, true],
-          onGetSessionRequest: () => {
-            getSessionCount += 1;
-            if (getSessionCount === 1) {
-              return mockGetSessionResponse("session-reconnect-ack", [pendingAnnotation]);
-            }
-
-            return mockGetSessionResponse("session-reconnect-ack", [acknowledgedAnnotation]);
-          },
-        });
-
-        render(
-          <PageFeedbackToolbarCSS
-            endpoint="http://localhost:4747"
-            sessionId="session-reconnect-ack"
-          />,
-        );
-
-        await act(async () => {
-          await Promise.resolve();
-          await Promise.resolve();
-          await Promise.resolve();
-        });
-
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(10000);
-          await Promise.resolve();
-          await Promise.resolve();
-          await Promise.resolve();
-        });
-
-        expect(screen.getByText("agentation ack")).toBeTruthy();
-        expect(screen.getByText("Reconnect ack")).toBeTruthy();
-
-        const storedAnnotations = JSON.parse(
-          localStorage.getItem(PAGE_TOOLBAR_ANNOTATION_STORAGE_KEY) ?? "[]",
-        );
-        expect(storedAnnotations).toMatchObject([
-          {
-            id: "reconnect-ack-1",
-            status: "acknowledged",
-          },
-        ]);
-      } finally {
-        vi.useRealTimers();
-      }
+        },
+      ]);
     });
 
     it("creates new session on reconnect if existing session is expired", async () => {
-      vi.useFakeTimers();
+      const annotation = makeAnnotation({
+        id: "reconnect-expired-1",
+        comment: "Reconnect me",
+      });
+      seedAnnotations([annotation]);
 
-      try {
-        const annotation = makeAnnotation({
-          id: "reconnect-expired-1",
-          comment: "Reconnect me",
-        });
-        seedAnnotations([annotation]);
+      const createdSessionIds = ["session-reconnect-old", "session-reconnect-new"];
+      let createSessionIndex = 0;
+      const setup = setupBasicServerMocks("session-reconnect-old", [], {
+        onCreateSessionRequest: () => {
+          const nextSessionId =
+            createdSessionIds[createSessionIndex] ?? createdSessionIds[createdSessionIds.length - 1];
+          createSessionIndex += 1;
+          return mockCreateSessionResponse(nextSessionId);
+        },
+        onGetSessionRequest: () => mockNetworkError("Session not found"),
+      });
 
-        const createdSessionIds = ["session-reconnect-old", "session-reconnect-new"];
-        let createSessionIndex = 0;
-        const setup = setupBasicServerMocks("session-reconnect-old", [], {
-          healthResponses: [true, false, true],
-          onCreateSessionRequest: () => {
-            const nextSessionId =
-              createdSessionIds[createSessionIndex] ?? createdSessionIds[createdSessionIds.length - 1];
-            createSessionIndex += 1;
-            return mockCreateSessionResponse(nextSessionId);
-          },
-          onGetSessionRequest: () => mockNetworkError("Session not found"),
-        });
+      render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
 
-        render(<PageFeedbackToolbarCSS endpoint="http://localhost:4747" />);
+      await waitFor(() => {
+        expect(getLastEventSource()).not.toBeNull();
+      });
 
-        await act(async () => {
-          await Promise.resolve();
-          await Promise.resolve();
-          await Promise.resolve();
-        });
+      await act(async () => {
+        eventSourceHarness.error();
+        await Promise.resolve();
+      });
 
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(10000);
-          await Promise.resolve();
-          await Promise.resolve();
-        });
+      await act(async () => {
+        eventSourceHarness.open();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(10000);
-          await Promise.resolve();
-          await Promise.resolve();
-          await Promise.resolve();
-        });
+      const sessionCreateCalls = setup.fetchCalls.filter(
+        (call) =>
+          call.url === "http://localhost:4747/sessions" &&
+          call.method === "POST",
+      );
+      expect(sessionCreateCalls).toHaveLength(2);
 
-        const sessionCreateCalls = setup.fetchCalls.filter(
-          (call) =>
-            call.url === "http://localhost:4747/sessions" &&
-            call.method === "POST",
-        );
-        expect(sessionCreateCalls).toHaveLength(2);
+      const reconnectGetSessionCall = setup.fetchCalls.find(
+        (call) =>
+          call.url === "http://localhost:4747/sessions/session-reconnect-old" &&
+          call.method === "GET",
+      );
+      expect(reconnectGetSessionCall).toBeTruthy();
 
-        const reconnectGetSessionCall = setup.fetchCalls.find(
-          (call) =>
-            call.url === "http://localhost:4747/sessions/session-reconnect-old" &&
-            call.method === "GET",
-        );
-        expect(reconnectGetSessionCall).toBeTruthy();
+      const reconnectSyncCall = setup.fetchCalls.find(
+        (call) =>
+          call.url === "http://localhost:4747/sessions/session-reconnect-new/annotations" &&
+          call.method === "POST",
+      );
+      expect(reconnectSyncCall?.body).toMatchObject({
+        id: "reconnect-expired-1",
+        sessionId: "session-reconnect-new",
+      });
 
-        const reconnectSyncCall = setup.fetchCalls.find(
-          (call) =>
-            call.url === "http://localhost:4747/sessions/session-reconnect-new/annotations" &&
-            call.method === "POST",
-        );
-        expect(reconnectSyncCall?.body).toMatchObject({
-          id: "reconnect-expired-1",
-          sessionId: "session-reconnect-new",
-        });
-
-        expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBe("session-reconnect-new");
-      } finally {
-        vi.useRealTimers();
-      }
+      expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBe("session-reconnect-new");
     });
   });
 
@@ -1095,7 +1112,6 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
     it("shows Server Connecting indicator during connection", async () => {
       setupBasicServerMocks("session-connecting", [], {
-        onHealthRequest: () => mockPendingResponse(),
         onCreateSessionRequest: () => mockPendingResponse(),
       });
 
@@ -1123,7 +1139,6 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
 
     it("shows Server Disconnected indicator when disconnected", async () => {
       setupBasicServerMocks("session-disconnected", [], {
-        onHealthRequest: () => mockNetworkError(),
         onCreateSessionRequest: () => mockNetworkError(),
       });
 

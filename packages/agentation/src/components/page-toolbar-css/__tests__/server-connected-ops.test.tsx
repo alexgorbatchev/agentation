@@ -11,6 +11,7 @@ import {
 import { PageFeedbackToolbarCSS } from "../index";
 import type { Annotation } from "../../../types";
 import { unfreeze as unfreezeAll } from "../../../utils/freeze-animations";
+import { createEventSourceHarness } from "./pageToolbarTestUtils";
 import { setupPageToolbarServerMock } from "./pageToolbarServerTestUtils";
 
 // ---------------------------------------------------------------------------
@@ -87,18 +88,14 @@ function createMockTarget(
 // ---------------------------------------------------------------------------
 
 let fetchCalls: ReturnType<typeof setupPageToolbarServerMock>["fetchCalls"] = [];
+const eventSourceHarness = createEventSourceHarness();
 
 function setupServerMock(sessionAnnotations: Annotation[] = []) {
-  const setup = setupPageToolbarServerMock({ annotations: sessionAnnotations });
+  const setup = setupPageToolbarServerMock({
+    annotations: sessionAnnotations,
+    eventSourceClass: eventSourceHarness.EventSourceClass,
+  });
   fetchCalls = setup.fetchCalls;
-  vi.stubGlobal(
-    "EventSource",
-    class {
-      addEventListener() {}
-      removeEventListener() {}
-      close() {}
-    },
-  );
   return setup.mockFetch;
 }
 
@@ -108,6 +105,7 @@ function setupServerMock(sessionAnnotations: Annotation[] = []) {
 
 beforeEach(() => {
   idCounter = 0;
+  eventSourceHarness.reset();
   vi.spyOn(console, "warn").mockImplementation(() => {});
   // jsdom does not implement elementFromPoint
   document.elementFromPoint = vi.fn().mockReturnValue(null);
@@ -647,56 +645,45 @@ describe("Scroll tracking clears isScrolling", () => {
 // =============================================================================
 
 describe("Reconnection sync", () => {
-  it("syncs local annotations when connection status goes from disconnected to connected", async () => {
-    vi.useFakeTimers();
+  it("syncs local annotations when the session stream reconnects", async () => {
+    const ann = makeAnnotation({ id: "local-1" });
+    seedAnnotations([ann]);
 
-    try {
-      const ann = makeAnnotation({ id: "local-1" });
-      seedAnnotations([ann]);
+    const setup = setupPageToolbarServerMock({
+      annotations: [],
+      eventSourceClass: eventSourceHarness.EventSourceClass,
+      sessionId: "session-r",
+    });
 
-      const setup = setupPageToolbarServerMock({
-        annotations: [],
-        sessionId: "session-r",
-        healthResponses: [false, true],
-      });
+    render(
+      <PageFeedbackToolbarCSS
+        endpoint="http://reconnect-test"
+        sessionId="session-r"
+      />,
+    );
 
-      vi.stubGlobal(
-        "EventSource",
-        class {
-          addEventListener() {}
-          removeEventListener() {}
-          close() {}
-        },
-      );
+    await waitFor(() => {
+      expect(eventSourceHarness.getLastInstance()).not.toBeNull();
+    });
 
-      render(
-        <PageFeedbackToolbarCSS
-          endpoint="http://reconnect-test"
-          sessionId="session-r"
-        />,
-      );
+    expect(setup.mockFetch).toHaveBeenCalled();
 
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
-      });
+    await act(async () => {
+      eventSourceHarness.error();
+      await Promise.resolve();
+    });
 
-      expect(setup.mockFetch).toHaveBeenCalled();
+    await act(async () => {
+      eventSourceHarness.open();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-      await act(async () => {
-        vi.advanceTimersByTime(10000);
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      const syncCall = setup.fetchCalls.find(
-        (call) => call.url.includes("/annotations") && call.method === "POST",
-      );
-      expect(syncCall).toBeTruthy();
-      expect(syncCall?.body).toMatchObject({ id: "local-1" });
-    } finally {
-      vi.useRealTimers();
-    }
+    const syncCall = setup.fetchCalls.find(
+      (call) => call.url.includes("/annotations") && call.method === "POST",
+    );
+    expect(syncCall).toBeTruthy();
+    expect(syncCall?.body).toMatchObject({ id: "local-1" });
   });
 });
