@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Annotation } from "../../../types";
 import { originalSetTimeout } from "../../../utils/freeze-animations";
 
-const ACKNOWLEDGEMENT_NOTIFICATION_DURATION_MS = 2500;
+const ACKNOWLEDGEMENT_NOTIFICATION_DURATION_MS = 5000;
 const COMMENT_PREVIEW_MAX_LENGTH = 72;
 const MISSING_STATUS = "__missing__";
 

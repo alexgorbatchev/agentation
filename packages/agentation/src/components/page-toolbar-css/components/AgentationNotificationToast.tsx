@@ -23,7 +23,7 @@ export function AgentationNotificationToast({
         data-agentation-notification-toast
         data-annotation-id={notification.annotationId}
       >
-        <span className={styles.notificationToastTitle}>Agent started work</span>
+        <span className={styles.notificationToastTitle}>agentation ack</span>
         <span className={styles.notificationToastDetail}>{notification.detail}</span>
       </div>
     </div>

@@ -659,12 +659,12 @@ export function PageFeedbackToolbarCSS({
             handleClearReviewedAnnotations={handleClearReviewedAnnotations}
           />
         </div>
-      </ToolbarShell>
 
-      <AgentationNotificationToast
-        notification={activeNotification}
-        isDarkMode={isDarkMode}
-      />
+        <AgentationNotificationToast
+          notification={activeNotification}
+          isDarkMode={isDarkMode}
+        />
+      </ToolbarShell>
 
       <MarkersLayer
         markersVisible={markersVisible}

@@ -939,11 +939,13 @@ $green: #34c759;
 // =============================================================================
 
 .notificationToastContainer {
-  position: fixed;
-  top: 1.25rem;
-  left: 50%;
-  z-index: 100003;
-  transform: translateX(-50%);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.75rem);
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
   pointer-events: none;
 }
 
@@ -990,7 +992,7 @@ $green: #34c759;
 
 @keyframes notificationToastIn {
   0% {
-    transform: translateY(-8px);
+    transform: translateY(8px);
     opacity: 0;
   }
   100% {

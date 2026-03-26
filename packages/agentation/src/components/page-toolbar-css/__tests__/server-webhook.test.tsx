@@ -528,9 +528,15 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Agent started work")).toBeTruthy();
+        expect(screen.getByText("agentation ack")).toBeTruthy();
         expect(screen.getByText("Ack me")).toBeTruthy();
       });
+
+      const notificationToast = document.querySelector(
+        "[data-agentation-notification-toast]",
+      );
+      assert(notificationToast instanceof HTMLElement);
+      expect(notificationToast.closest("[data-feedback-toolbar]")).toBeTruthy();
 
       const acknowledgedMarker = document.querySelector(
         '[data-annotation-status="acknowledged"]',
@@ -550,6 +556,73 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
         },
       ]);
     });
+
+    it(
+      "queues multiple acknowledgement notifications and shows them one at a time",
+      async () => {
+        const firstAnnotation = makeAnnotation({
+          id: "sse-ack-queue-1",
+          comment: "First ack",
+        });
+        const secondAnnotation = makeAnnotation({
+          id: "sse-ack-queue-2",
+          comment: "Second ack",
+        });
+        seedAnnotations([firstAnnotation, secondAnnotation]);
+        setupBasicServerMocks("session-sse-queue", [firstAnnotation, secondAnnotation]);
+
+        render(
+          <PageFeedbackToolbarCSS
+            endpoint="http://localhost:4747"
+            sessionId="session-sse-queue"
+          />
+        );
+        await activateToolbar();
+
+        await waitFor(() => {
+          expect(getLastEventSource()).not.toBeNull();
+          expect(eventSourceHarness.getListeners("annotation.updated").length).toBeGreaterThan(0);
+        });
+
+        act(() => {
+          eventSourceHarness.emit("annotation.updated", {
+            id: "sse-ack-queue-1",
+            status: "acknowledged",
+          });
+          eventSourceHarness.emit("annotation.updated", {
+            id: "sse-ack-queue-2",
+            status: "acknowledged",
+          });
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("agentation ack")).toBeTruthy();
+          expect(screen.getByText("First ack")).toBeTruthy();
+        });
+        expect(screen.queryByText("Second ack")).toBeNull();
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5200));
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("agentation ack")).toBeTruthy();
+          expect(screen.getByText("Second ack")).toBeTruthy();
+        });
+        expect(screen.queryByText("First ack")).toBeNull();
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5200));
+        });
+
+        await waitFor(() => {
+          expect(
+            document.querySelector("[data-agentation-notification-toast]"),
+          ).toBeNull();
+        });
+      },
+      15000,
+    );
 
     it("handles malformed SSE event data gracefully", async () => {
       setupBasicServerMocks("session-sse-malformed");
@@ -871,7 +944,7 @@ describe("PageFeedbackToolbarCSS - Server & Webhook", () => {
           await Promise.resolve();
         });
 
-        expect(screen.getByText("Agent started work")).toBeTruthy();
+        expect(screen.getByText("agentation ack")).toBeTruthy();
         expect(screen.getByText("Reconnect ack")).toBeTruthy();
 
         const storedAnnotations = JSON.parse(
